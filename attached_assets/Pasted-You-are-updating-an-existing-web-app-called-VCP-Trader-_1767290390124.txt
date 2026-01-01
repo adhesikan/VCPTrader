@@ -1,0 +1,158 @@
+You are updating an existing web app called “VCP Trader”.
+
+GOAL
+Add a complete “Legal” system with:
+- Terms of Use
+- Disclaimer
+- Privacy Policy
+…plus required user acceptance gating before accessing scanning, alerts, or charts.
+
+REQUIREMENTS
+
+1) LEGAL PAGES + ROUTES
+Create three new routes/pages:
+- /terms
+- /disclaimer
+- /privacy
+
+Add links to these pages in:
+- Global footer (all public + authenticated pages)
+- Signup / Login screens
+- Settings → Legal (inside the app)
+
+2) DISCLAIMER CONTENT (USE EXACT TEXT — DO NOT PARAPHRASE)
+Create /disclaimer with the following exact text:
+
+---
+VCP Trader is an educational market-analysis and alerting platform designed to help users identify technical patterns and market conditions.
+
+VCP Trader does not provide investment advice, personalized recommendations, or trade instructions. All information, alerts, pattern detections, rankings, and analytics are provided for educational and informational purposes only.
+
+Nothing on this platform should be interpreted as a recommendation to buy, sell, or hold any security, option, or financial instrument. You are solely responsible for your trading decisions and any resulting gains or losses.
+
+Trading stocks, options, and other financial instruments involves substantial risk and may result in partial or total loss of capital. Past performance, back-tested results, and historical patterns do not guarantee future outcomes.
+
+Market data and alerts may be delayed, incomplete, or inaccurate due to exchange, brokerage, or technology limitations. VCP Trader makes no guarantee regarding the timeliness or accuracy of any data, alerts, or analysis.
+
+By using this platform, you acknowledge and agree that VCP Trader, its operators, developers, and affiliates shall not be liable for any trading losses, missed opportunities, or decisions made based on information provided by the platform.
+---
+
+3) TERMS OF USE PAGE (/terms)
+Create a clear, plain-English Terms of Use page that includes:
+- Description of the service (software platform, scanners, alerts, charts)
+- Educational/informational-only statement (not investment advice)
+- User responsibility for all decisions
+- No warranties (availability, data accuracy, uninterrupted service)
+- Limitation of liability + indemnification
+- Acceptable use (no abuse, scraping, reverse engineering, illegal use)
+- Subscription/billing terms (if subscription exists in app)
+- Termination and suspension rights
+- Governing law placeholder (leave as: “State of Delaware, USA” unless app already uses a different state)
+Keep it concise and professional.
+
+4) PRIVACY POLICY PAGE (/privacy)
+Create a Privacy Policy page that matches a market-scanner SaaS with accounts, alerts, broker connections, and PWA push.
+
+Include these sections:
+A) Information We Collect
+- Account info (email, name if collected)
+- Usage data (pages viewed, feature usage, device/browser info)
+- Watchlists and alert configurations
+- Market data requests (symbols/timeframes)
+- Push notification subscription identifiers (endpoint + keys)
+- Broker connection data (OAuth tokens/refresh tokens if used)
+B) How We Use Information
+- Provide and improve the service
+- Authenticate users
+- Deliver alerts/notifications
+- Maintain security, prevent fraud/abuse
+- Customer support
+C) Broker Connections / OAuth
+- Clarify we do not store brokerage passwords
+- Tokens are stored securely and used only to access user-authorized data
+- Users can disconnect at any time
+D) Push Notifications
+- Explain opt-in, how to disable, and what is sent
+E) Cookies & Analytics
+- Session cookies
+- Optional analytics (if present); if not present, state “we may use privacy-friendly analytics”
+F) Data Sharing
+- Vendors/hosting (e.g., database hosting, email provider, push service)
+- Legal compliance
+- Never sell personal information
+G) Data Retention
+- Keep data as long as account active; delete upon request (reasonable time)
+H) Security
+- Encryption at rest/in transit, access controls (high level)
+I) User Rights
+- Access, deletion, correction
+- Contact email placeholder: support@vcptrader.com
+J) Changes to this Policy
+
+If the app already has a “support” email env var, use it; otherwise use support@vcptrader.com.
+
+5) REQUIRED USER ACCEPTANCE (GATING)
+Add a required acceptance flow:
+- On signup: required checkbox:
+  “I agree to the Terms of Use, Disclaimer, and Privacy Policy”
+  with links to /terms, /disclaimer, /privacy.
+- For existing users who have not accepted yet:
+  show a blocking modal on first login (or before accessing protected pages)
+  requiring acceptance.
+
+Persist acceptance to DB:
+- acceptedTerms: boolean
+- acceptedPrivacy: boolean
+- acceptedDisclaimer: boolean
+- acceptedAt: datetime
+- acceptedIP: string (best-effort)
+- acceptedUserAgent: string (best-effort)
+If the user accepts once, do not prompt again unless policies are updated (see #6).
+
+6) VERSIONING (POLICY UPDATES)
+Implement simple versioning:
+- Store a currentLegalVersion string in server config (e.g., LEGAL_VERSION="2026-01-01")
+- Save acceptedLegalVersion on the user record
+- If acceptedLegalVersion != LEGAL_VERSION, require acceptance again.
+
+Add to .env.example:
+- LEGAL_VERSION=2026-01-01
+- SUPPORT_EMAIL=support@vcptrader.com
+
+7) BLOCK ACCESS UNTIL ACCEPTED (FRONTEND + BACKEND)
+Frontend:
+- Block navigation to:
+  - Scanner pages
+  - Alerts pages
+  - Ticker/chart pages
+  unless accepted.
+
+Backend:
+- Add middleware that denies API access (401/403) for:
+  - scan endpoints
+  - alerts endpoints
+  - market data endpoints
+  when acceptedLegalVersion mismatch or acceptance missing.
+
+Return a structured error:
+{ code: "LEGAL_NOT_ACCEPTED", message: "Please accept the Terms, Disclaimer, and Privacy Policy to continue." }
+
+8) ALERT DISCLAIMER APPEND
+On any alert delivery (in-app, push, email, webhook), append:
+“This alert is informational only and not investment advice.”
+
+9) FOOTER + SETTINGS
+Footer: add “Terms”, “Disclaimer”, “Privacy”
+Settings → Legal page: show:
+- currentLegalVersion
+- date accepted
+- links to pages
+- a “Download/Print” friendly view (basic)
+
+10) QUALITY
+- Keep code consistent with existing architecture and styling
+- TypeScript strict, no any
+- Do not break existing authentication
+- Add minimal tests for middleware gating if tests exist
+
+Now implement these changes in the existing VCP Trader codebase, touching only what’s necessary, and ensure everything works end-to-end.

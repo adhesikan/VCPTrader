@@ -33,6 +33,10 @@ export const users = pgTable("users", {
   subscriptionStatus: varchar("subscription_status"),
   subscriptionPlanId: varchar("subscription_plan_id"),
   subscriptionEndDate: timestamp("subscription_end_date"),
+  acceptedLegalVersion: varchar("accepted_legal_version"),
+  acceptedAt: timestamp("accepted_at"),
+  acceptedIp: varchar("accepted_ip"),
+  acceptedUserAgent: varchar("accepted_user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
