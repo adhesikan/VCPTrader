@@ -22,12 +22,14 @@ import Alerts from "@/pages/alerts";
 import Watchlists from "@/pages/watchlists";
 import Backtest from "@/pages/backtest";
 import Settings from "@/pages/settings";
+import Signals from "@/pages/signals";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/signals" component={Signals} />
       <Route path="/scanner" component={Scanner} />
       <Route path="/charts" component={Charts} />
       <Route path="/charts/:ticker" component={Charts} />

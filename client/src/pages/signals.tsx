@@ -1,0 +1,440 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PriceChart, TechnicalAnalysisWidget, VolumeProfileWidget } from "@/components/price-chart";
+import type { Alert } from "@shared/schema";
+
+interface ChartData {
+  candles: Array<{
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
+  ema9?: number[];
+  ema21?: number[];
+  ema50?: number[];
+  resistance?: number;
+  stopLoss?: number;
+  ticker: string;
+  name?: string;
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  volume?: number;
+  avgVolume?: number;
+  atr?: number;
+  rvol?: number;
+  patternScore?: number;
+  stage?: string;
+  contractionZones?: Array<{ start: string; end: string; highLevel: number; lowLevel: number }>;
+  vcpAnnotations?: Array<{
+    time: string;
+    price: number;
+    type: "pivot_high" | "pivot_low" | "contraction_start" | "breakout";
+    label?: string;
+  }>;
+}
+
+interface SignalCardProps {
+  ticker: string;
+  type: string;
+  price: number;
+  resistance: number;
+  stopLoss: number;
+  rvol: number;
+  atr: number;
+  message?: string;
+  onClick: () => void;
+}
+
+function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, message, onClick }: SignalCardProps) {
+  const upside = ((resistance - price) / price * 100).toFixed(1);
+  const risk = ((price - stopLoss) / price * 100).toFixed(1);
+
+  return (
+    <Card 
+      className="hover-elevate active-elevate-2 cursor-pointer transition-all"
+      onClick={onClick}
+      data-testid={`signal-card-${ticker}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold font-mono">{ticker}</span>
+            <Badge 
+              variant={type === "BREAKOUT" ? "default" : type === "APPROACHING" ? "secondary" : "outline"}
+              className="text-xs"
+            >
+              {type}
+            </Badge>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+              <Target className="h-3 w-3 text-chart-2" />
+              Resistance
+            </p>
+            <p className="font-mono font-medium text-chart-2">${resistance.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">{upside}% upside</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3 text-destructive" />
+              Stop Loss
+            </p>
+            <p className="font-mono font-medium text-destructive">${stopLoss.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">{risk}% risk</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">RVOL</p>
+            <p className={`font-mono font-medium ${rvol >= 1.5 ? "text-chart-2" : ""}`}>{rvol.toFixed(2)}x</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">ATR (14)</p>
+            <p className="font-mono font-medium">${atr.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {message && (
+          <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">{message}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface SignalDetailDialogProps {
+  open: boolean;
+  onClose: () => void;
+  ticker: string;
+}
+
+function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) {
+  const [showEMA9, setShowEMA9] = useState(true);
+  const [showEMA21, setShowEMA21] = useState(true);
+  const [showEMA50, setShowEMA50] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
+  const [showLevels, setShowLevels] = useState(true);
+  const [showVCPOverlay, setShowVCPOverlay] = useState(true);
+
+  const { data: chartData, isLoading } = useQuery<ChartData>({
+    queryKey: ["/api/charts", ticker, "3M"],
+    enabled: open && !!ticker,
+  });
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <DialogTitle className="flex items-center gap-2">
+                <span className="text-xl font-bold font-mono">{ticker}</span>
+                {chartData?.name && <span className="text-muted-foreground font-normal">{chartData.name}</span>}
+              </DialogTitle>
+              {chartData?.price && (
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-mono font-semibold">${chartData.price.toFixed(2)}</span>
+                  {chartData.changePercent !== undefined && (
+                    <Badge
+                      variant={chartData.changePercent >= 0 ? "default" : "destructive"}
+                      className="font-mono text-xs"
+                    >
+                      {chartData.changePercent >= 0 ? "+" : ""}{chartData.changePercent.toFixed(2)}%
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {chartData?.stage && (
+                <Badge variant={chartData.stage === "BREAKOUT" ? "default" : chartData.stage === "READY" ? "secondary" : "outline"}>
+                  {chartData.stage}
+                </Badge>
+              )}
+              {chartData?.patternScore && (
+                <Badge variant="outline" className="font-mono">Score: {chartData.patternScore}</Badge>
+              )}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="p-4">
+          {isLoading ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Loading chart...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+              <div className="space-y-4">
+                <Card>
+                  <CardContent className="p-0">
+                    {chartData?.candles && chartData.candles.length > 0 ? (
+                      <PriceChart
+                        data={chartData.candles}
+                        ema9={showEMA9 ? chartData.ema9 : undefined}
+                        ema21={showEMA21 ? chartData.ema21 : undefined}
+                        ema50={showEMA50 ? chartData.ema50 : undefined}
+                        resistanceLevel={showLevels ? chartData.resistance : undefined}
+                        stopLevel={showLevels ? chartData.stopLoss : undefined}
+                        ticker={ticker}
+                        showVCPOverlay={showVCPOverlay}
+                        vcpAnnotations={chartData.vcpAnnotations}
+                        contractionZones={chartData.contractionZones}
+                        atr={chartData.atr}
+                        className="h-[380px]"
+                      />
+                    ) : (
+                      <div className="h-[380px] flex items-center justify-center text-muted-foreground">
+                        No chart data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-1 pt-3 px-3">
+                      <CardTitle className="text-xs font-medium text-muted-foreground">Resistance</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3">
+                      <span className="text-base font-mono font-semibold text-chart-2">
+                        ${chartData?.resistance?.toFixed(2) || "-"}
+                      </span>
+                      {chartData?.resistance && chartData?.price && (
+                        <p className="text-xs text-muted-foreground">
+                          {((chartData.resistance - chartData.price) / chartData.price * 100).toFixed(1)}% upside
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-1 pt-3 px-3">
+                      <CardTitle className="text-xs font-medium text-muted-foreground">Stop Loss</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3">
+                      <span className="text-base font-mono font-semibold text-destructive">
+                        ${chartData?.stopLoss?.toFixed(2) || "-"}
+                      </span>
+                      {chartData?.stopLoss && chartData?.price && (
+                        <p className="text-xs text-muted-foreground">
+                          {((chartData.price - chartData.stopLoss) / chartData.price * 100).toFixed(1)}% risk
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-1 pt-3 px-3">
+                      <CardTitle className="text-xs font-medium text-muted-foreground">RVOL</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3">
+                      <span className={`text-base font-mono font-semibold ${(chartData?.rvol || 0) >= 1.5 ? "text-chart-2" : ""}`}>
+                        {chartData?.rvol?.toFixed(2) || "-"}x
+                      </span>
+                      <p className="text-xs text-muted-foreground">vs 20-day avg</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-1 pt-3 px-3">
+                      <CardTitle className="text-xs font-medium text-muted-foreground">ATR (14)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3">
+                      <span className="text-base font-mono font-semibold">
+                        ${chartData?.atr?.toFixed(2) || "-"}
+                      </span>
+                      {chartData?.atr && chartData?.price && (
+                        <p className="text-xs text-muted-foreground">
+                          {((chartData.atr / chartData.price) * 100).toFixed(1)}% of price
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Chart Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ema9-d" className="text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-0.5 rounded-full bg-amber-500" />
+                        EMA 9
+                      </Label>
+                      <Switch id="ema9-d" checked={showEMA9} onCheckedChange={setShowEMA9} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ema21-d" className="text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-0.5 rounded-full bg-blue-500" />
+                        EMA 21
+                      </Label>
+                      <Switch id="ema21-d" checked={showEMA21} onCheckedChange={setShowEMA21} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ema50-d" className="text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-0.5 rounded-full bg-violet-500" />
+                        EMA 50
+                      </Label>
+                      <Switch id="ema50-d" checked={showEMA50} onCheckedChange={setShowEMA50} />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="volume-d" className="text-sm">Volume Bars</Label>
+                      <Switch id="volume-d" checked={showVolume} onCheckedChange={setShowVolume} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="levels-d" className="text-sm">Support/Resistance</Label>
+                      <Switch id="levels-d" checked={showLevels} onCheckedChange={setShowLevels} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="vcp-d" className="text-sm">VCP Overlays</Label>
+                      <Switch id="vcp-d" checked={showVCPOverlay} onCheckedChange={setShowVCPOverlay} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {chartData && chartData.price && (
+                  <TechnicalAnalysisWidget
+                    ticker={ticker}
+                    price={chartData.price}
+                    change={chartData.change || 0}
+                    changePercent={chartData.changePercent || 0}
+                    ema9={chartData.ema9?.[chartData.ema9.length - 1]}
+                    ema21={chartData.ema21?.[chartData.ema21.length - 1]}
+                    ema50={chartData.ema50?.[chartData.ema50?.length - 1]}
+                    resistance={chartData.resistance}
+                    stopLoss={chartData.stopLoss}
+                    atr={chartData.atr}
+                    rvol={chartData.rvol}
+                    patternScore={chartData.patternScore}
+                    stage={chartData.stage}
+                    volume={chartData.volume}
+                    avgVolume={chartData.avgVolume}
+                  />
+                )}
+
+                {chartData?.candles && chartData.candles.length > 0 && (
+                  <VolumeProfileWidget data={chartData.candles} levels={10} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function Signals() {
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+
+  const { data: alerts, isLoading } = useQuery<Alert[]>({
+    queryKey: ["/api/alerts"],
+  });
+
+  const { data: scanResults } = useQuery<any[]>({
+    queryKey: ["/api/scan/results"],
+  });
+
+  const signalData = alerts?.map(alert => {
+    const scanResult = scanResults?.find(s => s.ticker === alert.ticker);
+    return {
+      ...alert,
+      resistance: alert.targetPrice || scanResult?.resistance || alert.price * 1.1,
+      stopLoss: alert.stopPrice || scanResult?.stopLoss || alert.price * 0.93,
+      rvol: scanResult?.rvol || 1.5,
+      atr: scanResult?.atr || alert.price * 0.02,
+    };
+  }) || [];
+
+  return (
+    <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
+      <div>
+        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Trade Signals</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Educational VCP pattern alerts - click for detailed analysis
+        </p>
+      </div>
+
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
+          Always do your own research and consult with a qualified financial advisor before making any trading decisions.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-6 w-24" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-12" />
+                  <Skeleton className="h-12" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : signalData.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <p className="text-muted-foreground">No active signals at this time</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Check back later for new trade opportunities</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {signalData.map((signal) => (
+            <SignalCard
+              key={signal.id}
+              ticker={signal.ticker}
+              type={signal.type}
+              price={signal.price}
+              resistance={signal.resistance}
+              stopLoss={signal.stopLoss}
+              rvol={signal.rvol}
+              atr={signal.atr}
+              message={signal.message}
+              onClick={() => setSelectedTicker(signal.ticker)}
+            />
+          ))}
+        </div>
+      )}
+
+      <SignalDetailDialog
+        open={!!selectedTicker}
+        onClose={() => setSelectedTicker(null)}
+        ticker={selectedTicker || ""}
+      />
+    </div>
+  );
+}
