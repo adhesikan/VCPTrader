@@ -58,17 +58,28 @@ Preferred communication style: Simple, everyday language.
 
 ## Authentication & Authorization
 
-### Replit Auth Integration
-- **Authentication**: Replit OpenID Connect (OIDC) for user login
+### Email/Password Authentication (Portable)
+- **Authentication**: Email/password with bcrypt hashing (works on any platform)
 - **Session Storage**: PostgreSQL-backed sessions via `connect-pg-simple`
 - **User Roles**: `user` (default) and `admin` roles
 - **Auth Files Location**: `server/replit_integrations/auth/`
 - **Client Hook**: `client/src/hooks/use-auth.ts` for React components
+- **Auth Pages**: `client/src/pages/auth.tsx` - login/register forms
+
+### Auth API Endpoints
+- `POST /api/auth/register` - Create new user account
+- `POST /api/auth/login` - Authenticate and create session
+- `POST /api/auth/logout` - Destroy session
+- `GET /api/auth/user` - Get current authenticated user
 
 ### Role-Based Access Control
 - **Public Routes**: Market stats, scan results (read), chart data, alerts (read)
-- **Authenticated Routes**: Push subscription
+- **Authenticated Routes**: Push subscription, user profile
 - **Admin-Only Routes**: Scan run, alerts CRUD, watchlists CRUD, broker connections, backtest
+
+### Deployment Requirements
+- `SESSION_SECRET` environment variable required
+- `DATABASE_URL` environment variable for PostgreSQL connection
 
 ## External Dependencies
 

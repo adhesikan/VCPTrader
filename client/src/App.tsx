@@ -14,6 +14,17 @@ import {
 } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import type { MarketStats } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, User, Loader2 } from "lucide-react";
 
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -23,6 +34,7 @@ import Watchlists from "@/pages/watchlists";
 import Backtest from "@/pages/backtest";
 import Settings from "@/pages/settings";
 import Signals from "@/pages/signals";
+import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -42,6 +54,57 @@ function Router() {
   );
 }
 
+function UserMenu() {
+  const { user, logout, isLoggingOut } = useAuth();
+  
+  if (!user) return null;
+  
+  const initials = [user.firstName?.[0], user.lastName?.[0]]
+    .filter(Boolean)
+    .join("")
+    .toUpperCase() || user.email?.[0]?.toUpperCase() || "U";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <div className="px-2 py-1.5">
+          <p className="text-sm font-medium" data-testid="text-user-email">{user.email}</p>
+          <p className="text-xs text-muted-foreground">
+            {user.role === "admin" ? "Administrator" : "Member"}
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <a href="/settings" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Settings
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          onClick={() => logout()} 
+          disabled={isLoggingOut}
+          data-testid="button-logout"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="mr-2 h-4 w-4" />
+          )}
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function AppHeader() {
   const { data: marketStats, isLoading } = useQuery<MarketStats>({
     queryKey: ["/api/market/stats"],
@@ -55,6 +118,7 @@ function AppHeader() {
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
   );
@@ -81,12 +145,30 @@ function AppLayout() {
   );
 }
 
+function AuthenticatedApp() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  return <AppLayout />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <AppLayout />
+          <AuthenticatedApp />
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>

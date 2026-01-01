@@ -6,12 +6,11 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-  if (!user?.claims?.sub) {
+  if (!req.session.userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  const dbUser = await authStorage.getUser(user.claims.sub);
-  if (!dbUser || dbUser.role !== UserRole.ADMIN) {
+  const user = await authStorage.getUser(req.session.userId);
+  if (!user || user.role !== UserRole.ADMIN) {
     return res.status(403).json({ message: "Forbidden: Admin access required" });
   }
   next();
