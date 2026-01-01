@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Loader2 } from "lucide-react";
@@ -14,6 +15,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [acceptLegal, setAcceptLegal] = useState(false);
   const { login, register, isLoggingIn, isRegistering } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -21,17 +23,22 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!isLogin && !acceptLegal) {
+      toast({ title: "Required", description: "Please accept the legal agreements to continue.", variant: "destructive" });
+      return;
+    }
+    
     try {
       if (isLogin) {
         await login({ email, password });
         toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       } else {
-        await register({ email, password, firstName, lastName });
+        await register({ email, password, firstName, lastName, acceptLegal: true });
         toast({ title: "Account created!", description: "Your account has been created successfully." });
       }
       setLocation("/");
-    } catch (error: any) {
-      const message = error?.message || (isLogin ? "Failed to login" : "Failed to register");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : (isLogin ? "Failed to login" : "Failed to register");
       toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
@@ -104,6 +111,30 @@ export default function AuthPage() {
                 minLength={6}
               />
             </div>
+            {!isLogin && (
+              <div className="flex items-start gap-3 pt-2">
+                <Checkbox
+                  id="acceptLegal"
+                  checked={acceptLegal}
+                  onCheckedChange={(checked) => setAcceptLegal(checked === true)}
+                  data-testid="checkbox-accept-legal"
+                />
+                <Label htmlFor="acceptLegal" className="text-sm leading-relaxed cursor-pointer">
+                  I agree to the{" "}
+                  <Link href="/terms">
+                    <a className="text-primary underline" target="_blank" data-testid="link-signup-terms">Terms of Use</a>
+                  </Link>
+                  ,{" "}
+                  <Link href="/disclaimer">
+                    <a className="text-primary underline" target="_blank" data-testid="link-signup-disclaimer">Disclaimer</a>
+                  </Link>
+                  , and{" "}
+                  <Link href="/privacy">
+                    <a className="text-primary underline" target="_blank" data-testid="link-signup-privacy">Privacy Policy</a>
+                  </Link>
+                </Label>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button 
@@ -119,11 +150,25 @@ export default function AuthPage() {
               type="button"
               variant="ghost"
               className="w-full"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setAcceptLegal(false);
+              }}
               data-testid="button-toggle-auth-mode"
             >
               {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </Button>
+            <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+              <Link href="/terms">
+                <a className="hover:text-foreground" data-testid="link-auth-terms">Terms</a>
+              </Link>
+              <Link href="/disclaimer">
+                <a className="hover:text-foreground" data-testid="link-auth-disclaimer">Disclaimer</a>
+              </Link>
+              <Link href="/privacy">
+                <a className="hover:text-foreground" data-testid="link-auth-privacy">Privacy</a>
+              </Link>
+            </div>
           </CardFooter>
         </form>
       </Card>

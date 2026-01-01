@@ -4,7 +4,19 @@ import { isAuthenticated } from "./sessionAuth";
 import { loginSchema, registerSchema } from "@shared/models/auth";
 import { z } from "zod";
 
+const LEGAL_VERSION = process.env.LEGAL_VERSION || "2026-01-01";
+
+const acceptLegalSchema = z.object({
+  acceptTerms: z.boolean().refine(v => v === true, "You must accept the terms"),
+  acceptPrivacy: z.boolean().refine(v => v === true, "You must accept the privacy policy"),
+  acceptDisclaimer: z.boolean().refine(v => v === true, "You must accept the disclaimer"),
+});
+
 export function registerAuthRoutes(app: Express): void {
+  app.get("/api/legal/version", (req, res) => {
+    res.json({ version: LEGAL_VERSION });
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = registerSchema.parse(req.body);
@@ -21,9 +33,19 @@ export function registerAuthRoutes(app: Express): void {
         data.lastName
       );
 
+      if (req.body.acceptLegal) {
+        await authStorage.updateUser(user.id, {
+          acceptedLegalVersion: LEGAL_VERSION,
+          acceptedAt: new Date(),
+          acceptedIp: req.ip || req.headers["x-forwarded-for"]?.toString() || "unknown",
+          acceptedUserAgent: req.headers["user-agent"] || "unknown",
+        });
+      }
+
       req.session.userId = user.id;
       
-      const { password: _, ...safeUser } = user;
+      const updatedUser = await authStorage.getUser(user.id);
+      const { password: _, ...safeUser } = updatedUser!;
       res.status(201).json(safeUser);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -83,6 +105,52 @@ export function registerAuthRoutes(app: Express): void {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/auth/accept-legal", isAuthenticated, async (req, res) => {
+    try {
+      acceptLegalSchema.parse(req.body);
+      
+      const user = await authStorage.updateUser(req.session.userId!, {
+        acceptedLegalVersion: LEGAL_VERSION,
+        acceptedAt: new Date(),
+        acceptedIp: req.ip || req.headers["x-forwarded-for"]?.toString() || "unknown",
+        acceptedUserAgent: req.headers["user-agent"] || "unknown",
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Accept legal error:", error);
+      res.status(500).json({ message: "Failed to accept legal terms" });
+    }
+  });
+
+  app.get("/api/auth/legal-status", isAuthenticated, async (req, res) => {
+    try {
+      const user = await authStorage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isAccepted = user.acceptedLegalVersion === LEGAL_VERSION;
+      res.json({
+        accepted: isAccepted,
+        currentVersion: LEGAL_VERSION,
+        acceptedVersion: user.acceptedLegalVersion,
+        acceptedAt: user.acceptedAt,
+      });
+    } catch (error) {
+      console.error("Legal status error:", error);
+      res.status(500).json({ message: "Failed to get legal status" });
     }
   });
 }

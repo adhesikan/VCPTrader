@@ -18,6 +18,8 @@ import type {
   PatternStageType,
 } from "@shared/schema";
 
+const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -440,7 +442,15 @@ export class MemStorage implements IStorage {
 
   async createAlert(alert: InsertAlert): Promise<Alert> {
     const id = randomUUID();
-    const newAlert: Alert = { ...alert, id, triggeredAt: new Date() };
+    const messageWithDisclaimer = alert.message 
+      ? `${alert.message} ${ALERT_DISCLAIMER}`
+      : ALERT_DISCLAIMER;
+    const newAlert: Alert = { 
+      ...alert, 
+      id, 
+      message: messageWithDisclaimer,
+      triggeredAt: new Date() 
+    };
     this.alerts.set(id, newAlert);
     return newAlert;
   }

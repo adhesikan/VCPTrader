@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import {
   Select,
   SelectContent,
@@ -124,6 +125,10 @@ export default function Settings() {
           <TabsTrigger value="scanner" className="gap-2" data-testid="tab-scanner">
             <Database className="h-4 w-4" />
             Scanner
+          </TabsTrigger>
+          <TabsTrigger value="legal" className="gap-2" data-testid="tab-legal">
+            <FileText className="h-4 w-4" />
+            Legal
           </TabsTrigger>
         </TabsList>
 
@@ -324,7 +329,161 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="legal">
+          <LegalSettings />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+interface LegalStatus {
+  accepted: boolean;
+  currentVersion: string;
+  acceptedVersion: string | null;
+  acceptedAt: string | null;
+}
+
+function LegalSettings() {
+  const { data: legalStatus, isLoading } = useQuery<LegalStatus>({
+    queryKey: ["/api/auth/legal-status"],
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-muted-foreground">Loading legal information...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Legal Acceptance Status</CardTitle>
+          <CardDescription>
+            Your acceptance of our legal agreements
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Current Policy Version</p>
+              <p className="font-mono font-medium" data-testid="text-legal-version">
+                {legalStatus?.currentVersion || "Unknown"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Your Accepted Version</p>
+              <p className="font-mono font-medium" data-testid="text-accepted-version">
+                {legalStatus?.acceptedVersion || "Not accepted"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Status</p>
+              <Badge 
+                variant={legalStatus?.accepted ? "default" : "destructive"}
+                data-testid="badge-legal-status"
+              >
+                {legalStatus?.accepted ? "Up to date" : "Acceptance required"}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Accepted On</p>
+              <p className="font-medium" data-testid="text-accepted-date">
+                {legalStatus?.acceptedAt 
+                  ? new Date(legalStatus.acceptedAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Not available"
+                }
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Legal Documents</CardTitle>
+          <CardDescription>
+            Review our terms, disclaimer, and privacy policy
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Link href="/terms">
+              <a className="block" data-testid="link-settings-terms">
+                <Card className="hover-elevate cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Terms of Use</p>
+                        <p className="text-xs text-muted-foreground">Service agreement</p>
+                      </div>
+                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </a>
+            </Link>
+
+            <Link href="/disclaimer">
+              <a className="block" data-testid="link-settings-disclaimer">
+                <Card className="hover-elevate cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Disclaimer</p>
+                        <p className="text-xs text-muted-foreground">Educational only</p>
+                      </div>
+                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </a>
+            </Link>
+
+            <Link href="/privacy">
+              <a className="block" data-testid="link-settings-privacy">
+                <Card className="hover-elevate cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Privacy Policy</p>
+                        <p className="text-xs text-muted-foreground">Data handling</p>
+                      </div>
+                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </a>
+            </Link>
+          </div>
+
+          <div className="pt-4 border-t">
+            <Button variant="outline" onClick={handlePrint} data-testid="button-print-legal">
+              <Printer className="mr-2 h-4 w-4" />
+              Print All Documents
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
