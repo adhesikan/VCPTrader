@@ -13,7 +13,6 @@ import {
 import {
   Search,
   Bell,
-  TrendingUp,
   BarChart3,
   Smartphone,
   Link2,
@@ -25,6 +24,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import logoUrl from "@assets/ChatGPT_Image_Jan_1,_2026,_01_38_07_PM_1767292703801.png";
 import { useState } from "react";
 
 function NavBar() {
@@ -45,8 +45,7 @@ function NavBar() {
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-primary" />
-              <span className="text-xl font-semibold" data-testid="text-logo">VCP Trader</span>
+              <img src={logoUrl} alt="VCP Trader" className="h-8 w-auto" data-testid="img-logo" />
             </Link>
             <div className="hidden md:flex items-center gap-6">
               {navLinks.map((link) => (
@@ -488,8 +487,7 @@ function LandingFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            <span className="font-semibold">VCP Trader</span>
+            <img src={logoUrl} alt="VCP Trader" className="h-6 w-auto" />
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm">
             <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-terms">
