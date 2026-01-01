@@ -85,9 +85,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Railway Deployment
 - **Configuration File**: `railway.json` contains build and deploy settings
-- **Build Command**: `npm run build && npm run db:push` (runs migrations automatically)
-- **Start Command**: `npm run start`
-- **Database**: Automatically pushes schema changes to PostgreSQL on each deploy
+- **Build Command**: `npm run build`
+- **Start Command**: `npm run db:push && npm run start` (runs migrations at startup)
+- **Database**: Automatically pushes schema changes to PostgreSQL when the app starts
 - **Environment Variables Required on Railway**:
   - `DATABASE_URL` - PostgreSQL connection string
   - `SESSION_SECRET` - Random secret for session encryption
