@@ -1,0 +1,22 @@
+{
+  "name": "VCP Day Trader",
+  "short_name": "VCP Trader",
+  "description": "Scan, Alert, and Trade Volatility Contraction Breakouts",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
