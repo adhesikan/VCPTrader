@@ -121,17 +121,11 @@ export default function AuthPage() {
                 />
                 <Label htmlFor="acceptLegal" className="text-sm leading-relaxed cursor-pointer">
                   I agree to the{" "}
-                  <Link href="/terms">
-                    <a className="text-primary underline" target="_blank" data-testid="link-signup-terms">Terms of Use</a>
-                  </Link>
+                  <Link href="/terms" className="text-primary underline" data-testid="link-signup-terms">Terms of Use</Link>
                   ,{" "}
-                  <Link href="/disclaimer">
-                    <a className="text-primary underline" target="_blank" data-testid="link-signup-disclaimer">Disclaimer</a>
-                  </Link>
+                  <Link href="/disclaimer" className="text-primary underline" data-testid="link-signup-disclaimer">Disclaimer</Link>
                   , and{" "}
-                  <Link href="/privacy">
-                    <a className="text-primary underline" target="_blank" data-testid="link-signup-privacy">Privacy Policy</a>
-                  </Link>
+                  <Link href="/privacy" className="text-primary underline" data-testid="link-signup-privacy">Privacy Policy</Link>
                 </Label>
               </div>
             )}
@@ -159,15 +153,9 @@ export default function AuthPage() {
               {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </Button>
             <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-              <Link href="/terms">
-                <a className="hover:text-foreground" data-testid="link-auth-terms">Terms</a>
-              </Link>
-              <Link href="/disclaimer">
-                <a className="hover:text-foreground" data-testid="link-auth-disclaimer">Disclaimer</a>
-              </Link>
-              <Link href="/privacy">
-                <a className="hover:text-foreground" data-testid="link-auth-privacy">Privacy</a>
-              </Link>
+              <Link href="/terms" className="hover:text-foreground" data-testid="link-auth-terms">Terms</Link>
+              <Link href="/disclaimer" className="hover:text-foreground" data-testid="link-auth-disclaimer">Disclaimer</Link>
+              <Link href="/privacy" className="hover:text-foreground" data-testid="link-auth-privacy">Privacy</Link>
             </div>
           </CardFooter>
         </form>

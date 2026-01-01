@@ -424,55 +424,49 @@ function LegalSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Link href="/terms">
-              <a className="block" data-testid="link-settings-terms">
-                <Card className="hover-elevate cursor-pointer h-full">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Terms of Use</p>
-                        <p className="text-xs text-muted-foreground">Service agreement</p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+            <Link href="/terms" className="block" data-testid="link-settings-terms">
+              <Card className="hover-elevate cursor-pointer h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Terms of Use</p>
+                      <p className="text-xs text-muted-foreground">Service agreement</p>
                     </div>
-                  </CardContent>
-                </Card>
-              </a>
+                    <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
             </Link>
 
-            <Link href="/disclaimer">
-              <a className="block" data-testid="link-settings-disclaimer">
-                <Card className="hover-elevate cursor-pointer h-full">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Disclaimer</p>
-                        <p className="text-xs text-muted-foreground">Educational only</p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+            <Link href="/disclaimer" className="block" data-testid="link-settings-disclaimer">
+              <Card className="hover-elevate cursor-pointer h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Disclaimer</p>
+                      <p className="text-xs text-muted-foreground">Educational only</p>
                     </div>
-                  </CardContent>
-                </Card>
-              </a>
+                    <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
             </Link>
 
-            <Link href="/privacy">
-              <a className="block" data-testid="link-settings-privacy">
-                <Card className="hover-elevate cursor-pointer h-full">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Privacy Policy</p>
-                        <p className="text-xs text-muted-foreground">Data handling</p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+            <Link href="/privacy" className="block" data-testid="link-settings-privacy">
+              <Card className="hover-elevate cursor-pointer h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Privacy Policy</p>
+                      <p className="text-xs text-muted-foreground">Data handling</p>
                     </div>
-                  </CardContent>
-                </Card>
-              </a>
+                    <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
             </Link>
           </div>
 
