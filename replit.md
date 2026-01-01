@@ -56,10 +56,29 @@ Preferred communication style: Simple, everyday language.
 - **Type Sharing**: Schema types are shared between frontend and backend via `@shared/schema`
 - **API Communication**: Client uses fetch wrapper with React Query for all API calls
 
+## Authentication & Authorization
+
+### Replit Auth Integration
+- **Authentication**: Replit OpenID Connect (OIDC) for user login
+- **Session Storage**: PostgreSQL-backed sessions via `connect-pg-simple`
+- **User Roles**: `user` (default) and `admin` roles
+- **Auth Files Location**: `server/replit_integrations/auth/`
+- **Client Hook**: `client/src/hooks/use-auth.ts` for React components
+
+### Role-Based Access Control
+- **Public Routes**: Market stats, scan results (read), chart data, alerts (read)
+- **Authenticated Routes**: Push subscription
+- **Admin-Only Routes**: Scan run, alerts CRUD, watchlists CRUD, broker connections, backtest
+
 ## External Dependencies
 
 ### Database
 - **PostgreSQL**: Primary data store, connection via `DATABASE_URL` environment variable
+
+### Stripe Integration (TODO)
+- **Status**: Pending - user will provide API keys later
+- **Purpose**: Subscription-based access to trade signals
+- **Required Keys**: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`
 
 ### Brokerage Integrations (Planned)
 The app is designed to connect to multiple brokerage providers for market data:
