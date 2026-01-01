@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -423,7 +423,7 @@ function LegalSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Link href="/terms" className="block" data-testid="link-settings-terms">
               <Card className="hover-elevate cursor-pointer h-full">
                 <CardContent className="p-4">
@@ -462,6 +462,21 @@ function LegalSettings() {
                     <div>
                       <p className="font-medium">Privacy Policy</p>
                       <p className="text-xs text-muted-foreground">Data handling</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/open-source" className="block" data-testid="link-settings-open-source">
+              <Card className="hover-elevate cursor-pointer h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Code className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Open Source Notices</p>
+                      <p className="text-xs text-muted-foreground">Licenses & attributions</p>
                     </div>
                     <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
                   </div>

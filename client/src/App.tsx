@@ -42,6 +42,7 @@ import HomePage from "@/pages/home";
 import TermsPage from "@/pages/terms";
 import DisclaimerPage from "@/pages/disclaimer";
 import PrivacyPage from "@/pages/privacy";
+import OpenSourcePage from "@/pages/open-source";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -196,6 +197,7 @@ function PublicRoutes() {
   if (location === "/terms") return <TermsPage />;
   if (location === "/disclaimer") return <DisclaimerPage />;
   if (location === "/privacy") return <PrivacyPage />;
+  if (location === "/open-source") return <OpenSourcePage />;
   if (location === "/auth") return <AuthPage />;
   
   return null;
@@ -205,7 +207,7 @@ function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
-  const publicRoutes = ["/", "/terms", "/disclaimer", "/privacy", "/auth"];
+  const publicRoutes = ["/", "/terms", "/disclaimer", "/privacy", "/open-source", "/auth"];
   const isPublicRoute = publicRoutes.includes(location);
   
   if (isLoading) {

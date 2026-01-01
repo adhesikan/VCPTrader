@@ -499,6 +499,9 @@ function LandingFooter() {
             <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-privacy">
               Privacy
             </Link>
+            <Link href="/open-source" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-open-source">
+              Open Source
+            </Link>
             <a href="mailto:support@vcptrader.com" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-contact">
               Contact
             </a>

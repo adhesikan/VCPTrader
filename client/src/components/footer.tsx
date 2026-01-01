@@ -9,21 +9,18 @@ export function Footer() {
         <p data-testid="text-copyright">
           {currentYear} VCP Trader. All rights reserved.
         </p>
-        <nav className="flex items-center gap-4">
-          <Link href="/terms">
-            <a className="hover:text-foreground transition-colors" data-testid="link-footer-terms">
-              Terms of Use
-            </a>
+        <nav className="flex flex-wrap items-center gap-4">
+          <Link href="/terms" className="hover:text-foreground transition-colors" data-testid="link-footer-terms">
+            Terms
           </Link>
-          <Link href="/disclaimer">
-            <a className="hover:text-foreground transition-colors" data-testid="link-footer-disclaimer">
-              Disclaimer
-            </a>
+          <Link href="/disclaimer" className="hover:text-foreground transition-colors" data-testid="link-footer-disclaimer">
+            Disclaimer
           </Link>
-          <Link href="/privacy">
-            <a className="hover:text-foreground transition-colors" data-testid="link-footer-privacy">
-              Privacy Policy
-            </a>
+          <Link href="/privacy" className="hover:text-foreground transition-colors" data-testid="link-footer-privacy">
+            Privacy
+          </Link>
+          <Link href="/open-source" className="hover:text-foreground transition-colors" data-testid="link-footer-open-source">
+            Open Source
           </Link>
         </nav>
       </div>

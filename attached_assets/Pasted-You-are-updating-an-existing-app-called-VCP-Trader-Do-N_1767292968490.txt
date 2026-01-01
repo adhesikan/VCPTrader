@@ -1,0 +1,79 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Add proper open-source licensing display and TradingView attribution for the **TradingView Lightweight Charts** library (Apache 2.0) so it is visible inside the app.
+
+REQUIREMENTS
+
+1) ADD A NEW PAGE: “Open Source Notices”
+Create a new route/page:
+- /open-source
+
+Title: “Open Source Notices”
+This page must be public (no login required) and must be linked from the footer and Settings → Legal.
+
+2) ADD TRADINGVIEW LIGHTWEIGHT CHARTS ATTRIBUTION (REQUIRED TEXT)
+On /open-source, add a section:
+
+Heading: “TradingView Lightweight Charts”
+Body (include exactly; do not paraphrase):
+---
+This product includes the TradingView Lightweight Charts library, which is licensed under the Apache License, Version 2.0.
+Copyright © TradingView, Inc.
+
+Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an “AS IS” BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.
+---
+
+3) INCLUDE THE FULL APACHE 2.0 LICENSE TEXT
+On the same /open-source page, add a collapsible/accordion section labeled:
+- “Apache License 2.0 (Full Text)”
+Include the full license text in the app bundle.
+Implementation details:
+- Add a file in the repo: /legal/apache-2.0.txt (or similar)
+- Load and render it on the page (client-side fetch or import as raw text)
+- Ensure formatting is preserved (monospace block, pre-wrap)
+
+4) FOOTER LINKS (GLOBAL)
+Update the global footer to include:
+- Terms
+- Disclaimer
+- Privacy
+- Open Source
+Where “Open Source” links to /open-source
+
+5) SETTINGS → LEGAL (AUTHENTICATED)
+If the app has a Settings page, add a “Legal” section with links:
+- Terms of Use
+- Disclaimer
+- Privacy Policy
+- Open Source Notices
+
+6) OPTIONAL: “ABOUT” MODAL (IF IT EXISTS)
+If the app has an “About” modal/page, add:
+- “Open Source Notices” link
+and a one-liner:
+“Charts rendered using TradingView Lightweight Charts (Apache 2.0).”
+
+7) DO NOT MISUSE TRADEMARKS
+Ensure no marketing copy in the UI says:
+- “Powered by TradingView”
+- “TradingView Charts”
+Instead only use:
+- “Lightweight Charts library by TradingView (Apache 2.0)”
+in the legal notices area.
+
+8) QUALITY + TEST
+- Keep styling consistent with existing UI (Tailwind)
+- Add a small unit/integration test (if tests exist) that /open-source route renders and contains “TradingView Lightweight Charts” text.
+- Ensure this works in production build.
+
+DELIVERABLE
+Implement /open-source page, add the attribution + license display, update footer and Settings → Legal links, and verify it’s visible in the running app.
+
+Now implement these changes in the existing VCP Trader codebase.
