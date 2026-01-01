@@ -1,0 +1,110 @@
+Starting Container
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+Thu, 01 Jan 2026 17:47:51 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+file:///app/node_modules/openid-client/build/index.js:89
+    const err = new TypeError(message, { cause });
+                ^
+TypeError: "clientId" must be a non-empty string
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
+    at new Configuration (file:///app/node_modules/openid-client/build/index.js:463:19)
+    at Object.discovery (file:///app/node_modules/openid-client/build/index.js:244:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async N8.maxAge (/app/dist/index.cjs:76:104739)
+    at async mm (/app/dist/index.cjs:76:105542)
+    at async j8 (/app/dist/index.cjs:76:107331)
+    at async /app/dist/index.cjs:76:113140 {
+  code: 'ERR_INVALID_ARG_TYPE',
+  [cause]: undefined
+}
+Node.js v22.21.1
+}
+Node.js v22.21.1
+npm warn config production Use `--omit=dev` instead.
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
+> rest-express@1.0.0 start
+    at new Configuration (file:///app/node_modules/openid-client/build/index.js:463:19)
+> NODE_ENV=production node dist/index.cjs
+    at Object.discovery (file:///app/node_modules/openid-client/build/index.js:244:22)
+Thu, 01 Jan 2026 17:47:53 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+file:///app/node_modules/openid-client/build/index.js:89
+    at async N8.maxAge (/app/dist/index.cjs:76:104739)
+    const err = new TypeError(message, { cause });
+                ^
+    at async mm (/app/dist/index.cjs:76:105542)
+    at async j8 (/app/dist/index.cjs:76:107331)
+TypeError: "clientId" must be a non-empty string
+    at async /app/dist/index.cjs:76:113140 {
+  code: 'ERR_INVALID_ARG_TYPE',
+  [cause]: undefined
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+    const err = new TypeError(message, { cause });
+                ^
+TypeError: "clientId" must be a non-empty string
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
+    at async mm (/app/dist/index.cjs:76:105542)
+    at new Configuration (file:///app/node_modules/openid-client/build/index.js:463:19)
+    at Object.discovery (file:///app/node_modules/openid-client/build/index.js:244:22)
+    at async j8 (/app/dist/index.cjs:76:107331)
+Thu, 01 Jan 2026 17:47:55 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async /app/dist/index.cjs:76:113140 {
+file:///app/node_modules/openid-client/build/index.js:89
+    at async N8.maxAge (/app/dist/index.cjs:76:104739)
+  code: 'ERR_INVALID_ARG_TYPE',
+  [cause]: undefined
+}
+Node.js v22.21.1
+  [cause]: undefined
+}
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
+file:///app/node_modules/openid-client/build/index.js:89
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+npm warn config production Use `--omit=dev` instead.
+                ^
+    at new Configuration (file:///app/node_modules/openid-client/build/index.js:463:19)
+    at async N8.maxAge (/app/dist/index.cjs:76:104739)
+    const err = new TypeError(message, { cause });
+    at Object.discovery (file:///app/node_modules/openid-client/build/index.js:244:22)
+    at async mm (/app/dist/index.cjs:76:105542)
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+TypeError: "clientId" must be a non-empty string
+    at async j8 (/app/dist/index.cjs:76:107331)
+    at async /app/dist/index.cjs:76:113140 {
+  code: 'ERR_INVALID_ARG_TYPE',
+Thu, 01 Jan 2026 17:47:58 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+Node.js v22.21.1
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+Thu, 01 Jan 2026 17:48:00 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+file:///app/node_modules/openid-client/build/index.js:89
+    const err = new TypeError(message, { cause });
+                ^
+TypeError: "clientId" must be a non-empty string
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
+    at new Configuration (file:///app/node_modules/openid-client/build/index.js:463:19)
+    at Object.discovery (file:///app/node_modules/openid-client/build/index.js:244:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async N8.maxAge (/app/dist/index.cjs:76:104739)
+    at async mm (/app/dist/index.cjs:76:105542)
+    at async j8 (/app/dist/index.cjs:76:107331)
+    at async /app/dist/index.cjs:76:113140 {
+  code: 'ERR_INVALID_ARG_TYPE',
+  [cause]: undefined
+}
+Node.js v22.21.1
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+Thu, 01 Jan 2026 17:48:02 GMT express-session deprecated req.secret; provide secret option at node:internal/modules/cjs/loader:1706:14
+file:///app/node_modules/openid-client/build/index.js:89
+    const err = new TypeError(message, { cause });
+                ^
+TypeError: "clientId" must be a non-empty string
+    at CodedTypeError (file:///app/node_modules/openid-client/build/index.js:89:17)
