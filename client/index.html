@@ -3,14 +3,9 @@
   <head>
     <script>
       (function() {
-        var theme = localStorage.getItem('vcp-theme');
-        if (!theme) {
-          localStorage.setItem('vcp-theme', 'dark');
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('light', 'dark');
-          document.documentElement.classList.add(theme);
-        }
+        localStorage.setItem('vcp-theme', 'dark');
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
       })();
     </script>
     <meta charset="UTF-8" />
