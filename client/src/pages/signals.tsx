@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight } from "lucide-react";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, mess
             <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
               <Target className="h-3 w-3 text-chart-2" />
               Resistance
+              <InfoTooltip term="resistance" />
             </p>
             <p className="font-mono font-medium text-chart-2">${resistance.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground">{upside}% upside</p>
@@ -95,16 +97,17 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, mess
             <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 text-destructive" />
               Stop Loss
+              <InfoTooltip term="stopLoss" />
             </p>
             <p className="font-mono font-medium text-destructive">${stopLoss.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground">{risk}% risk</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">RVOL</p>
+            <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">RVOL <InfoTooltip term="rvol" /></p>
             <p className={`font-mono font-medium ${rvol >= 1.5 ? "text-chart-2" : ""}`}>{rvol.toFixed(2)}x</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">ATR (14)</p>
+            <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">ATR (14) <InfoTooltip term="atr" /></p>
             <p className="font-mono font-medium">${atr.toFixed(2)}</p>
           </div>
         </div>
@@ -423,7 +426,7 @@ export default function Signals() {
               stopLoss={signal.stopLoss}
               rvol={signal.rvol}
               atr={signal.atr}
-              message={signal.message}
+              message={signal.message ?? undefined}
               onClick={() => setSelectedTicker(signal.ticker)}
             />
           ))}

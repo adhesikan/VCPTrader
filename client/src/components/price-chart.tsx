@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { TrendingUp, TrendingDown, Activity, BarChart3, Layers, Target, AlertTriangle } from "lucide-react";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface CandleData {
   time: string;
@@ -484,7 +485,7 @@ export function TechnicalAnalysisWidget({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Trend</p>
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">Trend <InfoTooltip term="trend" /></p>
             <div className="flex items-center gap-1.5">
               {trendStrength === "bullish" ? (
                 <TrendingUp className="h-4 w-4 text-chart-2" />
@@ -517,21 +518,21 @@ export function TechnicalAnalysisWidget({
             <div className="flex flex-col">
               <span className="text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                EMA9
+                EMA9 <InfoTooltip term="ema9" />
               </span>
               <span className="font-mono">${ema9?.toFixed(2) || "-"}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                EMA21
+                EMA21 <InfoTooltip term="ema21" />
               </span>
               <span className="font-mono">${ema21?.toFixed(2) || "-"}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-violet-500" />
-                EMA50
+                EMA50 <InfoTooltip term="ema50" />
               </span>
               <span className="font-mono">${ema50?.toFixed(2) || "-"}</span>
             </div>
@@ -547,6 +548,7 @@ export function TechnicalAnalysisWidget({
               <div className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 text-chart-2" />
                 <span className="text-xs text-muted-foreground">Resistance</span>
+                <InfoTooltip term="resistance" />
               </div>
               <span className="text-sm font-mono text-chart-2">${resistance?.toFixed(2) || "-"}</span>
             </div>
@@ -554,6 +556,7 @@ export function TechnicalAnalysisWidget({
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                 <span className="text-xs text-muted-foreground">Stop</span>
+                <InfoTooltip term="stopLoss" />
               </div>
               <span className="text-sm font-mono text-destructive">${stopLoss?.toFixed(2) || "-"}</span>
             </div>
@@ -565,7 +568,7 @@ export function TechnicalAnalysisWidget({
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">R/R Ratio</span>
+            <span className="text-muted-foreground flex items-center gap-1">R/R Ratio <InfoTooltip term="rrRatio" /></span>
             <span className="font-mono font-medium">{riskRewardRatio}:1</span>
           </div>
         </div>
@@ -574,23 +577,23 @@ export function TechnicalAnalysisWidget({
 
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div>
-            <p className="text-muted-foreground mb-1">ATR</p>
+            <p className="text-muted-foreground mb-1 flex items-center gap-1">ATR <InfoTooltip term="atr" /></p>
             <span className="font-mono">${atr?.toFixed(2) || "-"}</span>
           </div>
           <div>
-            <p className="text-muted-foreground mb-1">RVOL</p>
+            <p className="text-muted-foreground mb-1 flex items-center gap-1">RVOL <InfoTooltip term="rvol" /></p>
             <span className={`font-mono ${(rvol || 0) >= 1.5 ? "text-chart-2 font-medium" : ""}`}>
               {rvol?.toFixed(2) || "-"}x
             </span>
           </div>
           <div>
-            <p className="text-muted-foreground mb-1">Volume</p>
+            <p className="text-muted-foreground mb-1 flex items-center gap-1">Volume <InfoTooltip term="volume" /></p>
             <span className="font-mono">
               {volume ? (volume >= 1_000_000 ? `${(volume / 1_000_000).toFixed(2)}M` : `${(volume / 1_000).toFixed(0)}K`) : "-"}
             </span>
           </div>
           <div>
-            <p className="text-muted-foreground mb-1">Avg Volume</p>
+            <p className="text-muted-foreground mb-1 flex items-center gap-1">Avg Volume <InfoTooltip term="avgVolume" /></p>
             <span className="font-mono text-muted-foreground">
               {avgVolume ? (avgVolume >= 1_000_000 ? `${(avgVolume / 1_000_000).toFixed(2)}M` : `${(avgVolume / 1_000).toFixed(0)}K`) : "-"}
             </span>
@@ -602,7 +605,7 @@ export function TechnicalAnalysisWidget({
             <Separator />
             <div>
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">VCP Pattern Score</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">VCP Pattern Score <InfoTooltip term="vcpScore" /></p>
                 <span className="text-sm font-mono font-semibold">{patternScore}</span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden">
