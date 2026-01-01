@@ -38,15 +38,17 @@ import Backtest from "@/pages/backtest";
 import Settings from "@/pages/settings";
 import Signals from "@/pages/signals";
 import AuthPage from "@/pages/auth";
+import HomePage from "@/pages/home";
 import TermsPage from "@/pages/terms";
 import DisclaimerPage from "@/pages/disclaimer";
 import PrivacyPage from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/signals" component={Signals} />
       <Route path="/scanner" component={Scanner} />
       <Route path="/charts" component={Charts} />
@@ -173,7 +175,7 @@ function AppLayout() {
           <SidebarInset className="flex flex-col flex-1 min-w-0">
             <AppHeader />
             <main className="flex-1 overflow-auto">
-              <Router />
+              <AppRouter />
             </main>
             <Footer />
           </SidebarInset>
@@ -190,9 +192,11 @@ function AppLayout() {
 function PublicRoutes() {
   const [location] = useLocation();
   
+  if (location === "/") return <HomePage />;
   if (location === "/terms") return <TermsPage />;
   if (location === "/disclaimer") return <DisclaimerPage />;
   if (location === "/privacy") return <PrivacyPage />;
+  if (location === "/auth") return <AuthPage />;
   
   return null;
 }
@@ -201,18 +205,19 @@ function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
-  const isPublicRoute = ["/terms", "/disclaimer", "/privacy"].includes(location);
+  const publicRoutes = ["/", "/terms", "/disclaimer", "/privacy", "/auth"];
+  const isPublicRoute = publicRoutes.includes(location);
   
-  if (isPublicRoute) {
-    return <PublicRoutes />;
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  if (isPublicRoute && !isAuthenticated) {
+    return <PublicRoutes />;
   }
 
   if (!isAuthenticated) {

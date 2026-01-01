@@ -1,0 +1,135 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Build a high-converting, compliance-safe marketing homepage at route “/” that clearly explains VCP Trader’s 3 subscription paths:
+1) Scanner Only
+2) Education Alerts Only
+3) Pro (Scanner + Education Alerts)
+
+The homepage must be mobile-first, fast, and visually modern, and must NOT use language that implies investment advice, guaranteed profits, or “buy/sell recommendations”.
+
+TECH STACK (use existing)
+- React + TypeScript (Vite)
+- Tailwind
+- Use existing layout components, nav, and auth buttons if present
+- Use lightweight-charts only for the app, NOT the marketing home (no heavy chart loads on landing page)
+
+REQUIREMENTS
+
+1) TOP NAV
+- Left: VCP Trader logo + name
+- Links: Features, How It Works, Pricing, FAQ, Legal
+- Right: “Sign In” and primary CTA “Start Free Trial”
+- Sticky on scroll
+
+2) HERO SECTION
+Headline (use exactly):
+“Breakout Intelligence for Self-Directed Day Traders”
+
+Subheadline (use exactly):
+“Scan the market for volatility contraction setups and get real-time alerts — with optional educational model alerts you can follow or ignore.”
+
+Buttons:
+- Primary: “Start Free Trial”
+- Secondary: “View Pricing”
+Small note under buttons:
+“Educational & informational only — not investment advice.”
+
+3) TRUST / SOCIAL PROOF STRIP (no fake logos)
+- 3 short bullets:
+  - “Market-wide scanning”
+  - “Real-time alerts (push + email)”
+  - “Broker-connected data (optional)”
+Do NOT add fake testimonials.
+
+4) SECTION: “CHOOSE YOUR MODE”
+Create 3 cards with clear positioning (no “signals” language like “buy now”):
+A) Scanner
+Title: “Scanner”
+Subtitle: “Run your own scans. Set your own alerts.”
+Bullets:
+- “Scan thousands of stocks with price/volume filters”
+- “Detect FORMING / READY / BREAKOUT patterns”
+- “Resistance & stop levels plotted automatically”
+CTA: “Get Scanner”
+
+B) Education Alerts
+Title: “Education Alerts”
+Subtitle: “Model-generated educational alerts.”
+Bullets:
+- “Daily watchlists: Forming, Ready, Breakout”
+- “Push alerts when educational conditions trigger”
+- “AI explanation for every alert”
+Small disclaimer text inside card:
+“Educational examples only. Not personalized recommendations.”
+CTA: “Get Education Alerts”
+
+C) Pro
+Title: “Pro”
+Subtitle: “Scanner + Education Alerts together.”
+Bullets:
+- “Everything in Scanner + Education Alerts”
+- “Compare your scans vs the model feed”
+- “Best for active traders”
+CTA: “Go Pro”
+Badge: “Most Popular”
+
+5) SECTION: FEATURES GRID
+6 feature tiles with icons (Lucide icons):
+- “Entire-market scanning”
+- “Powerful filters (price, volume, RVOL, ATR%)”
+- “Breakout + stop-loss alerts”
+- “Interactive charts inside the app”
+- “PWA mobile install + push notifications”
+- “Broker connections for market data (optional)”
+Each tile has 1 sentence max.
+
+6) SECTION: HOW IT WORKS (3 steps)
+Step 1: “Filter the market”
+Step 2: “Identify VCP setups”
+Step 3: “Get alerts and act on your plan”
+Include a short note:
+“You control the rules. You control the trades.”
+
+7) SECTION: PRICING (simple, editable)
+Show monthly pricing placeholders (do NOT hardcode if app has pricing config; otherwise use these defaults):
+- Scanner: $79/mo
+- Education Alerts: $59/mo
+- Pro: $129/mo
+Include:
+- “Cancel anytime”
+- “No guarantees. Past performance does not predict future results.”
+Pricing CTAs should route to your existing checkout/pricing flow.
+
+8) SECTION: FAQ
+Include 6 FAQs (answers concise):
+- “Is this investment advice?” (Answer: no)
+- “What is a VCP setup?” (simple definition)
+- “Do I need a brokerage connection?” (no, optional)
+- “How do alerts work?” (push/email/in-app)
+- “Can I use it on mobile?” (PWA install)
+- “What markets do you support?” (US equities; expand later)
+
+9) LEGAL SECTION + FOOTER
+Footer links:
+- Terms
+- Disclaimer
+- Privacy
+- Contact (support email)
+
+Add a short footer disclaimer (1–2 lines):
+“VCP Trader is an educational market-analysis and alerting platform. Not investment advice.”
+
+10) COMPLIANCE RULES (IMPORTANT)
+- Do NOT use: “buy/sell”, “trade recommendations”, “guaranteed”, “profit”, “make money”
+- Use: “scan”, “detect”, “alert”, “educational”, “informational”, “self-directed”
+- Do NOT show performance stats or backtest returns on the homepage.
+
+11) ROUTING / AUTH
+- If user is logged in, show “Go to Dashboard” instead of “Start Free Trial”
+- Keep homepage public.
+
+DELIVERABLE
+Implement the full homepage with clean Tailwind styling, good spacing, and modern layout. Ensure Lighthouse performance is strong and the page renders fast.
+
+Now implement this homepage in the existing VCP Trader codebase.
