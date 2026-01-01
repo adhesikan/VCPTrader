@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Clock } from "lucide-react";
+import { Search, Clock, ChevronRight, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -14,7 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PriceChart, ChartPlaceholder } from "@/components/price-chart";
+import { 
+  PriceChart, 
+  ChartPlaceholder, 
+  TechnicalAnalysisWidget,
+  VolumeProfileWidget,
+  ChartControlsWidget,
+} from "@/components/price-chart";
 import type { ScanResult } from "@shared/schema";
 
 interface ChartData {
@@ -28,6 +37,7 @@ interface ChartData {
   }>;
   ema9?: number[];
   ema21?: number[];
+  ema50?: number[];
   resistance?: number;
   stopLoss?: number;
   ticker: string;
@@ -36,14 +46,27 @@ interface ChartData {
   change?: number;
   changePercent?: number;
   volume?: number;
+  avgVolume?: number;
+  atr?: number;
+  rvol?: number;
+  patternScore?: number;
+  stage?: string;
+  contractionZones?: Array<{ start: string; end: string; highLevel: number; lowLevel: number }>;
+  vcpAnnotations?: Array<{
+    time: string;
+    price: number;
+    type: "pivot_high" | "pivot_low" | "contraction_start" | "breakout";
+    label?: string;
+  }>;
 }
 
 const timeframes = [
-  { value: "1D", label: "1 Day" },
-  { value: "1W", label: "1 Week" },
-  { value: "1M", label: "1 Month" },
-  { value: "3M", label: "3 Months" },
-  { value: "1Y", label: "1 Year" },
+  { value: "1D", label: "1D" },
+  { value: "1W", label: "1W" },
+  { value: "1M", label: "1M" },
+  { value: "3M", label: "3M" },
+  { value: "6M", label: "6M" },
+  { value: "1Y", label: "1Y" },
 ];
 
 export default function Charts() {
@@ -53,6 +76,13 @@ export default function Charts() {
   const [searchInput, setSearchInput] = useState(initialTicker);
   const [selectedTicker, setSelectedTicker] = useState(initialTicker);
   const [timeframe, setTimeframe] = useState("3M");
+  
+  const [showEMA9, setShowEMA9] = useState(true);
+  const [showEMA21, setShowEMA21] = useState(true);
+  const [showEMA50, setShowEMA50] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
+  const [showLevels, setShowLevels] = useState(true);
+  const [showVCPOverlay, setShowVCPOverlay] = useState(true);
 
   useEffect(() => {
     if (params?.ticker) {
@@ -85,17 +115,17 @@ export default function Charts() {
   };
 
   return (
-    <div className="p-6 space-y-6" data-testid="charts-page">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="p-4 lg:p-6 space-y-4" data-testid="charts-page">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Charts</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Charts</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Technical analysis with VCP overlays
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 md:w-64">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px] lg:w-64">
             <Input
               placeholder="Enter symbol..."
               value={searchInput}
@@ -115,40 +145,41 @@ export default function Charts() {
             </Button>
           </div>
 
-          <Select value={timeframe} onValueChange={setTimeframe}>
-            <SelectTrigger className="w-32" data-testid="select-timeframe">
-              <Clock className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {timeframes.map((tf) => (
-                <SelectItem key={tf.value} value={tf.value}>
-                  {tf.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-1">
+            {timeframes.map((tf) => (
+              <Button
+                key={tf.value}
+                variant={timeframe === tf.value ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setTimeframe(tf.value)}
+                className="font-mono text-xs px-2"
+                data-testid={`button-timeframe-${tf.value}`}
+              >
+                {tf.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {selectedTicker && (
-        <div className="flex flex-wrap items-center gap-4">
+      {selectedTicker && chartData && (
+        <div className="flex flex-wrap items-center gap-3 bg-card border rounded-lg px-4 py-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono">{selectedTicker}</span>
+            <span className="text-xl lg:text-2xl font-bold font-mono">{selectedTicker}</span>
             {chartData?.name && (
-              <span className="text-muted-foreground">{chartData.name}</span>
+              <span className="text-sm text-muted-foreground hidden sm:inline">{chartData.name}</span>
             )}
           </div>
 
           {chartData?.price && (
             <div className="flex items-center gap-2">
-              <span className="text-xl font-mono font-semibold">
+              <span className="text-lg lg:text-xl font-mono font-semibold">
                 ${chartData.price.toFixed(2)}
               </span>
               {chartData.changePercent !== undefined && (
                 <Badge
                   variant={chartData.changePercent >= 0 ? "default" : "destructive"}
-                  className="font-mono"
+                  className="font-mono text-xs"
                 >
                   {chartData.changePercent >= 0 ? "+" : ""}
                   {chartData.changePercent.toFixed(2)}%
@@ -157,107 +188,202 @@ export default function Charts() {
             </div>
           )}
 
-          {scanResult?.stage && (
-            <Badge 
-              variant={
-                scanResult.stage === "BREAKOUT" ? "default" :
-                scanResult.stage === "READY" ? "secondary" : "outline"
-              }
-            >
-              {scanResult.stage}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 ml-auto">
+            {scanResult?.stage && (
+              <Badge 
+                variant={
+                  scanResult.stage === "BREAKOUT" ? "default" :
+                  scanResult.stage === "READY" ? "secondary" : "outline"
+                }
+                className="text-xs"
+              >
+                {scanResult.stage}
+              </Badge>
+            )}
+            {chartData?.patternScore && (
+              <Badge variant="outline" className="font-mono text-xs">
+                Score: {chartData.patternScore}
+              </Badge>
+            )}
+          </div>
         </div>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          {chartLoading ? (
-            <div className="h-[500px] flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Loading chart data...</p>
-              </div>
-            </div>
-          ) : chartData?.candles && chartData.candles.length > 0 ? (
-            <PriceChart
-              data={chartData.candles}
-              ema9={chartData.ema9}
-              ema21={chartData.ema21}
-              resistanceLevel={chartData.resistance}
-              stopLevel={chartData.stopLoss}
-              ticker={selectedTicker}
-              className="h-[500px]"
-            />
-          ) : (
-            <ChartPlaceholder />
-          )}
-        </CardContent>
-      </Card>
-
-      {scanResult && (
-        <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-4">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Resistance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-lg font-mono font-semibold text-chart-2">
-                ${scanResult.resistance?.toFixed(2) || "-"}
-              </span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Stop Loss
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-lg font-mono font-semibold text-destructive">
-                ${scanResult.stopLoss?.toFixed(2) || "-"}
-              </span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                RVOL
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-lg font-mono font-semibold">
-                {scanResult.rvol?.toFixed(2) || "-"}x
-              </span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pattern Score
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${Math.min(100, scanResult.patternScore ?? 0)}%` }}
-                  />
+            <CardContent className="p-0">
+              {chartLoading ? (
+                <div className="h-[450px] lg:h-[550px] flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">Loading chart data...</p>
+                  </div>
                 </div>
-                <span className="text-lg font-mono font-semibold w-8">
-                  {scanResult.patternScore ?? 0}
-                </span>
+              ) : chartData?.candles && chartData.candles.length > 0 ? (
+                <PriceChart
+                  data={chartData.candles}
+                  ema9={showEMA9 ? chartData.ema9 : undefined}
+                  ema21={showEMA21 ? chartData.ema21 : undefined}
+                  ema50={showEMA50 ? chartData.ema50 : undefined}
+                  resistanceLevel={showLevels ? chartData.resistance : undefined}
+                  stopLevel={showLevels ? chartData.stopLoss : undefined}
+                  ticker={selectedTicker}
+                  showVCPOverlay={showVCPOverlay}
+                  vcpAnnotations={chartData.vcpAnnotations}
+                  contractionZones={chartData.contractionZones}
+                  atr={chartData.atr}
+                  className="h-[450px] lg:h-[550px]"
+                />
+              ) : (
+                <ChartPlaceholder />
+              )}
+            </CardContent>
+          </Card>
+
+          {chartData?.candles && chartData.candles.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Resistance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-lg font-mono font-semibold text-chart-2">
+                    ${chartData.resistance?.toFixed(2) || scanResult?.resistance?.toFixed(2) || "-"}
+                  </span>
+                  {chartData.resistance && chartData.price && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {((chartData.resistance - chartData.price) / chartData.price * 100).toFixed(1)}% upside
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Stop Loss
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-lg font-mono font-semibold text-destructive">
+                    ${chartData.stopLoss?.toFixed(2) || scanResult?.stopLoss?.toFixed(2) || "-"}
+                  </span>
+                  {chartData.stopLoss && chartData.price && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {((chartData.price - chartData.stopLoss) / chartData.price * 100).toFixed(1)}% risk
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    RVOL
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <span className={`text-lg font-mono font-semibold ${(chartData.rvol || scanResult?.rvol || 0) >= 1.5 ? "text-chart-2" : ""}`}>
+                    {chartData.rvol?.toFixed(2) || scanResult?.rvol?.toFixed(2) || "-"}x
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    vs 20-day avg
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    ATR (14)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-lg font-mono font-semibold">
+                    ${chartData.atr?.toFixed(2) || scanResult?.atr?.toFixed(2) || "-"}
+                  </span>
+                  {chartData.atr && chartData.price && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {((chartData.atr / chartData.price) * 100).toFixed(1)}% of price
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <Card data-testid="chart-controls-widget">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Chart Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ema9" className="text-sm flex items-center gap-2">
+                  <span className="w-2.5 h-0.5 rounded-full bg-amber-500" />
+                  EMA 9
+                </Label>
+                <Switch id="ema9" checked={showEMA9} onCheckedChange={setShowEMA9} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ema21" className="text-sm flex items-center gap-2">
+                  <span className="w-2.5 h-0.5 rounded-full bg-blue-500" />
+                  EMA 21
+                </Label>
+                <Switch id="ema21" checked={showEMA21} onCheckedChange={setShowEMA21} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ema50" className="text-sm flex items-center gap-2">
+                  <span className="w-2.5 h-0.5 rounded-full bg-violet-500" />
+                  EMA 50
+                </Label>
+                <Switch id="ema50" checked={showEMA50} onCheckedChange={setShowEMA50} />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="volume" className="text-sm">Volume Bars</Label>
+                <Switch id="volume" checked={showVolume} onCheckedChange={setShowVolume} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="levels" className="text-sm">Support/Resistance</Label>
+                <Switch id="levels" checked={showLevels} onCheckedChange={setShowLevels} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="vcp" className="text-sm">VCP Overlays</Label>
+                <Switch id="vcp" checked={showVCPOverlay} onCheckedChange={setShowVCPOverlay} />
               </div>
             </CardContent>
           </Card>
+
+          {chartData && chartData.price && (
+            <TechnicalAnalysisWidget
+              ticker={selectedTicker}
+              price={chartData.price}
+              change={chartData.change || 0}
+              changePercent={chartData.changePercent || 0}
+              ema9={chartData.ema9?.[chartData.ema9.length - 1]}
+              ema21={chartData.ema21?.[chartData.ema21.length - 1]}
+              ema50={chartData.ema50?.[chartData.ema50?.length - 1]}
+              resistance={chartData.resistance}
+              stopLoss={chartData.stopLoss}
+              atr={chartData.atr}
+              rvol={chartData.rvol}
+              patternScore={chartData.patternScore}
+              stage={chartData.stage || scanResult?.stage}
+              volume={chartData.volume}
+              avgVolume={chartData.avgVolume}
+            />
+          )}
+
+          {chartData?.candles && chartData.candles.length > 0 && (
+            <VolumeProfileWidget data={chartData.candles} levels={12} />
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

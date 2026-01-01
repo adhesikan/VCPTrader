@@ -136,21 +136,116 @@ function generateMockAlerts(): Alert[] {
   }));
 }
 
+function calculateATR(candles: Array<{ high: number; low: number; close: number }>, period: number = 14): number[] {
+  const atr: number[] = [];
+  const trueRanges: number[] = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) {
+      trueRanges.push(candles[i].high - candles[i].low);
+    } else {
+      const tr = Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - candles[i - 1].close),
+        Math.abs(candles[i].low - candles[i - 1].close)
+      );
+      trueRanges.push(tr);
+    }
+
+    if (i < period - 1) {
+      atr.push(0);
+    } else if (i === period - 1) {
+      const sum = trueRanges.slice(0, period).reduce((a, b) => a + b, 0);
+      atr.push(sum / period);
+    } else {
+      atr.push((atr[i - 1] * (period - 1) + trueRanges[i]) / period);
+    }
+  }
+
+  return atr.map(v => Number(v.toFixed(2)));
+}
+
+function findPivotPoints(candles: Array<{ time: string; high: number; low: number }>, lookback: number = 5) {
+  const pivotHighs: Array<{ time: string; price: number; type: "pivot_high" }> = [];
+  const pivotLows: Array<{ time: string; price: number; type: "pivot_low" }> = [];
+
+  for (let i = lookback; i < candles.length - lookback; i++) {
+    let isHigh = true;
+    let isLow = true;
+
+    for (let j = 1; j <= lookback; j++) {
+      if (candles[i].high <= candles[i - j].high || candles[i].high <= candles[i + j].high) {
+        isHigh = false;
+      }
+      if (candles[i].low >= candles[i - j].low || candles[i].low >= candles[i + j].low) {
+        isLow = false;
+      }
+    }
+
+    if (isHigh) {
+      pivotHighs.push({ time: candles[i].time, price: candles[i].high, type: "pivot_high" });
+    }
+    if (isLow) {
+      pivotLows.push({ time: candles[i].time, price: candles[i].low, type: "pivot_low" });
+    }
+  }
+
+  return { pivotHighs, pivotLows };
+}
+
+function generateContractionZones(candles: Array<{ time: string; high: number; low: number }>) {
+  const zones: Array<{ start: string; end: string; highLevel: number; lowLevel: number }> = [];
+  const windowSize = 15;
+
+  for (let i = 30; i < candles.length - windowSize; i += windowSize) {
+    const window = candles.slice(i, i + windowSize);
+    const highLevel = Math.max(...window.map(c => c.high));
+    const lowLevel = Math.min(...window.map(c => c.low));
+    const range = highLevel - lowLevel;
+    
+    const prevWindow = candles.slice(i - windowSize, i);
+    const prevRange = Math.max(...prevWindow.map(c => c.high)) - Math.min(...prevWindow.map(c => c.low));
+
+    if (range < prevRange * 0.8) {
+      zones.push({
+        start: window[0].time,
+        end: window[window.length - 1].time,
+        highLevel,
+        lowLevel,
+      });
+    }
+  }
+
+  return zones;
+}
+
 function generateChartData(ticker: string) {
   const candles = [];
   const now = new Date();
   let price = 100 + Math.random() * 300;
+  const baseVolume = 800000 + Math.random() * 1500000;
 
-  for (let i = 90; i >= 0; i--) {
+  for (let i = 120; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     
-    const volatility = 0.02;
-    const change = (Math.random() - 0.5) * volatility * price;
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+    
+    const volatilityBase = 0.018;
+    const volatilityMod = i > 60 ? 1.2 : (i > 30 ? 0.9 : 0.7);
+    const volatility = volatilityBase * volatilityMod;
+    
+    const trendBias = 0.001;
+    const change = (Math.random() - 0.48 + trendBias) * volatility * price;
     const open = price;
     const close = price + change;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.01);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+    const range = Math.abs(change) * (1 + Math.random() * 0.5);
+    const high = Math.max(open, close) + range * Math.random();
+    const low = Math.min(open, close) - range * Math.random();
+    
+    const volumeMultiplier = 0.8 + Math.random() * 0.6;
+    const volume = Math.floor(baseVolume * volumeMultiplier);
     
     candles.push({
       time: date.toISOString().split("T")[0],
@@ -158,28 +253,66 @@ function generateChartData(ticker: string) {
       high: Number(high.toFixed(2)),
       low: Number(low.toFixed(2)),
       close: Number(close.toFixed(2)),
-      volume: Math.floor(500000 + Math.random() * 2000000),
+      volume,
     });
     
     price = close;
   }
 
-  const ema9 = calculateEMA(candles.map(c => c.close), 9);
-  const ema21 = calculateEMA(candles.map(c => c.close), 21);
+  const closes = candles.map(c => c.close);
+  const ema9 = calculateEMA(closes, 9);
+  const ema21 = calculateEMA(closes, 21);
+  const ema50 = calculateEMA(closes, 50);
+  const atrValues = calculateATR(candles);
   const lastPrice = candles[candles.length - 1].close;
+  const prevPrice = candles[candles.length - 2].close;
+  const lastVolume = candles[candles.length - 1].volume;
+  const avgVolume = Math.floor(candles.slice(-20).reduce((sum, c) => sum + c.volume, 0) / 20);
+  const lastATR = atrValues[atrValues.length - 1];
+
+  const { pivotHighs, pivotLows } = findPivotPoints(candles);
+  const contractionZones = generateContractionZones(candles);
+
+  const vcpAnnotations: Array<{ time: string; price: number; type: "pivot_high" | "pivot_low" | "contraction_start" | "breakout"; label?: string }> = [];
+  
+  pivotHighs.slice(-3).forEach((ph, i) => {
+    vcpAnnotations.push({ ...ph, label: `H${i + 1}` });
+  });
+  pivotLows.slice(-3).forEach((pl, i) => {
+    vcpAnnotations.push({ ...pl, label: `L${i + 1}` });
+  });
+
+  const resistance = pivotHighs.length > 0 
+    ? Math.max(...pivotHighs.slice(-3).map(p => p.price))
+    : lastPrice * 1.05;
+  const stopLoss = pivotLows.length > 0 
+    ? Math.min(...pivotLows.slice(-2).map(p => p.price))
+    : lastPrice * 0.93;
+
+  const stages = ["FORMING", "READY", "BREAKOUT"];
+  const stage = stages[Math.floor(Math.random() * 3)];
+  const patternScore = Math.floor(65 + Math.random() * 35);
 
   return {
     ticker,
     name: `${ticker} Inc`,
-    price: lastPrice,
-    change: lastPrice - candles[candles.length - 2].close,
-    changePercent: ((lastPrice - candles[candles.length - 2].close) / candles[candles.length - 2].close) * 100,
-    volume: candles[candles.length - 1].volume,
+    price: Number(lastPrice.toFixed(2)),
+    change: Number((lastPrice - prevPrice).toFixed(2)),
+    changePercent: Number(((lastPrice - prevPrice) / prevPrice * 100).toFixed(2)),
+    volume: lastVolume,
+    avgVolume,
+    rvol: Number((lastVolume / avgVolume).toFixed(2)),
+    atr: lastATR,
+    patternScore,
+    stage,
     candles,
     ema9,
     ema21,
-    resistance: lastPrice * 1.05,
-    stopLoss: lastPrice * 0.93,
+    ema50,
+    resistance: Number(resistance.toFixed(2)),
+    stopLoss: Number(stopLoss.toFixed(2)),
+    contractionZones,
+    vcpAnnotations,
   };
 }
 
