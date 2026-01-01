@@ -155,10 +155,10 @@ function HeroSection() {
     <section className="py-16 md:py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-4xl mx-auto" data-testid="text-hero-headline">
-          Breakout Intelligence for Self-Directed Day Traders
+          Institutional-Grade Breakout Intelligence for Self-Directed Traders
         </h1>
         <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto" data-testid="text-hero-subheadline">
-          Scan the market for volatility contraction setups and get real-time alerts — with optional educational model alerts you can follow or ignore.
+          Scan the entire market, detect tightening bases, and get real-time alerts when momentum ignites — with full control over every trade.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           {isAuthenticated ? (
