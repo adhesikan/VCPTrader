@@ -80,6 +80,19 @@ Preferred communication style: Simple, everyday language.
 ### Deployment Requirements
 - `SESSION_SECRET` environment variable required
 - `DATABASE_URL` environment variable for PostgreSQL connection
+- `LEGAL_VERSION` environment variable (e.g., "2026-01-01") for legal acceptance tracking
+- `SUPPORT_EMAIL` environment variable for legal page contact info
+
+### Railway Deployment
+- **Configuration File**: `railway.json` contains build and deploy settings
+- **Build Command**: `npm run build && npm run db:push` (runs migrations automatically)
+- **Start Command**: `npm run start`
+- **Database**: Automatically pushes schema changes to PostgreSQL on each deploy
+- **Environment Variables Required on Railway**:
+  - `DATABASE_URL` - PostgreSQL connection string
+  - `SESSION_SECRET` - Random secret for session encryption
+  - `LEGAL_VERSION` - Current legal policy version date
+  - `SUPPORT_EMAIL` - Support contact email
 
 ## External Dependencies
 
