@@ -1,0 +1,210 @@
+You are building a brand-new, production-grade SaaS web application called:
+
+VCP Day Trader  
+“Scan • Alert • Trade Volatility Contraction Breakouts”
+
+This app is a standalone platform focused on identifying, tracking, and alerting on
+Volatility Contraction Pattern (VCP) breakouts for active day traders — with full
+mobile-ready PWA support, real-time push notifications, and **direct brokerage
+market-data connectivity**.
+
+====================================================
+CORE GOAL
+====================================================
+Provide a fast, scalable system that:
+• Scans the entire US stock market
+• Detects VCP Setup #1 patterns
+• Identifies FORMING, READY, and BREAKOUT stocks
+• Draws resistance + stop levels automatically
+• Fires real-time alerts for:
+    – Breakouts
+    – Stop loss hits
+    – EMA-21 exit
+    – “Approaching breakout”
+• Runs as a mobile app via PWA with push notifications
+• Uses live brokerage-grade market data
+
+====================================================
+TECH STACK
+====================================================
+Frontend
+- React + Vite + TypeScript
+- Tailwind CSS
+- TradingView lightweight-charts
+- PWA service worker + Web Push API
+
+Backend
+- Node.js + Express + TypeScript
+- PostgreSQL
+- Prisma ORM
+- node-cron for scanners & alerts
+- Web Push (VAPID) for notifications
+
+Deployment
+- Replit + Railway compatible
+- One-command dev: npm run dev
+
+====================================================
+BROKERAGE MARKET DATA CONNECTIVITY
+====================================================
+The app must support connecting directly to brokerages for market data.
+
+Supported providers (pluggable):
+• Tradier
+• Interactive Brokers (IBKR)
+• Alpaca
+• Schwab (via API)
+• Tastytrade (when available)
+
+Users can:
+• Connect their brokerage via OAuth or API key
+• Choose their preferred market-data source
+• Use either:
+  – Broker live data (preferred)
+  – Or Polygon/Alpaca public market data as fallback
+
+Data architecture:
+• Unified MarketDataProvider interface
+• Each broker implements:
+  - getSymbols()
+  - getQuotes()
+  - getCandles(timeframe, start, end)
+  - getVolume()
+• System automatically falls back to public data if broker feed is unavailable
+
+.env
+- DATA_PROVIDER=broker|polygon|alpaca
+- POLYGON_KEY=xxxx
+- ALPACA_KEY=xxxx
+- BROKER_OAUTH_CALLBACK=https://app.vcpdaytrader.com/api/broker/callback
+- DATABASE_URL=xxxx
+- SESSION_SECRET=xxxx
+- VAPID_PUBLIC_KEY=xxxx
+- VAPID_PRIVATE_KEY=xxxx
+
+====================================================
+DATA CACHING
+====================================================
+All OHLCV data from brokers or public feeds must be cached in Postgres.
+Never re-request candles already stored.
+Broker live quotes are cached short-term (seconds) for alerting.
+
+====================================================
+SYMBOL UNIVERSE
+====================================================
+Support:
+• Entire US stock market (from broker symbol list or master symbol table)
+• S&P 500
+• Nasdaq 100
+• Custom watchlists
+• Uploaded CSVs
+
+====================================================
+FAST MARKET FILTERS (Stage 1)
+====================================================
+Before running VCP detection, filter stocks by:
+• Price (min/max)
+• Avg volume
+• Dollar volume
+• Relative volume
+• ATR%
+• Gap %
+• Spread / liquidity (from broker quote feed)
+• Exclude ETFs / OTC
+• Optional float & market cap
+
+====================================================
+VCP PATTERN ENGINE (Stage 2)
+====================================================
+Calculate:
+• EMA 9
+• EMA 21
+• ATR(14)
+• VolumeSMA(20)
+• RVOL
+
+Setup #1 Rules:
+(unchanged, using broker candles instead of public feeds)
+
+====================================================
+ALERT SYSTEM (BROKER-POWERED)
+====================================================
+Alerts use **live broker quotes** when available.
+
+Alert triggers:
+• Breakout above resistance
+• Stop loss hits
+• EMA-21 close
+• Approaching breakout
+
+Execution-grade:
+• Use broker bid/ask or last trade for accuracy
+• Millisecond-resolution polling or websocket if broker supports it
+
+====================================================
+PWA + PUSH
+====================================================
+Push notifications delivered instantly when broker data triggers alerts.
+
+Example:
+"NVDA broke $512.40 on Tradier – Stop $506.80"
+
+====================================================
+BACKTEST ENGINE
+====================================================
+Backtests can use:
+• Broker historical candles (preferred)
+• Or public OHLCV as fallback
+
+====================================================
+DATABASE
+====================================================
+Tables:
+• Candle
+• Symbol
+• ScanRun
+• ScanResult
+• Watchlist
+• AlertRule
+• AlertEvent
+• BrokerConnection (userId, broker, tokens, permissions)
+• PushSubscription
+• BacktestRun
+
+====================================================
+API
+====================================================
+/api/broker/connect  
+/api/broker/callback  
+/api/broker/status  
+/api/scan/run  
+/api/alerts/create  
+/api/push/subscribe  
+
+====================================================
+FRONTEND
+====================================================
+Broker Setup page:
+• Connect Tradier / IBKR / Alpaca
+• Select primary data feed
+
+Scanner page:
+• Shows which broker feed is active
+• Displays bid/ask & last trade when available
+
+Ticker page:
+• Shows broker-sourced intraday data
+• Alerts based on live feed
+
+====================================================
+QUALITY
+====================================================
+• Broker-grade data integrity
+• TypeScript strict
+• Caching + rate-limit safe
+• Testable provider adapters
+• Mobile-first PWA
+• Production-ready
+
+====================================================
+Now generate the complete VCP Day Trader app with brokerage-connected market data, PWA push alerts, scanning, and backtesting.
