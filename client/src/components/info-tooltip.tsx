@@ -34,10 +34,12 @@ export function InfoTooltip({ term, className = "" }: InfoTooltipProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Info 
-          className={`h-3 w-3 text-muted-foreground/60 cursor-help inline-block ${className}`}
+        <span 
+          className={`inline-flex items-center cursor-help ${className}`}
           data-testid={`tooltip-trigger-${term}`}
-        />
+        >
+          <Info className="h-3 w-3 text-muted-foreground/60" />
+        </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs text-xs" side="top">
         <p>{description}</p>
