@@ -44,7 +44,7 @@ export default function AuthPage() {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <TrendingUp className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">VCP Day Trader</span>
+            <span className="text-2xl font-bold">VCP Trader</span>
           </div>
           <CardTitle data-testid="text-auth-title">{isLogin ? "Sign In" : "Create Account"}</CardTitle>
           <CardDescription>

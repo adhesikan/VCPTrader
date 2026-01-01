@@ -1,4 +1,4 @@
-# VCP Day Trader - Design Guidelines
+# VCP Trader - Design Guidelines
 
 ## Design Approach
 **System**: Material Design adapted for financial/trading applications

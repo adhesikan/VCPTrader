@@ -1,8 +1,8 @@
-# VCP Day Trader
+# VCP Trader
 
 ## Overview
 
-VCP Day Trader is a production-grade SaaS web application for active day traders focused on identifying, tracking, and alerting on Volatility Contraction Pattern (VCP) breakouts. The platform scans the US stock market to detect VCP patterns at various stages (FORMING, READY, BREAKOUT), automatically draws resistance and stop levels, and provides real-time alerts via push notifications. It's designed as a mobile-ready Progressive Web App (PWA) with direct brokerage market data connectivity.
+VCP Trader is a production-grade SaaS web application for active day traders focused on identifying, tracking, and alerting on Volatility Contraction Pattern (VCP) breakouts. The platform scans the US stock market to detect VCP patterns at various stages (FORMING, READY, BREAKOUT), automatically draws resistance and stop levels, and provides real-time alerts via push notifications. It's designed as a mobile-ready Progressive Web App (PWA) with direct brokerage market data connectivity.
 
 ## User Preferences
 
