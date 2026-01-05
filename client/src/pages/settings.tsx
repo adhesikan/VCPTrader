@@ -29,11 +29,41 @@ import { useToast } from "@/hooks/use-toast";
 import type { BrokerConnection, BrokerProviderType } from "@shared/schema";
 
 const brokerProviders = [
-  { id: "tradier", name: "Tradier", description: "Commission-free trading platform" },
-  { id: "alpaca", name: "Alpaca", description: "API-first stock trading" },
-  { id: "ibkr", name: "Interactive Brokers", description: "Professional trading platform" },
-  { id: "schwab", name: "Charles Schwab", description: "Full-service brokerage" },
-  { id: "polygon", name: "Polygon.io", description: "Market data only" },
+  { 
+    id: "tradier", 
+    name: "Tradier", 
+    description: "Commission-free trading platform",
+    tokenUrl: "https://dash.tradier.com/settings/api",
+    tokenInstructions: "Log in to Tradier, go to Settings > API Access, and copy your Access Token.",
+  },
+  { 
+    id: "alpaca", 
+    name: "Alpaca", 
+    description: "API-first stock trading",
+    tokenUrl: "https://app.alpaca.markets/paper/dashboard/overview",
+    tokenInstructions: "Log in to Alpaca, go to your dashboard, click on API Keys, and copy your API Key.",
+  },
+  { 
+    id: "ibkr", 
+    name: "Interactive Brokers", 
+    description: "Professional trading platform",
+    tokenUrl: "https://www.interactivebrokers.com/en/trading/ib-api.php",
+    tokenInstructions: "Log in to IBKR Portal, go to Settings > API Settings, and generate an API token.",
+  },
+  { 
+    id: "schwab", 
+    name: "Charles Schwab", 
+    description: "Full-service brokerage",
+    tokenUrl: "https://developer.schwab.com/",
+    tokenInstructions: "Log in to Schwab Developer Portal, create an app, and copy your API credentials.",
+  },
+  { 
+    id: "polygon", 
+    name: "Polygon.io", 
+    description: "Market data only",
+    tokenUrl: "https://polygon.io/dashboard/keys",
+    tokenInstructions: "Log in to Polygon.io, go to Dashboard > API Keys, and copy your API Key.",
+  },
 ];
 
 export default function Settings() {
@@ -241,20 +271,43 @@ export default function Settings() {
                         Connect to {brokerProviders.find(b => b.id === selectedProvider)?.name}
                       </DialogTitle>
                       <DialogDescription>
-                        Enter your API access token to connect your brokerage account. You can find this in your broker's developer settings.
+                        Enter your API access token to connect your brokerage account.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                      <Label htmlFor="accessToken">Access Token</Label>
-                      <Input
-                        id="accessToken"
-                        type="password"
-                        placeholder="Enter your API access token"
-                        value={accessToken}
-                        onChange={(e) => setAccessToken(e.target.value)}
-                        className="mt-2"
-                        data-testid="input-access-token"
-                      />
+                    <div className="py-4 space-y-4">
+                      {selectedProvider && (
+                        <div className="bg-muted p-3 rounded-md space-y-2">
+                          <p className="text-sm font-medium">How to get your access token:</p>
+                          <p className="text-sm text-muted-foreground">
+                            {brokerProviders.find(b => b.id === selectedProvider)?.tokenInstructions}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => window.open(brokerProviders.find(b => b.id === selectedProvider)?.tokenUrl, '_blank')}
+                            data-testid="button-open-broker-portal"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            Open {brokerProviders.find(b => b.id === selectedProvider)?.name} API Settings
+                          </Button>
+                        </div>
+                      )}
+                      <div>
+                        <Label htmlFor="accessToken">Access Token</Label>
+                        <Input
+                          id="accessToken"
+                          type="password"
+                          placeholder="Paste your API access token here"
+                          value={accessToken}
+                          onChange={(e) => setAccessToken(e.target.value)}
+                          className="mt-2"
+                          data-testid="input-access-token"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Your token is stored securely and never shared.
+                        </p>
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button
