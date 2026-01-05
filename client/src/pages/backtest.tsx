@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, Play, Trash2, Clock, Plug, Settings, HelpCircle } from "lucide-react";
+import { FlaskConical, Play, Trash2, Clock, Plug, Settings, HelpCircle, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { format, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
-import type { BacktestResult } from "@shared/schema";
+import type { BacktestResult, StrategyInfo } from "@shared/schema";
 import { InfoTooltip } from "@/components/info-tooltip";
 
 interface BacktestConfig {
@@ -29,6 +36,7 @@ interface BacktestConfig {
   initialCapital: number;
   positionSize: number;
   stopLossPercent: number;
+  strategy: string;
 }
 
 function getDefaultDates() {
@@ -49,9 +57,14 @@ export default function Backtest() {
     initialCapital: 100000,
     positionSize: 5,
     stopLossPercent: 7,
+    strategy: "VCP",
   });
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
+
+  const { data: strategies } = useQuery<StrategyInfo[]>({
+    queryKey: ["/api/strategies"],
+  });
 
   const { data: results, isLoading } = useQuery<BacktestResult[]>({
     queryKey: ["/api/backtest/results"],
@@ -196,6 +209,30 @@ export default function Backtest() {
                 className="font-mono"
                 data-testid="input-ticker"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Strategy
+              </Label>
+              <Select value={config.strategy} onValueChange={(value) => updateConfig("strategy", value)}>
+                <SelectTrigger data-testid="select-strategy">
+                  <SelectValue placeholder="Select strategy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {strategies?.map((strategy) => (
+                    <SelectItem key={strategy.id} value={strategy.id}>
+                      {strategy.name.replace(" (Volatility Contraction Pattern)", "")}
+                    </SelectItem>
+                  )) || (
+                    <>
+                      <SelectItem value="VCP">VCP</SelectItem>
+                      <SelectItem value="CLASSIC_PULLBACK">Classic Pullback</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

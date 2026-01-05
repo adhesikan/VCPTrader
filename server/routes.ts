@@ -714,7 +714,7 @@ export async function registerRoutes(
       const userId = req.session?.userId;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       
-      const { ticker, startDate, endDate, initialCapital, positionSize, stopLossPercent } = req.body;
+      const { ticker, startDate, endDate, initialCapital, positionSize, stopLossPercent, strategy = StrategyType.VCP } = req.body;
       
       if (!ticker) {
         return res.status(400).json({ error: "Ticker symbol is required" });
@@ -750,15 +750,40 @@ export async function registerRoutes(
       let entryDate = "";
       let stopPrice = 0;
 
+      const calcEMA = (data: number[], period: number): number[] => {
+        const k = 2 / (period + 1);
+        const emaArray: number[] = [];
+        emaArray[0] = data[0];
+        for (let i = 1; i < data.length; i++) {
+          emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
+        }
+        return emaArray;
+      };
+
+      const closes = filteredCandles.map(c => c.close);
+      const ema9 = calcEMA(closes, 9);
+      const ema21 = calcEMA(closes, 21);
+
       for (let i = 50; i < filteredCandles.length; i++) {
         const candle = filteredCandles[i];
         
         if (!inPosition) {
-          const recentHigh = Math.max(...filteredCandles.slice(i - 20, i).map(c => c.high));
-          const recentVolatility = filteredCandles.slice(i - 10, i).reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 10;
-          const currentVolatility = Math.abs(candle.close - candle.open);
+          let shouldEnter = false;
           
-          if (candle.close > recentHigh && currentVolatility < recentVolatility * 0.7) {
+          if (strategy === StrategyType.CLASSIC_PULLBACK) {
+            const inUptrend = ema9[i] > ema21[i] && candle.close > ema9[i];
+            const hadPullback = filteredCandles.slice(i - 10, i).some(c => c.low <= ema9[i - 5] * 1.01);
+            const avgVol = filteredCandles.slice(i - 20, i).reduce((s, c) => s + c.volume, 0) / 20;
+            const volumeSpike = candle.volume > avgVol * 1.5;
+            shouldEnter = inUptrend && hadPullback && volumeSpike && candle.close > candle.open;
+          } else {
+            const recentHigh = Math.max(...filteredCandles.slice(i - 20, i).map(c => c.high));
+            const recentVolatility = filteredCandles.slice(i - 10, i).reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 10;
+            const currentVolatility = Math.abs(candle.close - candle.open);
+            shouldEnter = candle.close > recentHigh && currentVolatility < recentVolatility * 0.7;
+          }
+          
+          if (shouldEnter) {
             inPosition = true;
             entryPrice = candle.close;
             entryDate = candle.time.split('T')[0];
