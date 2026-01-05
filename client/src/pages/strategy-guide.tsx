@@ -130,7 +130,7 @@ export default function StrategyGuide() {
               <CardContent className="space-y-4 text-sm">
                 <p>
                   VCP Trader automatically classifies patterns into stages to help you 
-                  identify the best opportunities.
+                  identify the best opportunities. VCP strategies use BREAKOUT as the actionable stage.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
@@ -156,7 +156,7 @@ export default function StrategyGuide() {
                     <div className="flex-1">
                       <p className="text-muted-foreground text-xs">
                         Price has broken above resistance with volume confirmation. 
-                        Potential entry signal.
+                        Potential entry signal. <span className="text-foreground font-medium">VCP strategies only.</span>
                       </p>
                     </div>
                   </div>
@@ -320,6 +320,7 @@ export default function StrategyGuide() {
               <CardContent className="space-y-4 text-sm">
                 <p>
                   The scanner classifies multi-day VCP patterns based on contraction quality and proximity to breakout.
+                  Like Intraday VCP, this strategy uses BREAKOUT as the actionable stage.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
@@ -345,6 +346,7 @@ export default function StrategyGuide() {
                     <div className="flex-1">
                       <p className="text-muted-foreground text-xs">
                         Price has broken above the pivot with volume surge. Pattern has fully matured and triggered.
+                        <span className="text-foreground font-medium"> VCP strategies only.</span>
                       </p>
                     </div>
                   </div>
@@ -512,7 +514,7 @@ export default function StrategyGuide() {
               <CardContent className="space-y-4 text-sm">
                 <p>
                   The scanner classifies pullback patterns into stages based on 
-                  where they are in the setup process.
+                  where they are in the setup process. Classic Pullback uses TRIGGERED as the actionable stage.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
@@ -538,7 +540,7 @@ export default function StrategyGuide() {
                     <div className="flex-1">
                       <p className="text-muted-foreground text-xs">
                         Price has bounced with volume confirmation. 
-                        Potential entry signal - the trend may be resuming.
+                        Potential entry signal - the trend may be resuming. <span className="text-foreground font-medium">Classic Pullback only.</span>
                       </p>
                     </div>
                   </div>
