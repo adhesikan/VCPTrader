@@ -39,7 +39,7 @@ const mainNavItems = [
 
 const toolsNavItems = [
   { title: "Backtest", url: "/backtest", icon: FlaskConical },
-  { title: "VCP Strategy", url: "/vcp-strategy", icon: BookOpen },
+  { title: "Strategy Guide", url: "/strategy-guide", icon: BookOpen },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
