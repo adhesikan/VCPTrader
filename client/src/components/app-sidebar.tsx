@@ -29,7 +29,7 @@ import type { BrokerConnection, Alert } from "@shared/schema";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Trade Signals", url: "/signals", icon: Zap },
+  { title: "Breakout Alerts", url: "/signals", icon: Zap },
   { title: "Scanner", url: "/scanner", icon: Search },
   { title: "Charts", url: "/charts", icon: BarChart3 },
   { title: "Alerts", url: "/alerts", icon: Bell },
@@ -78,7 +78,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url}
                   >
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                       {item.title === "Alerts" && unreadAlerts > 0 && (
@@ -106,7 +106,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url}
                   >
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>

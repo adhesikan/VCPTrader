@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Clock, ChevronRight, ExternalLink } from "lucide-react";
+import { Search, Clock, ChevronRight, ExternalLink, Plug, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +58,9 @@ interface ChartData {
     type: "pivot_high" | "pivot_low" | "contraction_start" | "breakout";
     label?: string;
   }>;
+  requiresBroker?: boolean;
+  error?: string;
+  isLive?: boolean;
 }
 
 const timeframes = [
@@ -162,12 +165,32 @@ export default function Charts() {
         </div>
       </div>
 
+      {selectedTicker && chartData && chartData.requiresBroker && (
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2">
+          <Plug className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <p className="text-sm text-amber-700 dark:text-amber-300 flex-1">
+            Showing sample data. Connect your broker for live market data.
+          </p>
+          <Link href="/settings">
+            <Button variant="outline" size="sm" className="gap-1">
+              <Settings className="h-3 w-3" />
+              Connect
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {selectedTicker && chartData && (
         <div className="flex flex-wrap items-center gap-3 bg-card border rounded-lg px-4 py-3">
           <div className="flex items-baseline gap-2">
             <span className="text-xl lg:text-2xl font-bold font-mono">{selectedTicker}</span>
             {chartData?.name && (
               <span className="text-sm text-muted-foreground hidden sm:inline">{chartData.name}</span>
+            )}
+            {chartData?.isLive && (
+              <Badge variant="outline" className="text-xs text-status-online border-status-online/30">
+                Live
+              </Badge>
             )}
           </div>
 

@@ -4,7 +4,16 @@ import { storage } from "./storage";
 import { insertAlertSchema, insertWatchlistSchema, scannerFilters, UserRole } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
-import { fetchQuotesFromBroker, quotesToScanResults, DEFAULT_SCAN_SYMBOLS } from "./broker-service";
+import { 
+  fetchQuotesFromBroker, 
+  quotesToScanResults, 
+  fetchHistoryFromBroker,
+  processChartData,
+  DEFAULT_SCAN_SYMBOLS,
+  DOW_30_SYMBOLS,
+  NASDAQ_100_TOP,
+  SP500_TOP
+} from "./broker-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -117,9 +126,26 @@ export async function registerRoutes(
 
   app.get("/api/charts/:ticker/:timeframe?", async (req, res) => {
     try {
-      const { ticker } = req.params;
-      const chartData = storage.getChartData(ticker.toUpperCase());
-      res.json(chartData);
+      const { ticker, timeframe = "3M" } = req.params;
+      const userId = req.session?.userId;
+      
+      if (userId) {
+        const connection = await storage.getBrokerConnectionWithToken(userId);
+        if (connection?.accessToken && connection?.isConnected) {
+          try {
+            const candles = await fetchHistoryFromBroker(connection, ticker.toUpperCase(), timeframe);
+            const chartData = processChartData(candles, ticker.toUpperCase());
+            return res.json({ ...chartData, isLive: true });
+          } catch (brokerError: any) {
+            console.error("Chart broker fetch failed, using stored data:", brokerError.message);
+            const storedData = storage.getChartData(ticker.toUpperCase());
+            return res.json({ ...storedData, isLive: false, error: brokerError.message });
+          }
+        }
+      }
+      
+      const storedData = storage.getChartData(ticker.toUpperCase());
+      res.json({ ...storedData, isLive: false, requiresBroker: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to get chart data" });
     }

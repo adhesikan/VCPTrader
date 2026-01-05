@@ -35,6 +35,24 @@ const PRICE_PRESETS = [
 
 const TOP_TECH_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"];
 
+const DOW_30_SYMBOLS = [
+  "AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "DOW",
+  "GS", "HD", "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM",
+  "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT"
+];
+
+const NASDAQ_100_TOP = [
+  "AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "GOOG", "AVGO", "TSLA", "COST",
+  "PEP", "ADBE", "NFLX", "AMD", "CSCO", "TMUS", "INTC", "CMCSA", "AMGN", "INTU",
+  "QCOM", "TXN", "HON", "AMAT", "BKNG", "ISRG", "SBUX", "VRTX", "ADP", "MDLZ"
+];
+
+const SP500_TOP = [
+  "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "META", "TSLA", "UNH", "XOM",
+  "JNJ", "JPM", "V", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "LLY",
+  "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
+];
+
 const VCP_STAGES = [
   { stage: "FORMING", description: "Pattern is in early stages - volatility is beginning to contract but not yet ready for entry." },
   { stage: "READY", description: "Pattern is mature - price is consolidating near resistance with tight range. Watch for breakout." },
@@ -60,10 +78,22 @@ export default function Scanner() {
   });
 
   const rawResults = liveResults || storedResults;
+  const isLiveData = !!liveResults;
+  
+  const getSymbolsForPreset = (preset: string): string[] | null => {
+    switch (preset) {
+      case "toptech": return TOP_TECH_SYMBOLS;
+      case "dow30": return DOW_30_SYMBOLS;
+      case "nasdaq100": return NASDAQ_100_TOP;
+      case "sp500": return SP500_TOP;
+      default: return null;
+    }
+  };
   
   const pricePreset = PRICE_PRESETS.find(p => p.id === selectedPriceRange);
+  const presetSymbols = getSymbolsForPreset(selectedWatchlist);
   const results = rawResults?.filter(r => {
-    if (selectedWatchlist === "toptech" && !TOP_TECH_SYMBOLS.includes(r.ticker)) {
+    if (isLiveData && presetSymbols && !presetSymbols.includes(r.ticker)) {
       return false;
     }
     if (!pricePreset) return true;
@@ -75,8 +105,9 @@ export default function Scanner() {
     mutationFn: async () => {
       let symbols: string[] | undefined;
       
-      if (selectedWatchlist === "toptech") {
-        symbols = TOP_TECH_SYMBOLS;
+      const presetSymbolsList = getSymbolsForPreset(selectedWatchlist);
+      if (presetSymbolsList) {
+        symbols = presetSymbolsList;
       } else if (selectedWatchlist !== "default" && watchlists) {
         const watchlist = watchlists.find(w => w.id === selectedWatchlist);
         if (watchlist?.symbols && watchlist.symbols.length > 0) {
@@ -138,6 +169,9 @@ export default function Scanner() {
             <SelectContent>
               <SelectItem value="default">Default (16 stocks)</SelectItem>
               <SelectItem value="toptech">Top Tech 5</SelectItem>
+              <SelectItem value="dow30">Dow 30</SelectItem>
+              <SelectItem value="nasdaq100">NASDAQ 100 Top 30</SelectItem>
+              <SelectItem value="sp500">S&P 500 Top 30</SelectItem>
               {watchlists && watchlists.map((wl) => (
                 <SelectItem key={wl.id} value={wl.id}>
                   {wl.name} ({wl.symbols?.length || 0})

@@ -380,7 +380,7 @@ export default function Signals() {
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
       <div>
-        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Trade Signals</h1>
+        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Educational VCP pattern alerts - click for detailed analysis
         </p>
