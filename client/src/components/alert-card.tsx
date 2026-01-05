@@ -97,9 +97,11 @@ export function AlertCard({ alert, onDismiss }: AlertCardProps) {
           <span className="text-lg font-semibold font-mono">
             {alert.ticker}
           </span>
-          <span className={`text-lg font-mono font-semibold ${getAlertColor(alert.type as AlertTypeValue)}`}>
-            ${alert.price.toFixed(2)}
-          </span>
+          {alert.price != null && (
+            <span className={`text-lg font-mono font-semibold ${getAlertColor(alert.type as AlertTypeValue)}`}>
+              ${alert.price.toFixed(2)}
+            </span>
+          )}
         </div>
 
         {alert.message && (
