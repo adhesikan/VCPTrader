@@ -221,22 +221,24 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/broker/status", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/broker/status", isAuthenticated, async (req, res) => {
     try {
-      const connection = await storage.getBrokerConnection();
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnection(userId);
       res.json(connection);
     } catch (error) {
       res.status(500).json({ error: "Failed to get broker status" });
     }
   });
 
-  app.post("/api/broker/connect", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/broker/connect", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const { provider } = req.body;
       if (!provider) {
         return res.status(400).json({ error: "Provider is required" });
       }
-      const connection = await storage.setBrokerConnection({
+      const connection = await storage.setBrokerConnection(userId, {
         provider,
         isConnected: true,
         lastSync: new Date(),
@@ -247,9 +249,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/broker/disconnect", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/broker/disconnect", isAuthenticated, async (req, res) => {
     try {
-      await storage.clearBrokerConnection();
+      const userId = req.session.userId!;
+      await storage.clearBrokerConnection(userId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to disconnect broker" });

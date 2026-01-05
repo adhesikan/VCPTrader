@@ -118,6 +118,7 @@ export type BrokerProviderType = typeof BrokerProvider[keyof typeof BrokerProvid
 
 export const brokerConnections = pgTable("broker_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   provider: text("provider").notNull(),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),

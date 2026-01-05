@@ -50,9 +50,9 @@ export interface IStorage {
   addSymbolToWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
   removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
 
-  getBrokerConnection(): Promise<BrokerConnection | null>;
-  setBrokerConnection(connection: InsertBrokerConnection): Promise<BrokerConnection>;
-  clearBrokerConnection(): Promise<void>;
+  getBrokerConnection(userId: string): Promise<BrokerConnection | null>;
+  setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection>;
+  clearBrokerConnection(userId: string): Promise<void>;
 
   getPushSubscriptions(): Promise<PushSubscription[]>;
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
@@ -342,7 +342,7 @@ export class MemStorage implements IStorage {
   private scanResults: Map<string, ScanResult>;
   private alerts: Map<string, Alert>;
   private watchlists: Map<string, Watchlist>;
-  private brokerConnection: BrokerConnection | null;
+  private brokerConnections: Map<string, BrokerConnection>;
   private pushSubscriptions: Map<string, PushSubscription>;
   private chartDataCache: Map<string, ReturnType<typeof generateChartData>>;
 
@@ -352,7 +352,7 @@ export class MemStorage implements IStorage {
     this.scanResults = new Map();
     this.alerts = new Map();
     this.watchlists = new Map();
-    this.brokerConnection = null;
+    this.brokerConnections = new Map();
     this.pushSubscriptions = new Map();
     this.chartDataCache = new Map();
 
@@ -525,18 +525,28 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async getBrokerConnection(): Promise<BrokerConnection | null> {
-    return this.brokerConnection;
+  async getBrokerConnection(userId: string): Promise<BrokerConnection | null> {
+    return this.brokerConnections.get(userId) || null;
   }
 
-  async setBrokerConnection(connection: InsertBrokerConnection): Promise<BrokerConnection> {
+  async setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection> {
     const id = randomUUID();
-    this.brokerConnection = { ...connection, id };
-    return this.brokerConnection;
+    const brokerConnection: BrokerConnection = { 
+      id, 
+      userId, 
+      provider: connection.provider,
+      accessToken: connection.accessToken ?? null,
+      refreshToken: connection.refreshToken ?? null,
+      isConnected: connection.isConnected ?? null,
+      lastSync: connection.lastSync ?? null,
+      permissions: connection.permissions ?? null,
+    };
+    this.brokerConnections.set(userId, brokerConnection);
+    return brokerConnection;
   }
 
-  async clearBrokerConnection(): Promise<void> {
-    this.brokerConnection = null;
+  async clearBrokerConnection(userId: string): Promise<void> {
+    this.brokerConnections.delete(userId);
   }
 
   async getPushSubscriptions(): Promise<PushSubscription[]> {
