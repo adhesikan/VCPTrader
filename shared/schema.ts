@@ -41,9 +41,24 @@ export const PatternStage = {
   FORMING: "FORMING",
   READY: "READY",
   BREAKOUT: "BREAKOUT",
+  TRIGGERED: "TRIGGERED",
 } as const;
 
 export type PatternStageType = typeof PatternStage[keyof typeof PatternStage];
+
+export const StrategyType = {
+  VCP: "VCP",
+  CLASSIC_PULLBACK: "CLASSIC_PULLBACK",
+} as const;
+
+export type StrategyTypeValue = typeof StrategyType[keyof typeof StrategyType];
+
+export interface StrategyInfo {
+  id: StrategyTypeValue;
+  name: string;
+  description: string;
+  stages: string[];
+}
 
 export const scanResults = pgTable("scan_results", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X, LayoutGrid, Target, AlertTriangle, ChevronRight } from "lucide-react";
+import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X, LayoutGrid, Target, AlertTriangle, ChevronRight, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { ScanResult, ScannerFilters, Watchlist } from "@shared/schema";
+import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo } from "@shared/schema";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 
 const PRICE_PRESETS = [
@@ -55,12 +55,18 @@ const SP500_TOP = [
   "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
 ];
 
-const VCP_STAGES = [
-  { stage: "FORMING", description: "Pattern is in early stages - volatility is beginning to contract but not yet ready for entry." },
-  { stage: "READY", description: "Pattern is mature - price is consolidating near resistance with tight range. Watch for breakout." },
-  { stage: "APPROACHING", description: "Price is within 2% of resistance level - potential breakout imminent." },
-  { stage: "BREAKOUT", description: "Price has broken above resistance with increased volume - potential entry signal." },
-];
+const STRATEGY_STAGES: Record<string, { stage: string; description: string }[]> = {
+  VCP: [
+    { stage: "FORMING", description: "Pattern is in early stages - volatility is beginning to contract but not yet ready for entry." },
+    { stage: "READY", description: "Pattern is mature - price is consolidating near resistance with tight range. Watch for breakout." },
+    { stage: "BREAKOUT", description: "Price has broken above resistance with increased volume - potential entry signal." },
+  ],
+  CLASSIC_PULLBACK: [
+    { stage: "FORMING", description: "Looking for uptrending stock above EMA9/EMA21. Waiting for impulse move and pullback." },
+    { stage: "READY", description: "Valid pullback detected - price has pulled back to support. Watching for volume breakout." },
+    { stage: "TRIGGERED", description: "Breakout confirmed with increased volume - entry signal triggered." },
+  ],
+};
 
 export default function Scanner() {
   const [, navigate] = useLocation();
@@ -68,12 +74,20 @@ export default function Scanner() {
   const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
   const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all");
+  const [selectedStrategy, setSelectedStrategy] = useState<string>("VCP");
   const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
+
+  const { data: strategies } = useQuery<StrategyInfo[]>({
+    queryKey: ["/api/strategies"],
+  });
+
+  const currentStrategy = strategies?.find(s => s.id === selectedStrategy);
+  const currentStages = STRATEGY_STAGES[selectedStrategy] || STRATEGY_STAGES.VCP;
 
   const handleRowClick = (result: ScanResult) => {
     navigate(`/charts/${result.ticker}`);
@@ -163,21 +177,43 @@ export default function Scanner() {
     setFilters(defaultFilters);
   };
 
-  const breakoutCount = results?.filter(r => r.stage === "BREAKOUT").length || 0;
+  const triggeredCount = results?.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length || 0;
   const readyCount = results?.filter(r => r.stage === "READY").length || 0;
   const formingCount = results?.filter(r => r.stage === "FORMING").length || 0;
+
+  const triggerLabel = selectedStrategy === "VCP" ? "Breakout" : "Triggered";
 
   return (
     <div className="p-6 space-y-6" data-testid="scanner-page">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">VCP Scanner</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {currentStrategy?.name || "Pattern Scanner"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Scan for Volatility Contraction Pattern setups
+            {currentStrategy?.description || "Scan for trading pattern setups"}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
+            <SelectTrigger className="w-[200px]" data-testid="select-strategy">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select strategy" />
+            </SelectTrigger>
+            <SelectContent>
+              {strategies?.map((strategy) => (
+                <SelectItem key={strategy.id} value={strategy.id}>
+                  {strategy.name.replace(" (Volatility Contraction Pattern)", "")}
+                </SelectItem>
+              )) || (
+                <>
+                  <SelectItem value="VCP">VCP</SelectItem>
+                  <SelectItem value="CLASSIC_PULLBACK">Classic Pullback</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
           <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
             <SelectTrigger className="w-[180px]" data-testid="select-watchlist">
               <List className="h-4 w-4 mr-2" />
@@ -244,7 +280,7 @@ export default function Scanner() {
       <Collapsible open={showStageInfo} onOpenChange={setShowStageInfo}>
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="default" className="gap-1">
-            Breakout <span className="font-mono">{breakoutCount}</span>
+            {triggerLabel} <span className="font-mono">{triggeredCount}</span>
           </Badge>
           <Badge variant="secondary" className="gap-1">
             Ready <span className="font-mono">{readyCount}</span>
@@ -264,12 +300,12 @@ export default function Scanner() {
         </div>
         <CollapsibleContent className="mt-4">
           <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
-            <p className="text-sm font-medium">VCP Pattern Stages</p>
+            <p className="text-sm font-medium">{currentStrategy?.name || "Pattern"} Stages</p>
             <div className="grid gap-3 md:grid-cols-2">
-              {VCP_STAGES.map((info) => (
+              {currentStages.map((info) => (
                 <div key={info.stage} className="flex gap-3">
                   <Badge 
-                    variant={info.stage === "BREAKOUT" ? "default" : info.stage === "READY" ? "secondary" : "outline"}
+                    variant={info.stage === "BREAKOUT" || info.stage === "TRIGGERED" ? "default" : info.stage === "READY" ? "secondary" : "outline"}
                     className="h-fit shrink-0"
                   >
                     {info.stage}

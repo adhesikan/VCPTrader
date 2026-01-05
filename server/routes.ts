@@ -1,7 +1,8 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, scannerFilters, UserRole, RuleConditionType, PatternStage } from "@shared/schema";
+import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { getStrategyList, classifyQuote, StrategyId, PullbackStage } from "./strategies";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { 
@@ -42,6 +43,16 @@ export async function registerRoutes(
       code: active ? PROMO_CODE : null,
       config: active ? PROMO_CONFIG : null,
     });
+  });
+
+  app.get("/api/strategies", (req, res) => {
+    const strategies = getStrategyList().map(s => ({
+      ...s,
+      stages: s.id === StrategyId.VCP 
+        ? [PatternStage.FORMING, PatternStage.READY, PatternStage.BREAKOUT]
+        : [PullbackStage.FORMING, PullbackStage.READY, PullbackStage.TRIGGERED],
+    }));
+    res.json(strategies);
   });
 
   app.get("/api/market/stats", async (req, res) => {
