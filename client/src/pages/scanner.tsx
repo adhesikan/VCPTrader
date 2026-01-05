@@ -145,7 +145,10 @@ export default function Scanner() {
         }
       }
       
-      const response = await apiRequest("POST", "/api/scan/live", { symbols });
+      const response = await apiRequest("POST", "/api/scan/live", { 
+        symbols, 
+        strategy: selectedStrategy 
+      });
       return response.json();
     },
     onSuccess: (data) => {

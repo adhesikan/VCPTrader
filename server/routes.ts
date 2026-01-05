@@ -135,8 +135,9 @@ export async function registerRoutes(
       }
 
       const symbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
+      const strategy = req.body.strategy || StrategyType.VCP;
       const quotes = await fetchQuotesFromBroker(connection, symbols);
-      const results = quotesToScanResults(quotes);
+      const results = quotesToScanResults(quotes, strategy);
       
       res.json(results);
     } catch (error: any) {

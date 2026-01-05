@@ -1,5 +1,6 @@
-import { BrokerConnection, ScanResult, PatternStage } from "@shared/schema";
+import { BrokerConnection, ScanResult, PatternStage, StrategyType } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { classifyQuote, StrategyId, PullbackStage } from "./strategies";
 
 export interface QuoteData {
   symbol: string;
@@ -288,9 +289,26 @@ function calculateVCPStage(quote: QuoteData): "FORMING" | "READY" | "BREAKOUT" {
   return PatternStage.FORMING;
 }
 
-export function quotesToScanResults(quotes: QuoteData[]): ScanResult[] {
+function calculateClassicPullbackStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (quote.changePercent > 1.5 && rvol >= 1.5) {
+    return PullbackStage.TRIGGERED;
+  } else if (quote.changePercent >= -2.5 && quote.changePercent <= 0.5 && quote.change >= 0) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+export function quotesToScanResults(quotes: QuoteData[], strategy: string = StrategyType.VCP): ScanResult[] {
   return quotes.map((quote) => {
-    const stage = calculateVCPStage(quote);
+    let stage: string;
+    if (strategy === StrategyType.CLASSIC_PULLBACK) {
+      stage = calculateClassicPullbackStage(quote);
+    } else {
+      stage = calculateVCPStage(quote);
+    }
+    
     const resistance = quote.high * 1.02;
     const stopLoss = quote.last * 0.93;
     const patternScore = Math.min(100, Math.max(50, 
