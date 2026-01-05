@@ -1,28 +1,51 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Loader2, RefreshCw } from "lucide-react";
+import { Search, Loader2, RefreshCw, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScannerTable } from "@/components/scanner-table";
 import { ScannerFiltersPanel, defaultFilters } from "@/components/scanner-filters";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { ScanResult, ScannerFilters } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { ScanResult, ScannerFilters, Watchlist } from "@shared/schema";
+import { useBrokerStatus } from "@/hooks/use-broker-status";
 
 export default function Scanner() {
   const [filters, setFilters] = useState<ScannerFilters>(defaultFilters);
   const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
   const { toast } = useToast();
+  const { isConnected } = useBrokerStatus();
 
   const { data: storedResults, isLoading, refetch } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
+  });
+
+  const { data: watchlists } = useQuery<Watchlist[]>({
+    queryKey: ["/api/watchlists"],
   });
 
   const results = liveResults || storedResults;
 
   const runScanMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/scan/live", {});
+      let symbols: string[] | undefined;
+      
+      if (selectedWatchlist !== "default" && watchlists) {
+        const watchlist = watchlists.find(w => w.id === selectedWatchlist);
+        if (watchlist?.symbols && watchlist.symbols.length > 0) {
+          symbols = watchlist.symbols;
+        }
+      }
+      
+      const response = await apiRequest("POST", "/api/scan/live", { symbols });
       return response.json();
     },
     onSuccess: (data) => {
@@ -67,7 +90,23 @@ export default function Scanner() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {watchlists && watchlists.length > 0 && (
+            <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+              <SelectTrigger className="w-[180px]" data-testid="select-watchlist">
+                <List className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select watchlist" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default (16 stocks)</SelectItem>
+                {watchlists.map((wl) => (
+                  <SelectItem key={wl.id} value={wl.id}>
+                    {wl.name} ({wl.symbols?.length || 0})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -80,7 +119,7 @@ export default function Scanner() {
           </Button>
           <Button
             onClick={() => runScanMutation.mutate()}
-            disabled={runScanMutation.isPending}
+            disabled={runScanMutation.isPending || !isConnected}
             className="gap-2"
             data-testid="button-run-scan"
           >

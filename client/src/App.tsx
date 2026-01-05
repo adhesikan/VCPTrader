@@ -28,6 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, User, Loader2 } from "lucide-react";
+import { BrokerStatusProvider } from "@/hooks/use-broker-status";
+import { StatusBanner } from "@/components/status-banner";
 
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -170,18 +172,21 @@ function AppLayout() {
 
   return (
     <>
-      <SidebarProvider style={sidebarStyle}>
-        <div className="flex h-screen w-full">
-          <AppSidebar />
-          <SidebarInset className="flex flex-col flex-1 min-w-0">
-            <AppHeader />
-            <main className="flex-1 overflow-auto">
-              <AppRouter />
-            </main>
-            <Footer />
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+      <BrokerStatusProvider>
+        <SidebarProvider style={sidebarStyle}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <SidebarInset className="flex flex-col flex-1 min-w-0">
+              <AppHeader />
+              <StatusBanner />
+              <main className="flex-1 overflow-auto">
+                <AppRouter />
+              </main>
+              <Footer />
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </BrokerStatusProvider>
       <LegalAcceptanceModal
         open={showLegalModal}
         onAccepted={() => setShowLegalModal(false)}

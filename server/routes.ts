@@ -36,7 +36,33 @@ export async function registerRoutes(
 
   app.get("/api/scan/results", async (req, res) => {
     try {
+      const userId = req.session?.userId;
+      const includeMeta = req.query.meta === "true";
+      
+      if (userId) {
+        const connection = await storage.getBrokerConnectionWithToken(userId);
+        if (connection?.accessToken && connection?.isConnected) {
+          try {
+            const quotes = await fetchQuotesFromBroker(connection, DEFAULT_SCAN_SYMBOLS);
+            const liveResults = quotesToScanResults(quotes);
+            if (includeMeta) {
+              return res.json({ data: liveResults, isLive: true, provider: connection.provider });
+            }
+            return res.json(liveResults);
+          } catch (brokerError: any) {
+            console.error("Broker fetch failed, falling back to mock data:", brokerError.message);
+            if (includeMeta) {
+              const results = await storage.getScanResults();
+              return res.json({ data: results, isLive: false, error: brokerError.message });
+            }
+          }
+        }
+      }
+      
       const results = await storage.getScanResults();
+      if (includeMeta) {
+        return res.json({ data: results, isLive: false });
+      }
       res.json(results);
     } catch (error) {
       res.status(500).json({ error: "Failed to get scan results" });
@@ -160,7 +186,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/watchlists", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/watchlists", isAuthenticated, async (req, res) => {
     try {
       const watchlists = await storage.getWatchlists();
       res.json(watchlists);
