@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Plus, Check, Trash2, Filter, List } from "lucide-react";
+import { Bell, Plus, Check, Trash2, List, Power, PowerOff, Clock, AlertCircle, TrendingUp, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -21,22 +24,188 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AlertList } from "@/components/alert-card";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Alert, AlertTypeValue, InsertAlert, Watchlist } from "@shared/schema";
+import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue } from "@shared/schema";
+import { RuleConditionType, PatternStage } from "@shared/schema";
+
+function getStageBadgeVariant(stage: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (stage) {
+    case "BREAKOUT":
+      return "default";
+    case "READY":
+      return "secondary";
+    case "FORMING":
+      return "outline";
+    default:
+      return "outline";
+  }
+}
+
+function AlertRuleCard({ 
+  rule, 
+  onToggle, 
+  onDelete 
+}: { 
+  rule: AlertRule; 
+  onToggle: (id: string, enabled: boolean) => void;
+  onDelete: (id: string) => void;
+}) {
+  const payload = rule.conditionPayload as { targetStage?: string } | null;
+  const targetStage = payload?.targetStage || "BREAKOUT";
+  const lastState = rule.lastState as { stage?: string; price?: number } | null;
+  
+  return (
+    <Card 
+      className={`relative overflow-visible ${rule.isEnabled ? "" : "opacity-60"}`}
+      data-testid={`rule-card-${rule.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
+            <Badge variant={getStageBadgeVariant(targetStage)} className="gap-1">
+              <TrendingUp className="h-3 w-3" />
+              {targetStage}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={rule.isEnabled ?? true}
+              onCheckedChange={(checked) => onToggle(rule.id, checked)}
+              data-testid={`switch-rule-${rule.id}`}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive"
+              onClick={() => onDelete(rule.id)}
+              data-testid={`button-delete-rule-${rule.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-2 text-sm text-muted-foreground">
+          Alert when {rule.symbol} enters {targetStage} stage
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3">
+            {lastState?.stage && (
+              <span className="flex items-center gap-1">
+                Current: <Badge variant="outline" className="h-5 text-xs">{lastState.stage}</Badge>
+              </span>
+            )}
+            {lastState?.price && (
+              <span className="font-mono">${lastState.price.toFixed(2)}</span>
+            )}
+          </div>
+          {rule.lastEvaluatedAt && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDistanceToNow(new Date(rule.lastEvaluatedAt), { addSuffix: true })}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AlertEventCard({ 
+  event, 
+  onMarkRead 
+}: { 
+  event: AlertEvent; 
+  onMarkRead?: (id: string) => void;
+}) {
+  const payload = event.payload as { message?: string; resistance?: number; stopLoss?: number } | null;
+  const timeAgo = event.triggeredAt
+    ? formatDistanceToNow(new Date(event.triggeredAt), { addSuffix: true })
+    : "";
+  
+  return (
+    <Card 
+      className={`relative overflow-visible ${!event.isRead ? "border-primary/30" : ""}`}
+      data-testid={`event-card-${event.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant={getStageBadgeVariant(event.toState)} className="gap-1">
+              <TrendingUp className="h-3 w-3" />
+              {event.toState}
+            </Badge>
+            {!event.isRead && (
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            )}
+          </div>
+          {onMarkRead && !event.isRead && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onMarkRead(event.id)}
+              data-testid={`button-mark-read-${event.id}`}
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Mark Read
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-lg font-semibold font-mono">{event.symbol}</span>
+          {event.price != null && (
+            <span className="text-lg font-mono font-semibold text-chart-2">
+              ${event.price.toFixed(2)}
+            </span>
+          )}
+        </div>
+
+        {event.fromState && (
+          <div className="mt-1 text-sm text-muted-foreground">
+            Transitioned from {event.fromState} to {event.toState}
+          </div>
+        )}
+
+        {payload?.message && (
+          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+            {payload.message}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          <Link href={`/charts/${event.symbol}`}>
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+              <ExternalLink className="h-3 w-3" />
+              View Chart
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Alerts() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("none");
-  const [newAlert, setNewAlert] = useState({
-    ticker: "",
-    type: "BREAKOUT" as AlertTypeValue,
+  const [newRule, setNewRule] = useState({
+    symbol: "",
+    targetStage: "BREAKOUT" as string,
   });
   const { toast } = useToast();
 
-  const { data: alerts, isLoading } = useQuery<Alert[]>({
-    queryKey: ["/api/alerts"],
+  const { data: rules, isLoading: rulesLoading } = useQuery<AlertRule[]>({
+    queryKey: ["/api/alert-rules"],
+  });
+
+  const { data: events, isLoading: eventsLoading } = useQuery<AlertEvent[]>({
+    queryKey: ["/api/alert-events"],
   });
 
   const { data: watchlists } = useQuery<Watchlist[]>({
@@ -47,85 +216,88 @@ export default function Alerts() {
 
   useEffect(() => {
     if (selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0) {
-      setNewAlert(prev => ({ ...prev, ticker: selectedWatchlistData.symbols![0] }));
+      setNewRule(prev => ({ ...prev, symbol: selectedWatchlistData.symbols![0] }));
     }
   }, [selectedWatchlistData]);
 
-  const dismissMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("PATCH", `/api/alerts/${id}`, { isRead: true });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: InsertAlert) => {
-      const response = await apiRequest("POST", "/api/alerts", data);
+  const createRuleMutation = useMutation({
+    mutationFn: async (data: Partial<InsertAlertRule>) => {
+      const response = await apiRequest("POST", "/api/alert-rules", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewAlert({
-        ticker: "",
-        type: "BREAKOUT",
-      });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT" });
       toast({
-        title: "Alert Created",
-        description: "You will be notified when conditions are met",
+        title: "Alert Rule Created",
+        description: "You'll be notified when conditions are met",
       });
     },
     onError: (error) => {
       toast({
-        title: "Failed to create alert",
+        title: "Failed to create rule",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/alerts/mark-all-read", {});
+  const toggleRuleMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      await apiRequest("PATCH", `/api/alert-rules/${id}`, { isEnabled: enabled });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
-      toast({
-        title: "All alerts marked as read",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
     },
   });
 
-  const deleteAllMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", "/api/alerts", {});
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/alert-rules/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
-      toast({
-        title: "All alerts cleared",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+      toast({ title: "Alert rule deleted" });
     },
   });
 
-  const handleCreateAlert = () => {
-    if (newAlert.ticker) {
-      createMutation.mutate({
-        ticker: newAlert.ticker.toUpperCase(),
-        type: newAlert.type,
-        isRead: false,
+  const markEventReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/alert-events/${id}/read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-events"] });
+    },
+  });
+
+  const markAllEventsReadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/alert-events/mark-all-read", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-events"] });
+      toast({ title: "All events marked as read" });
+    },
+  });
+
+  const handleCreateRule = () => {
+    if (newRule.symbol) {
+      createRuleMutation.mutate({
+        symbol: newRule.symbol.toUpperCase(),
+        conditionType: RuleConditionType.STAGE_ENTERED,
+        conditionPayload: { targetStage: newRule.targetStage },
+        strategy: "VCP",
+        timeframe: "1d",
+        isEnabled: true,
       });
     }
   };
 
-  const unreadAlerts = alerts?.filter(a => !a.isRead) || [];
-  const readAlerts = alerts?.filter(a => a.isRead) || [];
-
-  const breakoutAlerts = alerts?.filter(a => a.type === "BREAKOUT") || [];
-  const stopAlerts = alerts?.filter(a => a.type === "STOP_HIT") || [];
-  const approachingAlerts = alerts?.filter(a => a.type === "APPROACHING") || [];
+  const enabledRules = rules?.filter(r => r.isEnabled) || [];
+  const disabledRules = rules?.filter(r => !r.isEnabled) || [];
+  const unreadEvents = events?.filter(e => !e.isRead) || [];
+  const readEvents = events?.filter(e => e.isRead) || [];
 
   return (
     <div className="p-6 space-y-6" data-testid="alerts-page">
@@ -133,186 +305,210 @@ export default function Alerts() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your breakout and price alerts
+            Manage your VCP stage alerts and view triggered events
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={unreadAlerts.length === 0}
-            className="gap-1"
-            data-testid="button-mark-all-read"
-          >
-            <Check className="h-4 w-4" />
-            Mark All Read
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => deleteAllMutation.mutate()}
-            disabled={!alerts?.length}
-            className="gap-1 text-destructive"
-            data-testid="button-clear-all"
-          >
-            <Trash2 className="h-4 w-4" />
-            Clear All
-          </Button>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create-alert">
-                <Plus className="h-4 w-4" />
-                New Alert
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create VCP Stage Alert</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                {watchlists && watchlists.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>From Watchlist (optional)</Label>
-                    <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
-                      <SelectTrigger data-testid="select-alert-watchlist">
-                        <List className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Select a watchlist" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None - enter manually</SelectItem>
-                        {watchlists.map((wl) => (
-                          <SelectItem key={wl.id} value={wl.id}>
-                            {wl.name} ({wl.symbols?.length || 0} symbols)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2" data-testid="button-create-rule">
+              <Plus className="h-4 w-4" />
+              New Alert Rule
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create VCP Stage Alert</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {watchlists && watchlists.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="ticker">Symbol</Label>
-                  {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
-                    <Select
-                      value={newAlert.ticker}
-                      onValueChange={(value) => setNewAlert(prev => ({ ...prev, ticker: value }))}
-                    >
-                      <SelectTrigger className="font-mono" data-testid="input-alert-ticker">
-                        <SelectValue placeholder="Select symbol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedWatchlistData.symbols.map((symbol) => (
-                          <SelectItem key={symbol} value={symbol}>
-                            {symbol}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id="ticker"
-                      placeholder="AAPL"
-                      value={newAlert.ticker}
-                      onChange={(e) => setNewAlert(prev => ({ ...prev, ticker: e.target.value.toUpperCase() }))}
-                      className="font-mono uppercase"
-                      data-testid="input-alert-ticker"
-                    />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="type">VCP Stage</Label>
-                  <Select
-                    value={newAlert.type}
-                    onValueChange={(value) => setNewAlert(prev => ({ ...prev, type: value as AlertTypeValue }))}
-                  >
-                    <SelectTrigger id="type" data-testid="select-alert-type">
-                      <SelectValue />
+                  <Label>From Watchlist (optional)</Label>
+                  <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+                    <SelectTrigger data-testid="select-rule-watchlist">
+                      <List className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Select a watchlist" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="BREAKOUT">
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Breakout</span>
-                          <span className="text-xs text-muted-foreground">Alert when price breaks above resistance</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="APPROACHING">
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Ready</span>
-                          <span className="text-xs text-muted-foreground">Alert when pattern is ready for breakout</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="EMA_EXIT">
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Forming</span>
-                          <span className="text-xs text-muted-foreground">Alert when VCP pattern starts forming</span>
-                        </div>
-                      </SelectItem>
+                      <SelectItem value="none">None - enter manually</SelectItem>
+                      {watchlists.map((wl) => (
+                        <SelectItem key={wl.id} value={wl.id}>
+                          {wl.name} ({wl.symbols?.length || 0} symbols)
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    You'll be notified when the stock reaches this VCP stage
-                  </p>
                 </div>
+              )}
 
-                <Button
-                  onClick={handleCreateAlert}
-                  disabled={!newAlert.ticker || createMutation.isPending}
-                  className="w-full"
-                  data-testid="button-submit-alert"
-                >
-                  {createMutation.isPending ? "Creating..." : "Create Alert"}
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="symbol">Symbol</Label>
+                {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
+                  <Select
+                    value={newRule.symbol}
+                    onValueChange={(value) => setNewRule(prev => ({ ...prev, symbol: value }))}
+                  >
+                    <SelectTrigger className="font-mono" data-testid="input-rule-symbol">
+                      <SelectValue placeholder="Select symbol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedWatchlistData.symbols.map((symbol) => (
+                        <SelectItem key={symbol} value={symbol}>
+                          {symbol}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id="symbol"
+                    placeholder="AAPL"
+                    value={newRule.symbol}
+                    onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                    className="font-mono uppercase"
+                    data-testid="input-rule-symbol"
+                  />
+                )}
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stage">Target VCP Stage</Label>
+                <Select
+                  value={newRule.targetStage}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, targetStage: value }))}
+                >
+                  <SelectTrigger id="stage" data-testid="select-rule-stage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BREAKOUT">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Breakout</span>
+                        <span className="text-xs text-muted-foreground">Alert when price breaks above resistance</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="READY">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Ready</span>
+                        <span className="text-xs text-muted-foreground">Alert when pattern is ready for breakout</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="FORMING">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Forming</span>
+                        <span className="text-xs text-muted-foreground">Alert when VCP pattern starts forming</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You'll be notified when the stock enters this VCP stage
+                </p>
+              </div>
+
+              <Button
+                onClick={handleCreateRule}
+                disabled={!newRule.symbol || createRuleMutation.isPending}
+                className="w-full"
+                data-testid="button-submit-rule"
+              >
+                {createRuleMutation.isPending ? "Creating..." : "Create Alert Rule"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <Badge variant="default" className="gap-1">
-          <Bell className="h-3 w-3" />
-          Unread <span className="font-mono">{unreadAlerts.length}</span>
+          <Power className="h-3 w-3" />
+          Active Rules <span className="font-mono">{enabledRules.length}</span>
         </Badge>
         <Badge variant="secondary" className="gap-1">
-          Breakout <span className="font-mono">{breakoutAlerts.length}</span>
+          <Bell className="h-3 w-3" />
+          Unread <span className="font-mono">{unreadEvents.length}</span>
         </Badge>
         <Badge variant="outline" className="gap-1">
-          Ready <span className="font-mono">{approachingAlerts.length}</span>
+          Total Events <span className="font-mono">{events?.length || 0}</span>
         </Badge>
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs defaultValue="rules" className="w-full">
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all">
-            All ({alerts?.length || 0})
+          <TabsTrigger value="rules" data-testid="tab-rules">
+            Rules ({rules?.length || 0})
           </TabsTrigger>
-          <TabsTrigger value="unread" data-testid="tab-unread">
-            Unread ({unreadAlerts.length})
-          </TabsTrigger>
-          <TabsTrigger value="read" data-testid="tab-read">
-            Read ({readAlerts.length})
+          <TabsTrigger value="history" data-testid="tab-history">
+            History ({events?.length || 0})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="mt-6">
-          <AlertList
-            alerts={alerts || []}
-            onDismiss={(id) => dismissMutation.mutate(id)}
-          />
+        <TabsContent value="rules" className="mt-6">
+          {rulesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : rules && rules.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {rules.map((rule) => (
+                <AlertRuleCard
+                  key={rule.id}
+                  rule={rule}
+                  onToggle={(id, enabled) => toggleRuleMutation.mutate({ id, enabled })}
+                  onDelete={(id) => deleteRuleMutation.mutate(id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm font-medium">No alert rules</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Create a rule to monitor VCP stage transitions
+              </p>
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="unread" className="mt-6">
-          <AlertList
-            alerts={unreadAlerts}
-            onDismiss={(id) => dismissMutation.mutate(id)}
-          />
-        </TabsContent>
+        <TabsContent value="history" className="mt-6 space-y-4">
+          {unreadEvents.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markAllEventsReadMutation.mutate()}
+                className="gap-1"
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-4 w-4" />
+                Mark All Read
+              </Button>
+            </div>
+          )}
 
-        <TabsContent value="read" className="mt-6">
-          <AlertList alerts={readAlerts} />
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : events && events.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {events.map((event) => (
+                <AlertEventCard
+                  key={event.id}
+                  event={event}
+                  onMarkRead={(id) => markEventReadMutation.mutate(id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Bell className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm font-medium">No alert events</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Events will appear here when your rules are triggered
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
