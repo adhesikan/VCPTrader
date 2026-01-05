@@ -8,6 +8,10 @@ import type {
   InsertScanResult,
   Alert,
   InsertAlert,
+  AlertRule,
+  InsertAlertRule,
+  AlertEvent,
+  InsertAlertEvent,
   Watchlist,
   InsertWatchlist,
   BrokerConnection,
@@ -66,6 +70,21 @@ export interface IStorage {
   getBacktestResult(id: string): Promise<BacktestResult | undefined>;
   createBacktestResult(result: InsertBacktestResult): Promise<BacktestResult>;
   deleteBacktestResult(id: string): Promise<void>;
+
+  getAlertRules(userId?: string): Promise<AlertRule[]>;
+  getAlertRule(id: string): Promise<AlertRule | undefined>;
+  getEnabledAlertRules(): Promise<AlertRule[]>;
+  createAlertRule(rule: InsertAlertRule): Promise<AlertRule>;
+  updateAlertRule(id: string, data: Partial<AlertRule>): Promise<AlertRule | undefined>;
+  deleteAlertRule(id: string): Promise<void>;
+
+  getAlertEvents(userId?: string, ruleId?: string): Promise<AlertEvent[]>;
+  getAlertEvent(id: string): Promise<AlertEvent | undefined>;
+  getAlertEventByKey(eventKey: string): Promise<AlertEvent | undefined>;
+  createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent>;
+  updateAlertEvent(id: string, data: Partial<AlertEvent>): Promise<AlertEvent | undefined>;
+  markAlertEventRead(id: string): Promise<AlertEvent | undefined>;
+  markAllAlertEventsRead(userId: string): Promise<void>;
 }
 
 function generateMockScanResults(): ScanResult[] {

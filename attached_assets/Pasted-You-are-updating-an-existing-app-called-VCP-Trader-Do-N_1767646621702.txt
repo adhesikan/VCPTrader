@@ -1,0 +1,111 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+PROBLEM
+Right now, when a user creates a new alert, the system immediately posts an alert message (basically echoing what the user selected). This is incorrect.
+
+GOAL
+When a user creates an alert, it must be saved as a RULE. The system must continuously evaluate those rules against real market data + the VCP model, and only generate/dispatch alert notifications when the rule’s conditions are met (e.g., NVDA transitions into BREAKOUT stage).
+
+HIGH-LEVEL REQUIREMENTS
+1) Alert creation = store rule definition (no immediate “trigger” notification).
+2) Add an evaluation engine (scheduler/worker) that checks alert rules on a cadence.
+3) Detect state transitions (e.g., READY → BREAKOUT) so alerts fire once per event.
+4) Dispatch notifications (in-app + push/email if enabled) only when conditions are true and not already fired for that event.
+5) Add UI to show “Active rules” and “Triggered history”.
+
+DATA MODEL
+Implement/extend DB tables (Postgres) to support:
+
+A) alert_rules
+- id (uuid)
+- user_id
+- symbol (e.g., NVDA)
+- strategy (enum: "VCP")
+- timeframe (enum: "1m","5m","15m","1h","1d")
+- condition_type (enum: "STAGE_ENTERED","PRICE_ABOVE","VOLUME_SPIKE", etc.)  // keep extensible
+- condition_payload (jsonb) // for stage entered: { "stage": "BREAKOUT" }
+- is_enabled (boolean default true)
+- created_at
+- updated_at
+- last_evaluated_at (nullable)
+- last_state (jsonb nullable) // store last known stage, last pivot, etc.
+
+B) alert_events (history / dedupe)
+- id (uuid)
+- rule_id
+- user_id
+- symbol
+- triggered_at
+- event_key (string unique per rule) // e.g., "NVDA|VCP|5m|STAGE_ENTERED|BREAKOUT|2026-01-05T15:35Z"
+- payload (jsonb) // include detected stage, price, volume, pivot, explanation, etc.
+- delivery_status (jsonb) // in-app/push/email states
+
+Add unique constraint on (rule_id, event_key) to prevent duplicates.
+
+ALERT EVALUATION ENGINE
+Create a server-side “Alert Engine” that runs periodically:
+- Every 1 minute for intraday timeframes (1m/5m/15m)
+- Every 5–15 minutes for larger timeframes (1h)
+- Daily for 1d
+
+Implementation approach:
+- Use an internal scheduler in the API server (node-cron) OR a separate worker process.
+- Must be production-safe on Railway: avoid double-running if multiple replicas exist.
+  Preferred: a dedicated worker service OR Postgres advisory lock around each run.
+
+Workflow per run:
+1) Fetch enabled alert_rules (batched, e.g., 200 at a time)
+2) For each rule:
+   a) Fetch latest market data needed (candles/quote) for that symbol+timeframe (use existing data provider)
+   b) Run VCP classification function to determine current stage (FORMING/READY/BREAKOUT)
+   c) Evaluate rule condition:
+      - For STAGE_ENTERED with stage=BREAKOUT:
+        trigger ONLY when last_state.stage != "BREAKOUT" AND current_stage == "BREAKOUT"
+   d) If triggered:
+      - Create alert_events row with unique event_key
+      - Dispatch notifications to user via existing notification system
+      - Update alert_rules.last_state + last_evaluated_at
+   e) If not triggered:
+      - Update alert_rules.last_state + last_evaluated_at only (no notifications)
+
+IMPORTANT: Do not trigger repeatedly if NVDA remains in BREAKOUT for multiple cycles. Only trigger on transition into BREAKOUT, unless user explicitly sets “repeat” (not required now).
+
+VCP MODEL INTEGRATION
+Use the app’s existing VCP model logic. If it does not exist as a standalone function, refactor it into:
+- classifyVcpStage({ candles, ema9, ema21, volumeStats, pivotLine, contractionMetrics }) -> { stage, pivotPrice, score, explanation }
+
+Ensure alert engine uses the same logic as the scanner UI.
+
+NOTIFICATIONS
+When an alert triggers, create one user-facing alert message:
+Title example:
+- “NVDA entered BREAKOUT (VCP, 5m)”
+Body:
+- Include pivot price, current price, volume vs average, and a short explanation
+Append to EVERY alert body:
+“This alert is informational only and not investment advice.”
+
+Delivery channels:
+- In-app notifications (required)
+- Push/email if user has enabled them (use existing settings)
+
+UI CHANGES
+1) Alert creation flow:
+- After “Create alert”, show toast: “Alert rule saved. We’ll notify you when conditions are met.”
+- Do NOT post a triggered alert.
+2) Alerts page must have two tabs:
+- “Rules” (active alert rules)
+- “History” (triggered alert events)
+3) Rule list shows:
+- symbol, timeframe, condition (e.g., “Stage enters BREAKOUT”), enabled toggle, last evaluated time
+4) History shows:
+- triggered time, symbol, event summary, click to open details
+
+TESTING
+Add at least 3 tests (if test framework exists):
+1) Creating an alert creates alert_rules row and does NOT create alert_events
+2) Transition READY→BREAKOUT creates exactly one alert_event
+3) Repeated evaluations while still in BREAKOUT do NOT create duplicates
+
+DELIVERABLE
+Refactor alert creation to persist rules, implement the alert evaluation engine with dedupe + state transitions, trigger notifications only when conditions match (e.g., NVDA enters BREAKOUT), and update UI to show Rules vs History.

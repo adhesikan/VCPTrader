@@ -97,6 +97,72 @@ export const insertAlertSchema = createInsertSchema(alerts).omit({ id: true, tri
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
 
+export const RuleConditionType = {
+  STAGE_ENTERED: "STAGE_ENTERED",
+  PRICE_ABOVE: "PRICE_ABOVE",
+  PRICE_BELOW: "PRICE_BELOW",
+  VOLUME_SPIKE: "VOLUME_SPIKE",
+} as const;
+
+export type RuleConditionTypeValue = typeof RuleConditionType[keyof typeof RuleConditionType];
+
+export const AlertTimeframe = {
+  "1m": "1m",
+  "5m": "5m",
+  "15m": "15m",
+  "1h": "1h",
+  "1d": "1d",
+} as const;
+
+export type AlertTimeframeValue = typeof AlertTimeframe[keyof typeof AlertTimeframe];
+
+export const alertRules = pgTable("alert_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  strategy: text("strategy").notNull().default("VCP"),
+  timeframe: text("timeframe").notNull().default("1d"),
+  conditionType: text("condition_type").notNull(),
+  conditionPayload: jsonb("condition_payload"),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  lastEvaluatedAt: timestamp("last_evaluated_at"),
+  lastState: jsonb("last_state"),
+});
+
+export const insertAlertRuleSchema = createInsertSchema(alertRules).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true, 
+  lastEvaluatedAt: true,
+  lastState: true 
+});
+export type InsertAlertRule = z.infer<typeof insertAlertRuleSchema>;
+export type AlertRule = typeof alertRules.$inferSelect;
+
+export const alertEvents = pgTable("alert_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: varchar("rule_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  triggeredAt: timestamp("triggered_at").defaultNow(),
+  eventKey: text("event_key").notNull().unique(),
+  fromState: text("from_state"),
+  toState: text("to_state").notNull(),
+  price: real("price"),
+  payload: jsonb("payload"),
+  deliveryStatus: jsonb("delivery_status"),
+  isRead: boolean("is_read").default(false),
+});
+
+export const insertAlertEventSchema = createInsertSchema(alertEvents).omit({ 
+  id: true, 
+  triggeredAt: true 
+});
+export type InsertAlertEvent = z.infer<typeof insertAlertEventSchema>;
+export type AlertEvent = typeof alertEvents.$inferSelect;
+
 export const watchlists = pgTable("watchlists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
