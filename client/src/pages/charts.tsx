@@ -85,9 +85,11 @@ export default function Charts() {
     }
   }, [params?.ticker]);
 
-  const { data: chartData, isLoading: chartLoading } = useQuery<ChartData>({
+  const { data: chartData, isLoading: chartLoading, isFetching: chartFetching } = useQuery<ChartData>({
     queryKey: ["/api/charts", selectedTicker, timeframe],
     enabled: !!selectedTicker,
+    refetchInterval: 30000, // Refresh every 30 seconds for live data
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 
   const { data: scanResult } = useQuery<ScanResult | null>({
@@ -162,7 +164,8 @@ export default function Charts() {
               <span className="text-sm text-muted-foreground hidden sm:inline">{chartData.name}</span>
             )}
             {chartData?.isLive && (
-              <Badge variant="outline" className="text-xs text-status-online border-status-online/30">
+              <Badge variant="outline" className="text-xs text-status-online border-status-online/30 gap-1">
+                {chartFetching && <span className="h-1.5 w-1.5 rounded-full bg-status-online animate-pulse" />}
                 Live
               </Badge>
             )}
