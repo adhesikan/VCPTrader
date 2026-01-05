@@ -23,9 +23,15 @@ import {
   ArrowRight,
   Menu,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import logoUrl from "@assets/ChatGPT_Image_Jan_1,_2026,_01_38_07_PM_1767292703801.png";
-import { useState } from "react";
+import vcpChartImg from "@assets/VCPChart_1767652266272.png";
+import vcpAlertConfigImg from "@assets/VCPAlertConfig_1767652266274.png";
+import vcpBreakoutAlertsImg from "@assets/VCPBreakoutAlerts_1767652266274.png";
+import vcpBacktestImg from "@assets/VCPBacktest_1767652266275.png";
+import { useState, useRef, useCallback } from "react";
 
 function NavBar() {
   const { isAuthenticated } = useAuth();
@@ -187,6 +193,112 @@ function HeroSection() {
         <p className="mt-4 text-sm text-muted-foreground" data-testid="text-hero-disclaimer">
           Educational & informational only — not investment advice.
         </p>
+      </div>
+    </section>
+  );
+}
+
+function ScreenshotCarousel() {
+  const { isAuthenticated } = useAuth();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const screenshots = [
+    { src: vcpBreakoutAlertsImg, alt: "Breakout Alerts Dashboard", caption: "Real-time breakout alerts with key metrics" },
+    { src: vcpChartImg, alt: "VCP Chart Analysis", caption: "Interactive charts with technical analysis" },
+    { src: vcpAlertConfigImg, alt: "Alert Configuration", caption: "Customizable alert rules for any stock" },
+    { src: vcpBacktestImg, alt: "Strategy Backtesting", caption: "Test your strategy with historical data" },
+  ];
+
+  const updateScrollButtons = useCallback(() => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  }, []);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const scrollAmount = scrollRef.current.clientWidth * 0.8;
+      scrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+      setTimeout(updateScrollButtons, 350);
+    }
+  };
+
+  return (
+    <section className="py-12 md:py-16 bg-muted/30">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold" data-testid="text-carousel-heading">
+            See VCP Trader in Action
+          </h2>
+          <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+            Powerful tools designed for active traders
+          </p>
+        </div>
+
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="icon"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur ${!canScrollLeft ? "invisible" : ""}`}
+            onClick={() => scroll("left")}
+            data-testid="button-carousel-left"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+
+          <div
+            ref={scrollRef}
+            className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4"
+            onScroll={updateScrollButtons}
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {screenshots.map((screenshot, index) => (
+              <div
+                key={index}
+                className="flex-shrink-0 snap-center first:ml-0 last:mr-0"
+                style={{ width: "min(85vw, 600px)" }}
+              >
+                <div className="rounded-lg overflow-hidden border bg-background shadow-sm">
+                  <img
+                    src={screenshot.src}
+                    alt={screenshot.alt}
+                    className="w-full h-auto object-cover"
+                    data-testid={`img-screenshot-${index}`}
+                  />
+                </div>
+                <p className="mt-3 text-center text-sm text-muted-foreground" data-testid={`text-screenshot-caption-${index}`}>
+                  {screenshot.caption}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur ${!canScrollRight ? "invisible" : ""}`}
+            onClick={() => scroll("right")}
+            data-testid="button-carousel-right"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="text-center mt-8">
+          <Link href={isAuthenticated ? "/dashboard" : "/auth"}>
+            <Button size="lg" data-testid="button-carousel-cta">
+              {isAuthenticated ? "Go to Dashboard" : "Start Free Trial"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -520,6 +632,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <NavBar />
       <HeroSection />
+      <ScreenshotCarousel />
       <TrustStrip />
       <PricingTiersSection />
       <FeaturesSection />
