@@ -35,8 +35,25 @@ export function useAuth() {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: async () => {
+      // First invalidate user query
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Auto-connect broker if credentials exist
+      try {
+        await fetch("/api/broker/auto-connect", { 
+          method: "POST", 
+          credentials: "include" 
+        });
+      } catch (e) {
+        // Silent fail - auto-connect is best effort
+      }
+      
+      // Refresh all relevant data queries
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan/results"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
     },
   });
 

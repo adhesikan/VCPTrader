@@ -61,6 +61,7 @@ export interface IStorage {
   getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null>;
   setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection>;
   setBrokerConnectionWithTokens(userId: string, provider: string, accessToken: string, refreshToken?: string, expiresAt?: Date): Promise<BrokerConnection>;
+  updateBrokerConnectionStatus(userId: string, isConnected: boolean): Promise<void>;
   clearBrokerConnection(userId: string): Promise<void>;
 
   getPushSubscriptions(): Promise<PushSubscription[]>;
@@ -628,6 +629,16 @@ export class MemStorage implements IStorage {
       isConnected: true,
       lastSync: new Date(),
     });
+  }
+
+  async updateBrokerConnectionStatus(userId: string, isConnected: boolean): Promise<void> {
+    const existing = this.brokerConnections.get(userId);
+    if (existing) {
+      existing.isConnected = isConnected;
+      existing.lastSync = isConnected ? new Date() : existing.lastSync;
+      existing.updatedAt = new Date();
+      this.brokerConnections.set(userId, existing);
+    }
   }
 
   async clearBrokerConnection(userId: string): Promise<void> {

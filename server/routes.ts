@@ -505,6 +505,60 @@ export async function registerRoutes(
     }
   });
 
+  // Auto-connect endpoint - checks stored credentials and establishes connection
+  app.post("/api/broker/auto-connect", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.json({ connected: false, reason: "no_credentials" });
+      }
+
+      // Test the stored credentials
+      let isValid = false;
+      
+      if (connection.provider === "tradier") {
+        const response = await fetch("https://api.tradier.com/v1/markets/quotes?symbols=AAPL", {
+          headers: {
+            "Authorization": `Bearer ${connection.accessToken}`,
+            "Accept": "application/json",
+          },
+        });
+        isValid = response.ok;
+      } else if (connection.provider === "alpaca") {
+        const headers: Record<string, string> = {
+          "APCA-API-KEY-ID": connection.accessToken,
+        };
+        if (connection.refreshToken) {
+          headers["APCA-API-SECRET-KEY"] = connection.refreshToken;
+        }
+        const response = await fetch("https://paper-api.alpaca.markets/v2/account", { headers });
+        isValid = response.ok;
+      } else if (connection.provider === "polygon") {
+        const response = await fetch(`https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey=${connection.accessToken}`);
+        isValid = response.ok;
+      }
+
+      if (isValid) {
+        // Update connection status to connected
+        await storage.updateBrokerConnectionStatus(userId, true);
+        res.json({ 
+          connected: true, 
+          provider: connection.provider,
+          message: "Auto-connected successfully" 
+        });
+      } else {
+        // Mark as disconnected if credentials are invalid
+        await storage.updateBrokerConnectionStatus(userId, false);
+        res.json({ connected: false, reason: "invalid_credentials" });
+      }
+    } catch (error: any) {
+      console.error("Auto-connect error:", error.message);
+      res.json({ connected: false, reason: "error", error: error.message });
+    }
+  });
+
   app.post("/api/broker/test", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId!;
