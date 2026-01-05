@@ -280,6 +280,87 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/broker/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.status(400).json({ success: false, error: "No broker connection found" });
+      }
+
+      let testResult: { success: boolean; message: string; data?: any };
+
+      if (connection.provider === "tradier") {
+        const response = await fetch("https://api.tradier.com/v1/markets/quotes?symbols=AAPL", {
+          headers: {
+            "Authorization": `Bearer ${connection.accessToken}`,
+            "Accept": "application/json",
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const quote = data.quotes?.quote;
+          testResult = {
+            success: true,
+            message: "Connection successful",
+            data: quote ? {
+              symbol: quote.symbol,
+              last: quote.last,
+              change: quote.change,
+              volume: quote.volume,
+            } : null,
+          };
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          testResult = {
+            success: false,
+            message: errorData.fault?.faultstring || `API error: ${response.status}`,
+          };
+        }
+      } else if (connection.provider === "alpaca") {
+        const response = await fetch("https://data.alpaca.markets/v2/stocks/AAPL/quotes/latest", {
+          headers: {
+            "APCA-API-KEY-ID": connection.accessToken,
+            "APCA-API-SECRET-KEY": connection.refreshToken || "",
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          testResult = {
+            success: true,
+            message: "Connection successful",
+            data: { symbol: "AAPL", bidPrice: data.quote?.bp, askPrice: data.quote?.ap },
+          };
+        } else {
+          testResult = { success: false, message: `API error: ${response.status}` };
+        }
+      } else if (connection.provider === "polygon") {
+        const response = await fetch(`https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey=${connection.accessToken}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.results?.[0];
+          testResult = {
+            success: true,
+            message: "Connection successful",
+            data: result ? { symbol: "AAPL", close: result.c, volume: result.v } : null,
+          };
+        } else {
+          testResult = { success: false, message: `API error: ${response.status}` };
+        }
+      } else {
+        testResult = { success: true, message: "Connection stored (API test not available for this provider)" };
+      }
+
+      res.json(testResult);
+    } catch (error) {
+      res.status(500).json({ success: false, error: "Failed to test broker connection" });
+    }
+  });
+
   app.post("/api/push/subscribe", isAuthenticated, async (req, res) => {
     try {
       const { endpoint, keys } = req.body;

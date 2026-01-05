@@ -51,6 +51,7 @@ export interface IStorage {
   removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
 
   getBrokerConnection(userId: string): Promise<BrokerConnection | null>;
+  getBrokerConnectionWithToken(userId: string): Promise<BrokerConnection | null>;
   setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection>;
   clearBrokerConnection(userId: string): Promise<void>;
 
@@ -526,6 +527,10 @@ export class MemStorage implements IStorage {
   }
 
   async getBrokerConnection(userId: string): Promise<BrokerConnection | null> {
+    return this.brokerConnections.get(userId) || null;
+  }
+
+  async getBrokerConnectionWithToken(userId: string): Promise<BrokerConnection | null> {
     return this.brokerConnections.get(userId) || null;
   }
 

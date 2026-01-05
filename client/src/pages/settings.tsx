@@ -124,6 +124,36 @@ export default function Settings() {
     },
   });
 
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/broker/test", {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Connection Test Passed",
+          description: data.data 
+            ? `${data.data.symbol}: $${data.data.last || data.data.close || 'N/A'}` 
+            : data.message,
+        });
+      } else {
+        toast({
+          title: "Connection Test Failed",
+          description: data.message || data.error,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Connection Test Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const enablePushMutation = useMutation({
     mutationFn: async () => {
       if ("Notification" in window && "serviceWorker" in navigator) {
@@ -197,7 +227,7 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className={`h-3 w-3 rounded-full ${brokerStatus?.isConnected ? "bg-status-online" : "bg-status-offline"}`} />
                     <div>
@@ -213,14 +243,24 @@ export default function Settings() {
                     </div>
                   </div>
                   {brokerStatus?.isConnected && (
-                    <Button
-                      variant="outline"
-                      onClick={() => disconnectBrokerMutation.mutate()}
-                      disabled={disconnectBrokerMutation.isPending}
-                      data-testid="button-disconnect"
-                    >
-                      Disconnect
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => testConnectionMutation.mutate()}
+                        disabled={testConnectionMutation.isPending}
+                        data-testid="button-test-connection"
+                      >
+                        {testConnectionMutation.isPending ? "Testing..." : "Test Connection"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => disconnectBrokerMutation.mutate()}
+                        disabled={disconnectBrokerMutation.isPending}
+                        data-testid="button-disconnect"
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
