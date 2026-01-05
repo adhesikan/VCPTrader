@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { FlaskConical, Play, Trash2, Clock, Plug, Settings, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,11 +31,21 @@ interface BacktestConfig {
   stopLossPercent: number;
 }
 
+function getDefaultDates() {
+  const today = new Date();
+  const sixMonthsAgo = subMonths(today, 6);
+  return {
+    startDate: format(sixMonthsAgo, "yyyy-MM-dd"),
+    endDate: format(today, "yyyy-MM-dd"),
+  };
+}
+
 export default function Backtest() {
+  const defaultDates = useMemo(() => getDefaultDates(), []);
   const [config, setConfig] = useState<BacktestConfig>({
     ticker: "",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
+    startDate: defaultDates.startDate,
+    endDate: defaultDates.endDate,
     initialCapital: 100000,
     positionSize: 5,
     stopLossPercent: 7,
@@ -59,10 +69,27 @@ export default function Backtest() {
         description: "Results saved automatically",
       });
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
+      let errorMsg = "Failed to run backtest";
+      try {
+        if (error.response) {
+          const data = await error.response.json();
+          errorMsg = data.error || errorMsg;
+        } else if (error.message) {
+          errorMsg = error.message;
+        }
+      } catch {
+        // Use default message
+      }
+      
+      // Add helpful guidance for date range errors
+      if (errorMsg.includes("Not enough data")) {
+        errorMsg = "Not enough data in date range. Your broker provides approximately 1 year of history. Try adjusting dates to the recent past.";
+      }
+      
       toast({
         title: "Backtest Failed",
-        description: error.message || "Failed to run backtest",
+        description: errorMsg,
         variant: "destructive",
       });
     },
@@ -86,6 +113,16 @@ export default function Backtest() {
   };
 
   const latestResult = results && results.length > 0 ? results[0] : null;
+  const latestTrades = latestResult?.trades && Array.isArray(latestResult.trades) 
+    ? (latestResult.trades as Array<{
+        entryDate: string;
+        exitDate: string;
+        entryPrice: number;
+        exitPrice: number;
+        returnPercent: number;
+        exitReason: string;
+      }>)
+    : [];
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="backtest-page">
@@ -311,7 +348,7 @@ export default function Backtest() {
                   </div>
                 </div>
 
-                {latestResult.trades && Array.isArray(latestResult.trades) && latestResult.trades.length > 0 && (
+                {latestTrades.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium mb-3">Trade History</h3>
                     <div className="rounded-md border max-h-64 overflow-auto">
@@ -327,7 +364,7 @@ export default function Backtest() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {(latestResult.trades as any[]).map((trade: any, i: number) => (
+                          {latestTrades.map((trade, i) => (
                             <TableRow key={i}>
                               <TableCell className="text-muted-foreground text-sm">
                                 {trade.entryDate}

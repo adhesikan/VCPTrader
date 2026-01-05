@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings, List, LayoutGrid } from "lucide-react";
+import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings, List, LayoutGrid, Search, ArrowUpDown } from "lucide-react";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriceChart, TechnicalAnalysisWidget, VolumeProfileWidget } from "@/components/price-chart";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
@@ -56,11 +58,10 @@ interface SignalCardProps {
   stopLoss: number;
   rvol: number;
   atr: number;
-  message?: string;
   onClick: () => void;
 }
 
-function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, message, onClick }: SignalCardProps) {
+function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, onClick }: SignalCardProps) {
   const upside = ((resistance - price) / price * 100).toFixed(1);
   const risk = ((price - stopLoss) / price * 100).toFixed(1);
 
@@ -81,7 +82,10 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, mess
               {type}
             </Badge>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <div className="text-right">
+            <p className="font-mono font-bold">${price.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Current</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-sm">
@@ -112,10 +116,6 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, mess
             <p className="font-mono font-medium">${atr.toFixed(2)}</p>
           </div>
         </div>
-
-        {message && (
-          <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">{message}</p>
-        )}
       </CardContent>
     </Card>
   );
@@ -353,30 +353,60 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
   );
 }
 
+type SortField = "ticker" | "type" | "price" | "rvol";
+type SortDirection = "asc" | "desc";
+
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("card");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("ticker");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { isConnected } = useBrokerStatus();
 
   const { data: scanResults, isLoading } = useQuery<any[]>({
     queryKey: ["/api/scan/results"],
   });
 
-  const signalData = scanResults?.map(result => ({
-    id: result.ticker,
-    ticker: result.ticker,
-    type: result.stage,
-    price: result.price,
-    resistance: result.resistance,
-    stopLoss: result.stopLoss,
-    rvol: result.rvol || 1.0,
-    atr: result.atr || result.price * 0.02,
-    message: result.stage === "BREAKOUT" 
-      ? "Broke resistance with high volume" 
-      : result.stage === "APPROACHING" 
-        ? "Within 2% of resistance level"
-        : "VCP pattern ready for breakout",
-  })) || [];
+  const signalData = useMemo(() => {
+    const mapped = scanResults?.map(result => ({
+      id: result.ticker,
+      ticker: result.ticker,
+      type: result.stage,
+      price: result.price,
+      resistance: result.resistance,
+      stopLoss: result.stopLoss,
+      rvol: result.rvol || 1.0,
+      atr: result.atr || result.price * 0.02,
+    })) || [];
+
+    // Filter by search query
+    const filtered = searchQuery
+      ? mapped.filter(s => s.ticker.toLowerCase().includes(searchQuery.toLowerCase()))
+      : mapped;
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case "ticker":
+          comparison = a.ticker.localeCompare(b.ticker);
+          break;
+        case "type":
+          comparison = a.type.localeCompare(b.type);
+          break;
+        case "price":
+          comparison = (a.price || 0) - (b.price || 0);
+          break;
+        case "rvol":
+          comparison = (a.rvol || 0) - (b.rvol || 0);
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [scanResults, searchQuery, sortField, sortDirection]);
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
@@ -387,7 +417,38 @@ export default function Signals() {
         </p>
       </div>
 
-      <div className="flex items-center justify-end gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search ticker..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 w-48"
+              data-testid="input-signals-search"
+            />
+          </div>
+          <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
+            <SelectTrigger className="w-32" data-testid="select-signals-sort-field">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ticker">Ticker</SelectItem>
+              <SelectItem value="type">Stage</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+              <SelectItem value="rvol">RVOL</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+            data-testid="button-signals-sort-direction"
+          >
+            <ArrowUpDown className={`h-4 w-4 ${sortDirection === "desc" ? "rotate-180" : ""}`} />
+          </Button>
+        </div>
         <div className="flex items-center gap-1 border rounded-md p-0.5">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -466,7 +527,6 @@ export default function Signals() {
               stopLoss={signal.stopLoss}
               rvol={signal.rvol}
               atr={signal.atr}
-              message={signal.message ?? undefined}
               onClick={() => setSelectedTicker(signal.ticker)}
             />
           ))}
@@ -484,7 +544,6 @@ export default function Signals() {
                     <th className="text-right p-3 font-medium">Resistance</th>
                     <th className="text-right p-3 font-medium">Stop Loss</th>
                     <th className="text-right p-3 font-medium">RVOL</th>
-                    <th className="text-left p-3 font-medium">Signal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -511,9 +570,6 @@ export default function Signals() {
                       <td className="p-3 text-right font-mono text-destructive">${signal.stopLoss?.toFixed(2) || "-"}</td>
                       <td className={`p-3 text-right font-mono ${signal.rvol >= 1.5 ? "text-chart-2" : ""}`}>
                         {signal.rvol?.toFixed(2)}x
-                      </td>
-                      <td className="p-3 text-muted-foreground text-xs max-w-[200px] truncate">
-                        {signal.message}
                       </td>
                     </tr>
                   ))}
