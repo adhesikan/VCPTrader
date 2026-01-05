@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppSidebar } from "@/components/app-sidebar";
-import { MarketStatsBar } from "@/components/market-stats-bar";
 import { LegalAcceptanceModal } from "@/components/legal-acceptance-modal";
 import { Footer } from "@/components/footer";
 import {
@@ -15,8 +14,6 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import { useQuery } from "@tanstack/react-query";
-import type { MarketStats } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -123,15 +120,10 @@ function UserMenu() {
 }
 
 function AppHeader() {
-  const { data: marketStats, isLoading } = useQuery<MarketStats>({
-    queryKey: ["/api/market/stats"],
-  });
-
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
       <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
-        <MarketStatsBar stats={marketStats} isLoading={isLoading} />
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
