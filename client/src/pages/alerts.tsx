@@ -28,7 +28,7 @@ import type { Alert, AlertTypeValue, InsertAlert, Watchlist } from "@shared/sche
 
 export default function Alerts() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("");
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("none");
   const [newAlert, setNewAlert] = useState({
     ticker: "",
     type: "BREAKOUT" as AlertTypeValue,
@@ -190,7 +190,7 @@ export default function Alerts() {
                         <SelectValue placeholder="Select a watchlist" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None - enter manually</SelectItem>
+                        <SelectItem value="none">None - enter manually</SelectItem>
                         {watchlists.map((wl) => (
                           <SelectItem key={wl.id} value={wl.id}>
                             {wl.name} ({wl.symbols?.length || 0} symbols)
