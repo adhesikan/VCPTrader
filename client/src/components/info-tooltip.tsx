@@ -20,6 +20,18 @@ export const tradingTerms: Record<string, string> = {
   volume: "Number of shares traded. Higher volume confirms price moves and indicates stronger conviction.",
   avgVolume: "Average daily shares traded over 20 days. Used as baseline to compare current activity.",
   toResistance: "Percentage distance from current price to resistance level. Shows potential upside if breakout occurs.",
+  initialCapital: "Starting amount of money for the backtest simulation. This is the total capital you would invest.",
+  positionSize: "Percentage of your total capital to allocate to each trade. Lower percentages reduce risk but also potential gains.",
+  stopLossPercent: "Maximum percentage loss allowed before automatically exiting the trade. Protects capital from large drawdowns.",
+  startDate: "Beginning date of the historical data period to test the strategy against.",
+  endDate: "Ending date of the historical data period. The strategy will be tested between start and end dates.",
+  ticker: "Stock symbol to run the backtest on. Uses historical price data from your connected broker.",
+  totalReturn: "Overall percentage gain or loss from all trades during the backtest period.",
+  winRate: "Percentage of trades that were profitable. Higher win rates indicate more consistent performance.",
+  sharpeRatio: "Risk-adjusted return metric. Higher values (above 1.0) indicate better risk-adjusted performance.",
+  maxDrawdown: "Largest peak-to-trough decline during the backtest. Lower values indicate less volatile returns.",
+  profitFactor: "Ratio of gross profits to gross losses. Values above 1.0 mean the strategy is profitable overall.",
+  totalTrades: "Total number of buy/sell transactions executed during the backtest period.",
 };
 
 interface InfoTooltipProps {

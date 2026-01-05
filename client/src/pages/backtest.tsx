@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, Play, Trash2, Clock, Plug, Settings } from "lucide-react";
+import { FlaskConical, Play, Trash2, Clock, Plug, Settings, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 import type { BacktestResult } from "@shared/schema";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface BacktestConfig {
   ticker: string;
@@ -146,8 +147,9 @@ export default function Backtest() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="ticker" className="text-xs uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="ticker" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                 Stock Symbol
+                <InfoTooltip term="ticker" />
               </Label>
               <Input
                 id="ticker"
@@ -161,8 +163,9 @@ export default function Backtest() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate" className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="startDate" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                   Start Date
+                  <InfoTooltip term="startDate" />
                 </Label>
                 <Input
                   id="startDate"
@@ -173,8 +176,9 @@ export default function Backtest() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endDate" className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="endDate" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                   End Date
+                  <InfoTooltip term="endDate" />
                 </Label>
                 <Input
                   id="endDate"
@@ -187,8 +191,9 @@ export default function Backtest() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="capital" className="text-xs uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="capital" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                 Initial Capital
+                <InfoTooltip term="initialCapital" />
               </Label>
               <Input
                 id="capital"
@@ -202,8 +207,9 @@ export default function Backtest() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="posSize" className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="posSize" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                   Position Size %
+                  <InfoTooltip term="positionSize" />
                 </Label>
                 <Input
                   id="posSize"
@@ -215,8 +221,9 @@ export default function Backtest() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="stopLoss" className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="stopLoss" className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                   Stop Loss %
+                  <InfoTooltip term="stopLossPercent" />
                 </Label>
                 <Input
                   id="stopLoss"
@@ -255,21 +262,33 @@ export default function Backtest() {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Total Return</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Total Return
+                      <InfoTooltip term="totalReturn" />
+                    </p>
                     <p className={`text-2xl font-bold font-mono ${latestResult.totalReturn >= 0 ? "text-chart-2" : "text-destructive"}`}>
                       {latestResult.totalReturn >= 0 ? "+" : ""}{latestResult.totalReturn.toFixed(1)}%
                     </p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Win Rate</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Win Rate
+                      <InfoTooltip term="winRate" />
+                    </p>
                     <p className="text-2xl font-bold font-mono">{latestResult.winRate.toFixed(1)}%</p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Sharpe Ratio</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Sharpe Ratio
+                      <InfoTooltip term="sharpeRatio" />
+                    </p>
                     <p className="text-2xl font-bold font-mono">{(latestResult.sharpeRatio || 0).toFixed(2)}</p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Total Trades</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Total Trades
+                      <InfoTooltip term="totalTrades" />
+                    </p>
                     <p className="text-2xl font-bold font-mono">{latestResult.totalTrades}</p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
@@ -279,7 +298,10 @@ export default function Backtest() {
                     </p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Max Drawdown</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Max Drawdown
+                      <InfoTooltip term="maxDrawdown" />
+                    </p>
                     <p className="text-2xl font-bold font-mono text-destructive">
                       -{latestResult.maxDrawdown.toFixed(1)}%
                     </p>

@@ -1,0 +1,64 @@
+You are updating an existing commercial web app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Remove any language that implies the Volatility Contraction Pattern (VCP) was “developed by” or is owned/endorsed by any individual (e.g., Mark Minervini). Keep the educational guide page, but rewrite it to be neutral, descriptive, and compliance-safe.
+
+SCOPE
+Update the existing “VCP Strategy Guide” page (and any other pages/components where this wording appears).
+
+REQUIREMENTS
+
+1) REMOVE ATTRIBUTION / ENDORSEMENT LANGUAGE
+Find and remove/replace any text like:
+- “VCP was developed by legendary trader Mark Minervini…”
+- “Minervini’s VCP strategy…”
+- “created/invented by…”
+- any wording implying affiliation, endorsement, sponsorship, or ownership
+
+Do NOT mention Mark Minervini anywhere on the site unless it is in a clearly separated “Sources / Further Reading” section (not required for this task). For now, remove all mentions.
+
+2) REWRITE “WHAT IS VCP?” SECTION (USE THIS TEXT)
+Replace the “What is VCP?” description with the following exact copy:
+
+TITLE:
+“What is a Volatility Contraction Pattern (VCP)?”
+
+BODY:
+“A volatility contraction pattern is a technical market structure where price ranges tighten as a stock consolidates near resistance. This behavior can reflect decreasing selling pressure while buyers remain active, and may precede a breakout when demand overwhelms supply.
+
+VCP Trader identifies these contraction phases using objective price, volume, and moving-average data to help traders surface potential breakout conditions.”
+
+3) KEEP THE REST OF THE CONTENT, BUT ENSURE NEUTRAL WORDING
+- Keep your “Key Characteristics”, “Entry Strategy”, “Risk Management”, and “Pattern Stages” sections.
+- Scan those sections for any “buy/sell” advisory phrasing and adjust to neutral language such as:
+  - “potential breakout conditions”
+  - “may indicate”
+  - “informational/educational”
+- Do not use: “guaranteed”, “recommended trade”, “buy now”, “sell now”.
+
+4) ADD A SMALL DISCLAIMER ON THIS PAGE
+At the bottom of the VCP Strategy Guide page (or top if you prefer), add this line:
+
+“Educational & informational only. Not investment advice.”
+
+5) OPTIONAL UI (IF PRESENT)
+If the page has a “Learn about the VCP trading strategy” subtitle, change it to:
+
+“Learn about volatility contraction setups and breakout conditions.”
+
+6) GLOBAL SEARCH
+Perform a global search across the repo for:
+- “Minervini”
+- “legendary trader”
+- “developed by”
+- “invented by”
+- “creator of VCP”
+and remove/replace with neutral language.
+
+7) TEST / VERIFY
+- Ensure the page renders properly after changes
+- Ensure no mention of Mark Minervini remains
+- Ensure the content reads naturally and looks consistent with the existing design
+
+DELIVERABLE
+Commit changes updating the VCP Strategy Guide and any other references so the app describes VCP as a general technical pattern without attribution or implied endorsement, and includes the educational disclaimer.
