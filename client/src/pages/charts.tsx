@@ -63,6 +63,13 @@ interface ChartData {
   isLive?: boolean;
 }
 
+const intervals = [
+  { value: "5m", label: "5m" },
+  { value: "15m", label: "15m" },
+  { value: "30m", label: "30m" },
+  { value: "1h", label: "1h" },
+];
+
 const timeframes = [
   { value: "1D", label: "1D" },
   { value: "1W", label: "1W" },
@@ -148,7 +155,21 @@ export default function Charts() {
             </Button>
           </div>
 
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-0.5 items-center border-r pr-2 mr-1">
+              {intervals.map((iv) => (
+                <Button
+                  key={iv.value}
+                  variant={timeframe === iv.value ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setTimeframe(iv.value)}
+                  className="font-mono text-xs px-2"
+                  data-testid={`button-interval-${iv.value}`}
+                >
+                  {iv.label}
+                </Button>
+              ))}
+            </div>
             {timeframes.map((tf) => (
               <Button
                 key={tf.value}

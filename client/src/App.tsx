@@ -45,6 +45,7 @@ import TermsPage from "@/pages/terms";
 import DisclaimerPage from "@/pages/disclaimer";
 import PrivacyPage from "@/pages/privacy";
 import OpenSourcePage from "@/pages/open-source";
+import VCPStrategy from "@/pages/vcp-strategy";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -59,6 +60,7 @@ function AppRouter() {
       <Route path="/alerts" component={Alerts} />
       <Route path="/watchlists" component={Watchlists} />
       <Route path="/backtest" component={Backtest} />
+      <Route path="/vcp-strategy" component={VCPStrategy} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

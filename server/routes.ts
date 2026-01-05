@@ -484,9 +484,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/backtest/latest", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/backtest/results", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      res.json(null);
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const results = await storage.getBacktestResults(userId);
+      res.json(results);
     } catch (error) {
       res.status(500).json({ error: "Failed to get backtest results" });
     }
@@ -494,10 +497,121 @@ export async function registerRoutes(
 
   app.post("/api/backtest/run", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const result = await storage.runBacktest();
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      const { ticker, startDate, endDate, initialCapital, positionSize, stopLossPercent } = req.body;
+      
+      if (!ticker) {
+        return res.status(400).json({ error: "Ticker symbol is required" });
+      }
+
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      let candles: any[] = [];
+      
+      if (connection?.accessToken && connection?.isConnected) {
+        try {
+          candles = await fetchHistoryFromBroker(connection, ticker.toUpperCase(), "1Y");
+        } catch (brokerError: any) {
+          console.error("Broker fetch failed for backtest:", brokerError.message);
+        }
+      }
+
+      if (candles.length === 0) {
+        return res.status(400).json({ error: "No historical data available. Connect a broker to run backtests." });
+      }
+
+      const filteredCandles = candles.filter(c => {
+        const candleDate = c.time.split('T')[0];
+        return candleDate >= startDate && candleDate <= endDate;
+      });
+
+      if (filteredCandles.length < 10) {
+        return res.status(400).json({ error: "Not enough data in date range" });
+      }
+
+      const trades: any[] = [];
+      let inPosition = false;
+      let entryPrice = 0;
+      let entryDate = "";
+      let stopPrice = 0;
+
+      for (let i = 50; i < filteredCandles.length; i++) {
+        const candle = filteredCandles[i];
+        
+        if (!inPosition) {
+          const recentHigh = Math.max(...filteredCandles.slice(i - 20, i).map(c => c.high));
+          const recentVolatility = filteredCandles.slice(i - 10, i).reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 10;
+          const currentVolatility = Math.abs(candle.close - candle.open);
+          
+          if (candle.close > recentHigh && currentVolatility < recentVolatility * 0.7) {
+            inPosition = true;
+            entryPrice = candle.close;
+            entryDate = candle.time.split('T')[0];
+            stopPrice = entryPrice * (1 - stopLossPercent / 100);
+          }
+        } else {
+          if (candle.low <= stopPrice) {
+            trades.push({
+              ticker,
+              entryDate,
+              exitDate: candle.time.split('T')[0],
+              entryPrice: Number(entryPrice.toFixed(2)),
+              exitPrice: Number(stopPrice.toFixed(2)),
+              returnPercent: Number((((stopPrice - entryPrice) / entryPrice) * 100).toFixed(2)),
+              exitReason: "Stop Loss",
+            });
+            inPosition = false;
+          } else if (candle.close > entryPrice * 1.15) {
+            trades.push({
+              ticker,
+              entryDate,
+              exitDate: candle.time.split('T')[0],
+              entryPrice: Number(entryPrice.toFixed(2)),
+              exitPrice: Number(candle.close.toFixed(2)),
+              returnPercent: Number((((candle.close - entryPrice) / entryPrice) * 100).toFixed(2)),
+              exitReason: "Target",
+            });
+            inPosition = false;
+          }
+        }
+      }
+
+      const wins = trades.filter(t => t.returnPercent > 0).length;
+      const avgReturn = trades.length > 0 ? trades.reduce((sum, t) => sum + t.returnPercent, 0) / trades.length : 0;
+      const totalReturn = trades.reduce((sum, t) => sum + t.returnPercent, 0);
+      const maxDrawdown = trades.length > 0 ? Math.abs(Math.min(...trades.map(t => t.returnPercent), 0)) : 0;
+
+      const result = await storage.createBacktestResult({
+        userId,
+        ticker: ticker.toUpperCase(),
+        startDate,
+        endDate,
+        initialCapital,
+        positionSize,
+        stopLossPercent,
+        totalTrades: trades.length,
+        winRate: trades.length > 0 ? (wins / trades.length) * 100 : 0,
+        avgReturn,
+        maxDrawdown,
+        sharpeRatio: avgReturn > 0 ? avgReturn / (maxDrawdown || 1) : 0,
+        totalReturn,
+        trades,
+      });
+
       res.json(result);
     } catch (error) {
+      console.error("Backtest error:", error);
       res.status(500).json({ error: "Failed to run backtest" });
+    }
+  });
+
+  app.delete("/api/backtest/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteBacktestResult(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete backtest" });
     }
   });
 

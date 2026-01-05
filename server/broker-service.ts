@@ -178,6 +178,77 @@ export async function fetchSchwabQuotes(
   });
 }
 
+async function fetchTastyTradeQuotes(accessToken: string, symbols: string[]): Promise<QuoteData[]> {
+  const headers = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const quotes: QuoteData[] = [];
+  for (const symbol of symbols) {
+    try {
+      const response = await fetch(
+        `https://api.tastytrade.com/market-data/quotes/${symbol}`,
+        { headers }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const quote = data.data;
+        if (quote) {
+          quotes.push({
+            symbol,
+            last: quote.last || 0,
+            change: quote.netChange || 0,
+            changePercent: quote.netChangePercent || 0,
+            volume: quote.volume || 0,
+            avgVolume: quote.avgVolume || 0,
+            high: quote.high || 0,
+            low: quote.low || 0,
+            open: quote.open || 0,
+            previousClose: quote.previousClose || 0,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`TastyTrade quote error for ${symbol}:`, error);
+    }
+  }
+  return quotes;
+}
+
+async function fetchTradeStationQuotes(accessToken: string, symbols: string[]): Promise<QuoteData[]> {
+  const headers = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const symbolList = symbols.join(",");
+  const response = await fetch(
+    `https://api.tradestation.com/v3/marketdata/quotes/${symbolList}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`TradeStation API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const quotesData = data.Quotes || [];
+
+  return quotesData.map((q: any) => ({
+    symbol: q.Symbol,
+    last: q.Last || 0,
+    change: q.NetChange || 0,
+    changePercent: q.NetChangePct || 0,
+    volume: q.Volume || 0,
+    avgVolume: q.AvgVolume || 0,
+    high: q.High || 0,
+    low: q.Low || 0,
+    open: q.Open || 0,
+    previousClose: q.PreviousClose || 0,
+  }));
+}
+
 export async function fetchQuotesFromBroker(
   connection: BrokerConnection,
   symbols: string[]
@@ -197,6 +268,10 @@ export async function fetchQuotesFromBroker(
       return fetchIBKRQuotes(connection.accessToken, symbols);
     case "schwab":
       return fetchSchwabQuotes(connection.accessToken, symbols);
+    case "tastytrade":
+      return fetchTastyTradeQuotes(connection.accessToken, symbols);
+    case "tradestation":
+      return fetchTradeStationQuotes(connection.accessToken, symbols);
     default:
       throw new Error(`Provider ${connection.provider} not supported for market data`);
   }
@@ -278,12 +353,22 @@ export interface CandleData {
   volume: number;
 }
 
+function isIntradayTimeframe(timeframe: string): boolean {
+  return ["5m", "15m", "30m", "1h"].includes(timeframe);
+}
+
 function getDateRange(timeframe: string): { start: string; end: string } {
   const now = new Date();
   const end = now.toISOString().split('T')[0];
   let startDate = new Date(now);
   
   switch (timeframe) {
+    case "5m":
+    case "15m":
+    case "30m":
+    case "1h":
+      startDate.setDate(startDate.getDate() - 5);
+      break;
     case "1D":
       startDate.setDate(startDate.getDate() - 1);
       break;
@@ -309,33 +394,81 @@ function getDateRange(timeframe: string): { start: string; end: string } {
   return { start: startDate.toISOString().split('T')[0], end };
 }
 
+function getTradierInterval(timeframe: string): string {
+  switch (timeframe) {
+    case "5m": return "5min";
+    case "15m": return "15min";
+    case "30m": return "30min";
+    case "1h": return "60min";
+    case "1D": return "5min";
+    default: return "daily";
+  }
+}
+
+function getPolygonParams(timeframe: string): { multiplier: number; span: string } {
+  switch (timeframe) {
+    case "5m": return { multiplier: 5, span: "minute" };
+    case "15m": return { multiplier: 15, span: "minute" };
+    case "30m": return { multiplier: 30, span: "minute" };
+    case "1h": return { multiplier: 1, span: "hour" };
+    case "1D": return { multiplier: 5, span: "minute" };
+    default: return { multiplier: 1, span: "day" };
+  }
+}
+
+function getAlpacaTimeframe(timeframe: string): string {
+  switch (timeframe) {
+    case "5m": return "5Min";
+    case "15m": return "15Min";
+    case "30m": return "30Min";
+    case "1h": return "1Hour";
+    case "1D": return "5Min";
+    default: return "1Day";
+  }
+}
+
 export async function fetchTradierHistory(
   accessToken: string,
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
   const { start, end } = getDateRange(timeframe);
-  const interval = timeframe === "1D" ? "5min" : "daily";
+  const interval = getTradierInterval(timeframe);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
-  const response = await fetch(
-    `https://api.tradier.com/v1/markets/history?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-      },
-    }
-  );
+  const endpoint = isIntraday 
+    ? `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`
+    : `https://api.tradier.com/v1/markets/history?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`;
+  
+  const response = await fetch(endpoint, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
 
   if (!response.ok) {
     throw new Error(`Tradier history API error: ${response.status}`);
   }
 
   const data = await response.json();
+  
+  if (isIntraday) {
+    const series = data.series?.data;
+    if (!series) return [];
+    const seriesArray = Array.isArray(series) ? series : [series];
+    return seriesArray.map((d: any) => ({
+      time: d.time || d.timestamp,
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+      volume: d.volume,
+    }));
+  }
+  
   const history = data.history?.day;
-  
   if (!history) return [];
-  
   const historyArray = Array.isArray(history) ? history : [history];
   
   return historyArray.map((d: any) => ({
@@ -354,8 +487,8 @@ export async function fetchPolygonHistory(
   timeframe: string
 ): Promise<CandleData[]> {
   const { start, end } = getDateRange(timeframe);
-  const multiplier = timeframe === "1D" ? 5 : 1;
-  const span = timeframe === "1D" ? "minute" : "day";
+  const { multiplier, span } = getPolygonParams(timeframe);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   const response = await fetch(
     `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${span}/${start}/${end}?apiKey=${accessToken}&limit=5000`
@@ -369,7 +502,7 @@ export async function fetchPolygonHistory(
   const results = data.results || [];
   
   return results.map((d: any) => ({
-    time: new Date(d.t).toISOString().split('T')[0],
+    time: isIntraday ? new Date(d.t).toISOString() : new Date(d.t).toISOString().split('T')[0],
     open: d.o,
     high: d.h,
     low: d.l,
@@ -385,7 +518,8 @@ export async function fetchAlpacaHistory(
   timeframe: string
 ): Promise<CandleData[]> {
   const { start, end } = getDateRange(timeframe);
-  const tf = timeframe === "1D" ? "5Min" : "1Day";
+  const tf = getAlpacaTimeframe(timeframe);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   const headers: Record<string, string> = {
     "APCA-API-KEY-ID": accessToken,
@@ -407,12 +541,99 @@ export async function fetchAlpacaHistory(
   const bars = data.bars || [];
   
   return bars.map((d: any) => ({
-    time: d.t.split('T')[0],
+    time: isIntraday ? d.t : d.t.split('T')[0],
     open: d.o,
     high: d.h,
     low: d.l,
     close: d.c,
     volume: d.v,
+  }));
+}
+
+export async function fetchTastyTradeHistory(
+  accessToken: string,
+  secretKey: string | null,
+  symbol: string,
+  timeframe: string
+): Promise<CandleData[]> {
+  const { start, end } = getDateRange(timeframe);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
+  
+  const periodType = isIntraday ? "minute" : "day";
+  const period = isIntraday ? 5 : 1;
+  
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const response = await fetch(
+    `https://api.tastytrade.com/market-data/candles/${symbol}?start=${start}&end=${end}&periodType=${periodType}&period=${period}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`TastyTrade history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const candles = data.data?.candles || [];
+  
+  return candles.map((d: any) => ({
+    time: isIntraday ? d.time : d.time.split('T')[0],
+    open: d.open,
+    high: d.high,
+    low: d.low,
+    close: d.close,
+    volume: d.volume,
+  }));
+}
+
+export async function fetchTradeStationHistory(
+  accessToken: string,
+  secretKey: string | null,
+  symbol: string,
+  timeframe: string
+): Promise<CandleData[]> {
+  const { start, end } = getDateRange(timeframe);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
+  
+  let interval = "Daily";
+  if (isIntraday) {
+    switch (timeframe) {
+      case "5m": interval = "5"; break;
+      case "15m": interval = "15"; break;
+      case "30m": interval = "30"; break;
+      case "1h": interval = "60"; break;
+      case "1D": interval = "5"; break;
+    }
+  }
+  
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const unit = isIntraday ? "Minute" : "Daily";
+  const response = await fetch(
+    `https://api.tradestation.com/v3/marketdata/barcharts/${symbol}?interval=${interval}&unit=${unit}&startDate=${start}&endDate=${end}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`TradeStation history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const bars = data.Bars || [];
+  
+  return bars.map((d: any) => ({
+    time: isIntraday ? d.TimeStamp : d.TimeStamp.split('T')[0],
+    open: d.Open,
+    high: d.High,
+    low: d.Low,
+    close: d.Close,
+    volume: d.TotalVolume,
   }));
 }
 
@@ -432,6 +653,10 @@ export async function fetchHistoryFromBroker(
       return fetchPolygonHistory(connection.accessToken, symbol, timeframe);
     case "alpaca":
       return fetchAlpacaHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
+    case "tastytrade":
+      return fetchTastyTradeHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
+    case "tradestation":
+      return fetchTradeStationHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
     default:
       throw new Error(`Provider ${connection.provider} not supported for historical data`);
   }

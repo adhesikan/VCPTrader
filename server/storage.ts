@@ -16,6 +16,8 @@ import type {
   InsertPushSubscription,
   MarketStats,
   PatternStageType,
+  BacktestResult,
+  InsertBacktestResult,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -59,6 +61,11 @@ export interface IStorage {
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
 
   getMarketStats(): Promise<MarketStats>;
+
+  getBacktestResults(userId: string): Promise<BacktestResult[]>;
+  getBacktestResult(id: string): Promise<BacktestResult | undefined>;
+  createBacktestResult(result: InsertBacktestResult): Promise<BacktestResult>;
+  deleteBacktestResult(id: string): Promise<void>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -632,53 +639,32 @@ export class MemStorage implements IStorage {
     return results;
   }
 
-  async runBacktest(): Promise<{
-    id: string;
-    totalTrades: number;
-    winRate: number;
-    avgReturn: number;
-    maxDrawdown: number;
-    sharpeRatio: number;
-    totalReturn: number;
-    trades: Array<{
-      ticker: string;
-      entryDate: string;
-      exitDate: string;
-      entryPrice: number;
-      exitPrice: number;
-      returnPercent: number;
-      exitReason: string;
-    }>;
-  }> {
-    const tickers = ["NVDA", "AAPL", "MSFT", "AMD", "GOOGL", "META"];
-    const trades = tickers.map(ticker => {
-      const entryPrice = 100 + Math.random() * 200;
-      const returnPct = (Math.random() - 0.35) * 20;
-      const exitPrice = entryPrice * (1 + returnPct / 100);
-      return {
-        ticker,
-        entryDate: "2024-03-15",
-        exitDate: "2024-04-02",
-        entryPrice: Number(entryPrice.toFixed(2)),
-        exitPrice: Number(exitPrice.toFixed(2)),
-        returnPercent: Number(returnPct.toFixed(2)),
-        exitReason: returnPct > 0 ? "Target" : "Stop",
-      };
-    });
+  private backtestResults: Map<string, BacktestResult> = new Map();
 
-    const wins = trades.filter(t => t.returnPercent > 0).length;
-    const avgReturn = trades.reduce((sum, t) => sum + t.returnPercent, 0) / trades.length;
+  async getBacktestResults(userId: string): Promise<BacktestResult[]> {
+    return Array.from(this.backtestResults.values())
+      .filter(r => r.userId === userId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
 
-    return {
+  async getBacktestResult(id: string): Promise<BacktestResult | undefined> {
+    return this.backtestResults.get(id);
+  }
+
+  async createBacktestResult(result: InsertBacktestResult): Promise<BacktestResult> {
+    const newResult: BacktestResult = {
+      ...result,
       id: randomUUID(),
-      totalTrades: trades.length,
-      winRate: (wins / trades.length) * 100,
-      avgReturn,
-      maxDrawdown: 12.5,
-      sharpeRatio: 1.85,
-      totalReturn: trades.reduce((sum, t) => sum + t.returnPercent, 0),
-      trades,
+      createdAt: new Date(),
+      sharpeRatio: result.sharpeRatio ?? null,
+      trades: result.trades ?? null,
     };
+    this.backtestResults.set(newResult.id, newResult);
+    return newResult;
+  }
+
+  async deleteBacktestResult(id: string): Promise<void> {
+    this.backtestResults.delete(id);
   }
 }
 

@@ -112,6 +112,8 @@ export const BrokerProvider = {
   ALPACA: "alpaca",
   SCHWAB: "schwab",
   POLYGON: "polygon",
+  TASTYTRADE: "tastytrade",
+  TRADESTATION: "tradestation",
 } as const;
 
 export type BrokerProviderType = typeof BrokerProvider[keyof typeof BrokerProvider];
@@ -142,6 +144,29 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+export const backtestResults = pgTable("backtest_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  ticker: text("ticker").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  initialCapital: real("initial_capital").notNull(),
+  positionSize: real("position_size").notNull(),
+  stopLossPercent: real("stop_loss_percent").notNull(),
+  totalTrades: integer("total_trades").notNull(),
+  winRate: real("win_rate").notNull(),
+  avgReturn: real("avg_return").notNull(),
+  maxDrawdown: real("max_drawdown").notNull(),
+  sharpeRatio: real("sharpe_ratio"),
+  totalReturn: real("total_return").notNull(),
+  trades: jsonb("trades"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBacktestResultSchema = createInsertSchema(backtestResults).omit({ id: true, createdAt: true });
+export type InsertBacktestResult = z.infer<typeof insertBacktestResultSchema>;
+export type BacktestResult = typeof backtestResults.$inferSelect;
 
 export const scannerFilters = z.object({
   minPrice: z.number().min(0).optional(),

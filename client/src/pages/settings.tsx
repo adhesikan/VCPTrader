@@ -46,6 +46,22 @@ const brokerProviders = [
     requiresSecretKey: true,
   },
   { 
+    id: "tastytrade", 
+    name: "TastyTrade", 
+    description: "Options and futures trading platform",
+    tokenUrl: "https://developer.tastytrade.com/",
+    tokenInstructions: "Log in to TastyTrade Developer Portal, create an application, and copy your API credentials. Use your session token as the Access Token.",
+    requiresSecretKey: true,
+  },
+  { 
+    id: "tradestation", 
+    name: "TradeStation", 
+    description: "Advanced trading platform with API access",
+    tokenUrl: "https://developer.tradestation.com/",
+    tokenInstructions: "Log in to TradeStation Developer Portal, register your application, and copy your API Key and Secret.",
+    requiresSecretKey: true,
+  },
+  { 
     id: "ibkr", 
     name: "Interactive Brokers", 
     description: "Professional trading platform (limited support)",
