@@ -133,7 +133,7 @@ function NavBar() {
                     <Button variant="ghost" data-testid="button-sign-in">Sign In</Button>
                   </Link>
                   <Link href="/auth">
-                    <Button data-testid="button-start-trial">Start Free Trial</Button>
+                    <Button data-testid="button-start-trial">Start 14-Day Free Trial</Button>
                   </Link>
                 </>
               )}
@@ -184,7 +184,7 @@ function NavBar() {
                       <Button variant="outline" className="w-full" data-testid="button-sign-in-mobile">Sign In</Button>
                     </Link>
                     <Link href="/auth">
-                      <Button className="w-full" data-testid="button-start-trial-mobile">Start Free Trial</Button>
+                      <Button className="w-full" data-testid="button-start-trial-mobile">Start 14-Day Free Trial</Button>
                     </Link>
                   </>
                 )}
@@ -221,7 +221,7 @@ function HeroSection() {
             <>
               <Link href="/auth">
                 <Button size="lg" data-testid="button-hero-trial">
-                  Start Free Trial
+                  Start 14-Day Free Trial
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -338,7 +338,7 @@ function ScreenshotCarousel() {
         <div className="text-center mt-10">
           <Link href={isAuthenticated ? "/dashboard" : "/auth"}>
             <Button size="lg" data-testid="button-carousel-cta">
-              {isAuthenticated ? "Go to Dashboard" : "Start Free Trial"}
+              {isAuthenticated ? "Go to Dashboard" : "Start 14-Day Free Trial"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
@@ -508,6 +508,9 @@ function VCPTraderProSection() {
                   Ends {PROMO_CONFIG.endDateDisplay}
                 </p>
               )}
+              <p className="text-sm font-medium text-primary mt-3" data-testid="text-trial-info">
+                14-day free trial included
+              </p>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -532,7 +535,7 @@ function VCPTraderProSection() {
             <div className="text-center">
               <Link href={ctaUrl}>
                 <Button size="lg" className="px-8" data-testid="button-subscribe">
-                  {isAuthenticated ? "Manage Subscription" : "Start Free Trial"}
+                  {isAuthenticated ? "Manage Subscription" : "Start 14-Day Free Trial"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
