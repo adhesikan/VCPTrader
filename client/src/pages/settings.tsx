@@ -90,6 +90,7 @@ export default function Settings() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan/results", "meta"] });
       setConnectDialogOpen(false);
       setAccessToken("");
       setSecretKey("");
@@ -132,6 +133,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan/results", "meta"] });
       toast({
         title: "Broker Disconnected",
       });
