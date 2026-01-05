@@ -438,7 +438,7 @@ function FAQSection() {
     },
     {
       question: "What is a VCP setup?",
-      answer: "VCP stands for Volatility Contraction Pattern. It's a technical pattern where a stock's price range tightens over time, often preceding a breakout. The pattern was popularized by Mark Minervini and is characterized by successive contracting price pivots.",
+      answer: "VCP stands for Volatility Contraction Pattern. It's a technical market structure where price ranges tighten as a stock consolidates near resistance. This behavior can reflect decreasing selling pressure while buyers remain active, and may precede a breakout when demand overwhelms supply.",
     },
     {
       question: "Do I need a brokerage connection?",

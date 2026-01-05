@@ -12,7 +12,7 @@ export default function VCPStrategy() {
           <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">VCP Strategy Guide</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Learn about the Volatility Contraction Pattern (VCP) trading strategy
+          Learn about volatility contraction setups and breakout conditions
         </p>
       </div>
 
@@ -26,12 +26,13 @@ export default function VCPStrategy() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p>
-              The <strong>Volatility Contraction Pattern (VCP)</strong> was developed by legendary trader 
-              Mark Minervini. It identifies stocks that are building a base before a potential breakout.
+              A <strong>volatility contraction pattern</strong> is a technical market structure where price ranges 
+              tighten as a stock consolidates near resistance. This behavior can reflect decreasing selling pressure 
+              while buyers remain active, and may precede a breakout when demand overwhelms supply.
             </p>
             <p>
-              The pattern shows decreasing price swings (volatility contraction) as a stock consolidates, 
-              indicating that selling pressure is drying up while buyers are accumulating shares.
+              VCP Trader identifies these contraction phases using objective price, volume, and moving-average data 
+              to help traders surface potential breakout conditions.
             </p>
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <p className="font-medium">Key Characteristics:</p>

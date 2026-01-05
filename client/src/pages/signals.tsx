@@ -387,13 +387,7 @@ export default function Signals() {
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex-1">
-          <p className="text-sm text-amber-600 dark:text-amber-400">
-            <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
-            Always do your own research and consult with a qualified financial advisor before making any trading decisions.
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-4">
         <div className="flex items-center gap-1 border rounded-md p-0.5">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -535,6 +529,13 @@ export default function Signals() {
         onClose={() => setSelectedTicker(null)}
         ticker={selectedTicker || ""}
       />
+
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
+          Always do your own research and consult with a qualified financial advisor before making any trading decisions.
+        </p>
+      </div>
     </div>
   );
 }

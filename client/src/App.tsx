@@ -62,6 +62,10 @@ function AppRouter() {
       <Route path="/backtest" component={Backtest} />
       <Route path="/vcp-strategy" component={VCPStrategy} />
       <Route path="/settings" component={Settings} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/disclaimer" component={DisclaimerPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/open-source" component={OpenSourcePage} />
       <Route component={NotFound} />
     </Switch>
   );
