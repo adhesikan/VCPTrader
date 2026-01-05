@@ -188,13 +188,17 @@ export type BrokerProviderType = typeof BrokerProvider[keyof typeof BrokerProvid
 
 export const brokerConnections = pgTable("broker_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+  userId: varchar("user_id").notNull().unique(),
   provider: text("provider").notNull(),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
+  encryptedCredentials: text("encrypted_credentials"),
+  credentialsIv: text("credentials_iv"),
+  credentialsAuthTag: text("credentials_auth_tag"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
   isConnected: boolean("is_connected").default(false),
   lastSync: timestamp("last_sync"),
   permissions: jsonb("permissions"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertBrokerConnectionSchema = createInsertSchema(brokerConnections).omit({ id: true });

@@ -465,13 +465,12 @@ export async function registerRoutes(
       if (!accessToken || typeof accessToken !== "string" || !accessToken.trim()) {
         return res.status(400).json({ error: "Access token is required" });
       }
-      const connection = await storage.setBrokerConnection(userId, {
+      const connection = await storage.setBrokerConnectionWithTokens(
+        userId,
         provider,
-        accessToken: accessToken.trim(),
-        refreshToken: secretKey?.trim() || null,
-        isConnected: true,
-        lastSync: new Date(),
-      });
+        accessToken.trim(),
+        secretKey?.trim() || undefined
+      );
       const sanitizedConnection = {
         id: connection.id,
         userId: connection.userId,
@@ -480,8 +479,9 @@ export async function registerRoutes(
         lastSync: connection.lastSync,
       };
       res.json(sanitizedConnection);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to connect broker" });
+    } catch (error: any) {
+      console.error("Failed to connect broker:", error.message);
+      res.status(500).json({ error: error.message || "Failed to connect broker" });
     }
   });
 

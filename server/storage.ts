@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { encryptCredentials, decryptCredentials, hasEncryptionKey } from "./crypto";
 import type {
   User,
   InsertUser,
@@ -57,8 +58,9 @@ export interface IStorage {
   removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
 
   getBrokerConnection(userId: string): Promise<BrokerConnection | null>;
-  getBrokerConnectionWithToken(userId: string): Promise<BrokerConnection | null>;
+  getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null>;
   setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection>;
+  setBrokerConnectionWithTokens(userId: string, provider: string, accessToken: string, refreshToken?: string, expiresAt?: Date): Promise<BrokerConnection>;
   clearBrokerConnection(userId: string): Promise<void>;
 
   getPushSubscriptions(): Promise<PushSubscription[]>;
@@ -553,24 +555,79 @@ export class MemStorage implements IStorage {
     return this.brokerConnections.get(userId) || null;
   }
 
-  async getBrokerConnectionWithToken(userId: string): Promise<BrokerConnection | null> {
-    return this.brokerConnections.get(userId) || null;
+  async getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null> {
+    const connection = this.brokerConnections.get(userId);
+    if (!connection) return null;
+    
+    if (connection.encryptedCredentials && connection.credentialsIv && connection.credentialsAuthTag) {
+      try {
+        const credentials = decryptCredentials({
+          ciphertext: connection.encryptedCredentials,
+          iv: connection.credentialsIv,
+          authTag: connection.credentialsAuthTag,
+        });
+        return {
+          ...connection,
+          accessToken: credentials.accessToken,
+          refreshToken: credentials.refreshToken,
+        };
+      } catch (error) {
+        console.error("Failed to decrypt broker credentials:", error);
+        return connection;
+      }
+    }
+    
+    return connection;
   }
 
   async setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection> {
-    const id = randomUUID();
+    const existing = this.brokerConnections.get(userId);
+    const id = existing?.id || randomUUID();
+    const now = new Date();
     const brokerConnection: BrokerConnection = { 
       id, 
       userId, 
       provider: connection.provider,
-      accessToken: connection.accessToken ?? null,
-      refreshToken: connection.refreshToken ?? null,
+      encryptedCredentials: connection.encryptedCredentials ?? null,
+      credentialsIv: connection.credentialsIv ?? null,
+      credentialsAuthTag: connection.credentialsAuthTag ?? null,
+      accessTokenExpiresAt: connection.accessTokenExpiresAt ?? null,
       isConnected: connection.isConnected ?? null,
       lastSync: connection.lastSync ?? null,
       permissions: connection.permissions ?? null,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
     };
     this.brokerConnections.set(userId, brokerConnection);
     return brokerConnection;
+  }
+
+  async setBrokerConnectionWithTokens(
+    userId: string, 
+    provider: string, 
+    accessToken: string, 
+    refreshToken?: string, 
+    expiresAt?: Date
+  ): Promise<BrokerConnection> {
+    if (!hasEncryptionKey()) {
+      throw new Error("Encryption key not configured. Cannot store broker credentials securely.");
+    }
+
+    const encrypted = encryptCredentials({
+      accessToken,
+      refreshToken,
+      expiresAt: expiresAt?.toISOString(),
+    });
+
+    return this.setBrokerConnection(userId, {
+      provider,
+      encryptedCredentials: encrypted.ciphertext,
+      credentialsIv: encrypted.iv,
+      credentialsAuthTag: encrypted.authTag,
+      accessTokenExpiresAt: expiresAt ?? null,
+      isConnected: true,
+      lastSync: new Date(),
+    });
   }
 
   async clearBrokerConnection(userId: string): Promise<void> {
