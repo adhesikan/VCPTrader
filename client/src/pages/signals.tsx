@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings } from "lucide-react";
+import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings, List, LayoutGrid } from "lucide-react";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -355,6 +355,7 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
 
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "card">("card");
   const { isConnected } = useBrokerStatus();
 
   const { data: scanResults, isLoading } = useQuery<any[]>({
@@ -386,11 +387,35 @@ export default function Signals() {
         </p>
       </div>
 
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-        <p className="text-sm text-amber-600 dark:text-amber-400">
-          <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
-          Always do your own research and consult with a qualified financial advisor before making any trading decisions.
-        </p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex-1">
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
+            Always do your own research and consult with a qualified financial advisor before making any trading decisions.
+          </p>
+        </div>
+        <div className="flex items-center gap-1 border rounded-md p-0.5">
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1"
+            data-testid="button-signals-view-list"
+          >
+            <List className="h-4 w-4" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === "card" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("card")}
+            className="gap-1"
+            data-testid="button-signals-view-card"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Cards
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -435,7 +460,7 @@ export default function Signals() {
             )}
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === "card" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {signalData.map((signal) => (
             <SignalCard
@@ -452,6 +477,57 @@ export default function Signals() {
             />
           ))}
         </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-3 font-medium">Ticker</th>
+                    <th className="text-left p-3 font-medium">Stage</th>
+                    <th className="text-right p-3 font-medium">Price</th>
+                    <th className="text-right p-3 font-medium">Resistance</th>
+                    <th className="text-right p-3 font-medium">Stop Loss</th>
+                    <th className="text-right p-3 font-medium">RVOL</th>
+                    <th className="text-left p-3 font-medium">Signal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {signalData.map((signal) => (
+                    <tr 
+                      key={signal.id}
+                      className="border-b hover-elevate active-elevate-2 cursor-pointer"
+                      onClick={() => setSelectedTicker(signal.ticker)}
+                      data-testid={`signal-row-${signal.ticker}`}
+                    >
+                      <td className="p-3">
+                        <span className="font-bold font-mono">{signal.ticker}</span>
+                      </td>
+                      <td className="p-3">
+                        <Badge 
+                          variant={signal.type === "BREAKOUT" ? "default" : signal.type === "APPROACHING" ? "secondary" : "outline"}
+                          className="text-xs"
+                        >
+                          {signal.type}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-right font-mono">${signal.price?.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono text-chart-2">${signal.resistance?.toFixed(2) || "-"}</td>
+                      <td className="p-3 text-right font-mono text-destructive">${signal.stopLoss?.toFixed(2) || "-"}</td>
+                      <td className={`p-3 text-right font-mono ${signal.rvol >= 1.5 ? "text-chart-2" : ""}`}>
+                        {signal.rvol?.toFixed(2)}x
+                      </td>
+                      <td className="p-3 text-muted-foreground text-xs max-w-[200px] truncate">
+                        {signal.message}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <SignalDetailDialog

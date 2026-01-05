@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X } from "lucide-react";
+import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X, LayoutGrid, Target, AlertTriangle, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ export default function Scanner() {
   const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
 
@@ -303,6 +304,28 @@ export default function Scanner() {
             </Button>
           )}
         </div>
+        <div className="flex items-center gap-1 border rounded-md p-0.5">
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1"
+            data-testid="button-view-list"
+          >
+            <List className="h-4 w-4" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === "card" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("card")}
+            className="gap-1"
+            data-testid="button-view-card"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Cards
+          </Button>
+        </div>
         {lastScanTime && (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -329,8 +352,75 @@ export default function Scanner() {
             </Link>
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === "list" ? (
         <ScannerTable results={results || []} isLoading={isLoading} onRowClick={handleRowClick} searchQuery={searchQuery} />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {(results || [])
+            .filter(r => !searchQuery || r.ticker.toLowerCase().includes(searchQuery.toLowerCase()) || r.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+            .map((result) => (
+              <Card 
+                key={result.id}
+                className="hover-elevate active-elevate-2 cursor-pointer transition-all"
+                onClick={() => handleRowClick(result)}
+                data-testid={`scan-card-${result.ticker}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold font-mono">{result.ticker}</span>
+                      <Badge 
+                        variant={result.stage === "BREAKOUT" ? "default" : result.stage === "READY" ? "secondary" : "outline"}
+                        className="text-xs"
+                      >
+                        {result.stage}
+                      </Badge>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl font-bold font-mono">${result.price?.toFixed(2)}</span>
+                    {result.changePercent !== undefined && (
+                      <Badge
+                        variant={result.changePercent >= 0 ? "default" : "destructive"}
+                        className="font-mono text-xs"
+                      >
+                        {result.changePercent >= 0 ? "+" : ""}{result.changePercent.toFixed(2)}%
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                        <Target className="h-3 w-3 text-chart-2" />
+                        Resistance
+                      </p>
+                      <p className="font-mono font-medium text-chart-2">${result.resistance?.toFixed(2) || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 text-destructive" />
+                        Stop Loss
+                      </p>
+                      <p className="font-mono font-medium text-destructive">${result.stopLoss?.toFixed(2) || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">RVOL</p>
+                      <p className={`font-mono font-medium ${(result.rvol || 0) >= 1.5 ? "text-chart-2" : ""}`}>
+                        {result.rvol?.toFixed(2) || "-"}x
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Score</p>
+                      <p className="font-mono font-medium">{result.patternScore || "-"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
       )}
     </div>
   );

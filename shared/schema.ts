@@ -83,15 +83,17 @@ export const alerts = pgTable("alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ticker: text("ticker").notNull(),
   type: text("type").notNull(),
-  price: real("price").notNull(),
+  price: real("price"),
   targetPrice: real("target_price"),
   stopPrice: real("stop_price"),
   message: text("message"),
   isRead: boolean("is_read").default(false),
-  triggeredAt: timestamp("triggered_at").defaultNow(),
+  isTriggered: boolean("is_triggered").default(false),
+  triggeredAt: timestamp("triggered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAlertSchema = createInsertSchema(alerts).omit({ id: true, triggeredAt: true });
+export const insertAlertSchema = createInsertSchema(alerts).omit({ id: true, triggeredAt: true, createdAt: true });
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
 

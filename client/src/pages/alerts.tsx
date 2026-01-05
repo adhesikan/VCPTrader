@@ -32,9 +32,6 @@ export default function Alerts() {
   const [newAlert, setNewAlert] = useState({
     ticker: "",
     type: "BREAKOUT" as AlertTypeValue,
-    price: 0,
-    targetPrice: 0,
-    stopPrice: 0,
   });
   const { toast } = useToast();
 
@@ -74,9 +71,6 @@ export default function Alerts() {
       setNewAlert({
         ticker: "",
         type: "BREAKOUT",
-        price: 0,
-        targetPrice: 0,
-        stopPrice: 0,
       });
       toast({
         title: "Alert Created",
@@ -117,13 +111,10 @@ export default function Alerts() {
   });
 
   const handleCreateAlert = () => {
-    if (newAlert.ticker && newAlert.price > 0) {
+    if (newAlert.ticker) {
       createMutation.mutate({
         ticker: newAlert.ticker.toUpperCase(),
         type: newAlert.type,
-        price: newAlert.price,
-        targetPrice: newAlert.targetPrice || undefined,
-        stopPrice: newAlert.stopPrice || undefined,
         isRead: false,
       });
     }
@@ -178,7 +169,7 @@ export default function Alerts() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Price Alert</DialogTitle>
+                <DialogTitle>Create VCP Stage Alert</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 {watchlists && watchlists.length > 0 && (
@@ -232,7 +223,7 @@ export default function Alerts() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="type">Alert Type</Label>
+                  <Label htmlFor="type">VCP Stage</Label>
                   <Select
                     value={newAlert.type}
                     onValueChange={(value) => setNewAlert(prev => ({ ...prev, type: value as AlertTypeValue }))}
@@ -241,60 +232,34 @@ export default function Alerts() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="BREAKOUT">Breakout</SelectItem>
-                      <SelectItem value="STOP_HIT">Stop Hit</SelectItem>
-                      <SelectItem value="EMA_EXIT">EMA Exit</SelectItem>
-                      <SelectItem value="APPROACHING">Approaching</SelectItem>
+                      <SelectItem value="BREAKOUT">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Breakout</span>
+                          <span className="text-xs text-muted-foreground">Alert when price breaks above resistance</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="APPROACHING">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Ready</span>
+                          <span className="text-xs text-muted-foreground">Alert when pattern is ready for breakout</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="EMA_EXIT">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Forming</span>
+                          <span className="text-xs text-muted-foreground">Alert when VCP pattern starts forming</span>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="price">Trigger Price</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={newAlert.price || ""}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    className="font-mono"
-                    data-testid="input-alert-price"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="target">Target Price</Label>
-                    <Input
-                      id="target"
-                      type="number"
-                      step="0.01"
-                      placeholder="Optional"
-                      value={newAlert.targetPrice || ""}
-                      onChange={(e) => setNewAlert(prev => ({ ...prev, targetPrice: Number(e.target.value) }))}
-                      className="font-mono"
-                      data-testid="input-target-price"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stop">Stop Price</Label>
-                    <Input
-                      id="stop"
-                      type="number"
-                      step="0.01"
-                      placeholder="Optional"
-                      value={newAlert.stopPrice || ""}
-                      onChange={(e) => setNewAlert(prev => ({ ...prev, stopPrice: Number(e.target.value) }))}
-                      className="font-mono"
-                      data-testid="input-stop-price"
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You'll be notified when the stock reaches this VCP stage
+                  </p>
                 </div>
 
                 <Button
                   onClick={handleCreateAlert}
-                  disabled={!newAlert.ticker || !newAlert.price || createMutation.isPending}
+                  disabled={!newAlert.ticker || createMutation.isPending}
                   className="w-full"
                   data-testid="button-submit-alert"
                 >
@@ -306,7 +271,7 @@ export default function Alerts() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Badge variant="default" className="gap-1">
           <Bell className="h-3 w-3" />
           Unread <span className="font-mono">{unreadAlerts.length}</span>
@@ -314,11 +279,8 @@ export default function Alerts() {
         <Badge variant="secondary" className="gap-1">
           Breakout <span className="font-mono">{breakoutAlerts.length}</span>
         </Badge>
-        <Badge variant="destructive" className="gap-1">
-          Stop Hit <span className="font-mono">{stopAlerts.length}</span>
-        </Badge>
         <Badge variant="outline" className="gap-1">
-          Approaching <span className="font-mono">{approachingAlerts.length}</span>
+          Ready <span className="font-mono">{approachingAlerts.length}</span>
         </Badge>
       </div>
 
