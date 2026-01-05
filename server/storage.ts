@@ -685,6 +685,115 @@ export class MemStorage implements IStorage {
   async deleteBacktestResult(id: string): Promise<void> {
     this.backtestResults.delete(id);
   }
+
+  private alertRules: Map<string, AlertRule> = new Map();
+  private alertEvents: Map<string, AlertEvent> = new Map();
+
+  async getAlertRules(userId?: string): Promise<AlertRule[]> {
+    const rules = Array.from(this.alertRules.values());
+    if (userId) {
+      return rules.filter(r => r.userId === userId).sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+    }
+    return rules.sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  }
+
+  async getAlertRule(id: string): Promise<AlertRule | undefined> {
+    return this.alertRules.get(id);
+  }
+
+  async getEnabledAlertRules(): Promise<AlertRule[]> {
+    return Array.from(this.alertRules.values()).filter(r => r.isEnabled);
+  }
+
+  async createAlertRule(rule: InsertAlertRule): Promise<AlertRule> {
+    const now = new Date();
+    const newRule: AlertRule = {
+      ...rule,
+      id: randomUUID(),
+      strategy: rule.strategy || "VCP",
+      timeframe: rule.timeframe || "1d",
+      isEnabled: rule.isEnabled ?? true,
+      conditionPayload: rule.conditionPayload ?? null,
+      createdAt: now,
+      updatedAt: now,
+      lastEvaluatedAt: null,
+      lastState: null,
+    };
+    this.alertRules.set(newRule.id, newRule);
+    return newRule;
+  }
+
+  async updateAlertRule(id: string, data: Partial<AlertRule>): Promise<AlertRule | undefined> {
+    const rule = this.alertRules.get(id);
+    if (!rule) return undefined;
+    const updated = { ...rule, ...data, updatedAt: new Date() };
+    this.alertRules.set(id, updated);
+    return updated;
+  }
+
+  async deleteAlertRule(id: string): Promise<void> {
+    this.alertRules.delete(id);
+  }
+
+  async getAlertEvents(userId?: string, ruleId?: string): Promise<AlertEvent[]> {
+    let events = Array.from(this.alertEvents.values());
+    if (userId) {
+      events = events.filter(e => e.userId === userId);
+    }
+    if (ruleId) {
+      events = events.filter(e => e.ruleId === ruleId);
+    }
+    return events.sort((a, b) => 
+      new Date(b.triggeredAt || 0).getTime() - new Date(a.triggeredAt || 0).getTime()
+    );
+  }
+
+  async getAlertEvent(id: string): Promise<AlertEvent | undefined> {
+    return this.alertEvents.get(id);
+  }
+
+  async getAlertEventByKey(eventKey: string): Promise<AlertEvent | undefined> {
+    return Array.from(this.alertEvents.values()).find(e => e.eventKey === eventKey);
+  }
+
+  async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
+    const newEvent: AlertEvent = {
+      ...event,
+      id: randomUUID(),
+      triggeredAt: new Date(),
+      fromState: event.fromState ?? null,
+      price: event.price ?? null,
+      payload: event.payload ?? null,
+      deliveryStatus: event.deliveryStatus ?? null,
+      isRead: event.isRead ?? false,
+    };
+    this.alertEvents.set(newEvent.id, newEvent);
+    return newEvent;
+  }
+
+  async updateAlertEvent(id: string, data: Partial<AlertEvent>): Promise<AlertEvent | undefined> {
+    const event = this.alertEvents.get(id);
+    if (!event) return undefined;
+    const updated = { ...event, ...data };
+    this.alertEvents.set(id, updated);
+    return updated;
+  }
+
+  async markAlertEventRead(id: string): Promise<AlertEvent | undefined> {
+    return this.updateAlertEvent(id, { isRead: true });
+  }
+
+  async markAllAlertEventsRead(userId: string): Promise<void> {
+    this.alertEvents.forEach((event, id) => {
+      if (event.userId === userId) {
+        this.alertEvents.set(id, { ...event, isRead: true });
+      }
+    });
+  }
 }
 
 export const storage = new MemStorage();
