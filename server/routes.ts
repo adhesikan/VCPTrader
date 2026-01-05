@@ -267,7 +267,7 @@ export async function registerRoutes(
   app.post("/api/broker/connect", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { provider, accessToken } = req.body;
+      const { provider, accessToken, secretKey } = req.body;
       if (!provider) {
         return res.status(400).json({ error: "Provider is required" });
       }
@@ -277,6 +277,7 @@ export async function registerRoutes(
       const connection = await storage.setBrokerConnection(userId, {
         provider,
         accessToken: accessToken.trim(),
+        refreshToken: secretKey?.trim() || null,
         isConnected: true,
         lastSync: new Date(),
       });
@@ -343,22 +344,27 @@ export async function registerRoutes(
           };
         }
       } else if (connection.provider === "alpaca") {
-        const response = await fetch("https://data.alpaca.markets/v2/stocks/AAPL/quotes/latest", {
-          headers: {
-            "APCA-API-KEY-ID": connection.accessToken,
-            "APCA-API-SECRET-KEY": connection.refreshToken || "",
-          },
+        const headers: Record<string, string> = {
+          "APCA-API-KEY-ID": connection.accessToken,
+        };
+        if (connection.refreshToken) {
+          headers["APCA-API-SECRET-KEY"] = connection.refreshToken;
+        }
+        const response = await fetch("https://data.alpaca.markets/v2/stocks/bars/latest?symbols=AAPL", {
+          headers,
         });
         
         if (response.ok) {
           const data = await response.json();
+          const bar = data.bars?.AAPL;
           testResult = {
             success: true,
             message: "Connection successful",
-            data: { symbol: "AAPL", bidPrice: data.quote?.bp, askPrice: data.quote?.ap },
+            data: bar ? { symbol: "AAPL", last: bar.c, volume: bar.v } : null,
           };
         } else {
-          testResult = { success: false, message: `API error: ${response.status}` };
+          const errorText = await response.text().catch(() => "");
+          testResult = { success: false, message: `API error: ${response.status} ${errorText}` };
         }
       } else if (connection.provider === "polygon") {
         const response = await fetch(`https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey=${connection.accessToken}`);
@@ -374,13 +380,37 @@ export async function registerRoutes(
         } else {
           testResult = { success: false, message: `API error: ${response.status}` };
         }
+      } else if (connection.provider === "schwab") {
+        const response = await fetch("https://api.schwabapi.com/marketdata/v1/quotes?symbols=AAPL", {
+          headers: {
+            "Authorization": `Bearer ${connection.accessToken}`,
+            "Accept": "application/json",
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const quote = data.AAPL?.quote || data.AAPL;
+          testResult = {
+            success: true,
+            message: "Connection successful",
+            data: quote ? { symbol: "AAPL", last: quote.lastPrice || quote.mark, volume: quote.totalVolume } : null,
+          };
+        } else {
+          testResult = { success: false, message: `API error: ${response.status}` };
+        }
+      } else if (connection.provider === "ibkr") {
+        testResult = { 
+          success: false, 
+          message: "Interactive Brokers requires Client Portal API setup. Please use Tradier, Alpaca, or Polygon instead." 
+        };
       } else {
         testResult = { success: true, message: "Connection stored (API test not available for this provider)" };
       }
 
       res.json(testResult);
-    } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to test broker connection" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || "Failed to test broker connection" });
     }
   });
 

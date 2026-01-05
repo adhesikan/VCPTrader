@@ -35,27 +35,31 @@ const brokerProviders = [
     description: "Commission-free trading platform",
     tokenUrl: "https://dash.tradier.com/settings/api",
     tokenInstructions: "Log in to Tradier, go to Settings > API Access, and copy your Access Token.",
+    requiresSecretKey: false,
   },
   { 
     id: "alpaca", 
     name: "Alpaca", 
     description: "API-first stock trading",
     tokenUrl: "https://app.alpaca.markets/paper/dashboard/overview",
-    tokenInstructions: "Log in to Alpaca, go to your dashboard, click on API Keys, and copy your API Key.",
+    tokenInstructions: "Log in to Alpaca, go to your dashboard, click on API Keys, and copy both your API Key ID and Secret Key.",
+    requiresSecretKey: true,
   },
   { 
     id: "ibkr", 
     name: "Interactive Brokers", 
-    description: "Professional trading platform",
+    description: "Professional trading platform (limited support)",
     tokenUrl: "https://www.interactivebrokers.com/en/trading/ib-api.php",
-    tokenInstructions: "Log in to IBKR Portal, go to Settings > API Settings, and generate an API token.",
+    tokenInstructions: "IBKR requires Client Portal API setup. Consider using Tradier, Alpaca, or Polygon instead.",
+    requiresSecretKey: false,
   },
   { 
     id: "schwab", 
     name: "Charles Schwab", 
     description: "Full-service brokerage",
     tokenUrl: "https://developer.schwab.com/",
-    tokenInstructions: "Log in to Schwab Developer Portal, create an app, and copy your API credentials.",
+    tokenInstructions: "Log in to Schwab Developer Portal, create an app, and copy your Access Token.",
+    requiresSecretKey: false,
   },
   { 
     id: "polygon", 
@@ -63,6 +67,7 @@ const brokerProviders = [
     description: "Market data only",
     tokenUrl: "https://polygon.io/dashboard/keys",
     tokenInstructions: "Log in to Polygon.io, go to Dashboard > API Keys, and copy your API Key.",
+    requiresSecretKey: false,
   },
 ];
 
@@ -72,20 +77,22 @@ export default function Settings() {
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState("");
+  const [secretKey, setSecretKey] = useState("");
 
   const { data: brokerStatus } = useQuery<BrokerConnection | null>({
     queryKey: ["/api/broker/status"],
   });
 
   const connectBrokerMutation = useMutation({
-    mutationFn: async ({ provider, accessToken }: { provider: string; accessToken: string }) => {
-      const response = await apiRequest("POST", "/api/broker/connect", { provider, accessToken });
+    mutationFn: async ({ provider, accessToken, secretKey }: { provider: string; accessToken: string; secretKey?: string }) => {
+      const response = await apiRequest("POST", "/api/broker/connect", { provider, accessToken, secretKey });
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
       setConnectDialogOpen(false);
       setAccessToken("");
+      setSecretKey("");
       setSelectedProvider(null);
       toast({
         title: "Broker Connected",
@@ -104,12 +111,19 @@ export default function Settings() {
   const handleProviderClick = (providerId: string) => {
     setSelectedProvider(providerId);
     setAccessToken("");
+    setSecretKey("");
     setConnectDialogOpen(true);
   };
 
   const handleConnect = () => {
     if (!selectedProvider || !accessToken.trim()) return;
-    connectBrokerMutation.mutate({ provider: selectedProvider, accessToken: accessToken.trim() });
+    const provider = brokerProviders.find(b => b.id === selectedProvider);
+    if (provider?.requiresSecretKey && !secretKey.trim()) return;
+    connectBrokerMutation.mutate({ 
+      provider: selectedProvider, 
+      accessToken: accessToken.trim(),
+      secretKey: secretKey.trim() || undefined,
+    });
   };
 
   const disconnectBrokerMutation = useMutation({
@@ -334,20 +348,36 @@ export default function Settings() {
                         </div>
                       )}
                       <div>
-                        <Label htmlFor="accessToken">Access Token</Label>
+                        <Label htmlFor="accessToken">
+                          {brokerProviders.find(b => b.id === selectedProvider)?.requiresSecretKey ? "API Key ID" : "Access Token"}
+                        </Label>
                         <Input
                           id="accessToken"
                           type="password"
-                          placeholder="Paste your API access token here"
+                          placeholder={brokerProviders.find(b => b.id === selectedProvider)?.requiresSecretKey ? "Paste your API Key ID here" : "Paste your API access token here"}
                           value={accessToken}
                           onChange={(e) => setAccessToken(e.target.value)}
                           className="mt-2"
                           data-testid="input-access-token"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Your token is stored securely and never shared.
-                        </p>
                       </div>
+                      {brokerProviders.find(b => b.id === selectedProvider)?.requiresSecretKey && (
+                        <div>
+                          <Label htmlFor="secretKey">Secret Key</Label>
+                          <Input
+                            id="secretKey"
+                            type="password"
+                            placeholder="Paste your Secret Key here"
+                            value={secretKey}
+                            onChange={(e) => setSecretKey(e.target.value)}
+                            className="mt-2"
+                            data-testid="input-secret-key"
+                          />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Your credentials are stored securely and never shared.
+                      </p>
                     </div>
                     <DialogFooter>
                       <Button
@@ -359,7 +389,7 @@ export default function Settings() {
                       </Button>
                       <Button
                         onClick={handleConnect}
-                        disabled={!accessToken.trim() || connectBrokerMutation.isPending}
+                        disabled={!accessToken.trim() || (brokerProviders.find(b => b.id === selectedProvider)?.requiresSecretKey && !secretKey.trim()) || connectBrokerMutation.isPending}
                         data-testid="button-confirm-connect"
                       >
                         {connectBrokerMutation.isPending ? "Connecting..." : "Connect"}

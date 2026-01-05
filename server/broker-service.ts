@@ -91,6 +91,93 @@ export async function fetchPolygonQuotes(
   return results;
 }
 
+export async function fetchAlpacaQuotes(
+  accessToken: string,
+  secretKey: string | null,
+  symbols: string[]
+): Promise<QuoteData[]> {
+  const symbolList = symbols.join(",");
+  
+  const headers: Record<string, string> = {
+    "APCA-API-KEY-ID": accessToken,
+  };
+  
+  if (secretKey) {
+    headers["APCA-API-SECRET-KEY"] = secretKey;
+  }
+
+  const response = await fetch(
+    `https://data.alpaca.markets/v2/stocks/bars/latest?symbols=${symbolList}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Alpaca API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const bars = data.bars || {};
+
+  return Object.entries(bars).map(([symbol, bar]: [string, any]) => ({
+    symbol,
+    last: bar.c || 0,
+    change: bar.c - bar.o,
+    changePercent: bar.o ? ((bar.c - bar.o) / bar.o) * 100 : 0,
+    volume: bar.v || 0,
+    high: bar.h || 0,
+    low: bar.l || 0,
+    open: bar.o || 0,
+    prevClose: bar.o || 0,
+  }));
+}
+
+export async function fetchIBKRQuotes(
+  accessToken: string,
+  symbols: string[]
+): Promise<QuoteData[]> {
+  console.log("IBKR integration requires Client Portal API setup");
+  throw new Error("Interactive Brokers integration requires additional setup. Please use Tradier, Alpaca, or Polygon for now.");
+}
+
+export async function fetchSchwabQuotes(
+  accessToken: string,
+  symbols: string[]
+): Promise<QuoteData[]> {
+  const symbolList = symbols.join(",");
+  
+  const response = await fetch(
+    `https://api.schwabapi.com/marketdata/v1/quotes?symbols=${symbolList}`,
+    {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Schwab API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  return Object.entries(data).map(([symbol, quote]: [string, any]) => {
+    const q = quote.quote || quote;
+    return {
+      symbol,
+      last: q.lastPrice || q.mark || 0,
+      change: q.netChange || 0,
+      changePercent: q.netPercentChangeInDouble || 0,
+      volume: q.totalVolume || 0,
+      avgVolume: q.averageVolume || 0,
+      high: q.highPrice || q["52WkHigh"] || 0,
+      low: q.lowPrice || q["52WkLow"] || 0,
+      open: q.openPrice || 0,
+      prevClose: q.closePrice || 0,
+    };
+  });
+}
+
 export async function fetchQuotesFromBroker(
   connection: BrokerConnection,
   symbols: string[]
@@ -104,6 +191,12 @@ export async function fetchQuotesFromBroker(
       return fetchTradierQuotes(connection.accessToken, symbols);
     case "polygon":
       return fetchPolygonQuotes(connection.accessToken, symbols);
+    case "alpaca":
+      return fetchAlpacaQuotes(connection.accessToken, connection.refreshToken, symbols);
+    case "ibkr":
+      return fetchIBKRQuotes(connection.accessToken, symbols);
+    case "schwab":
+      return fetchSchwabQuotes(connection.accessToken, symbols);
     default:
       throw new Error(`Provider ${connection.provider} not supported for market data`);
   }
