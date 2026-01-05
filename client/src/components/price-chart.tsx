@@ -36,6 +36,7 @@ interface PriceChartProps {
   ticker?: string;
   className?: string;
   showVCPOverlay?: boolean;
+  showVolume?: boolean;
   vcpAnnotations?: VCPAnnotation[];
   atr?: number;
   contractionZones?: Array<{ start: string; end: string; highLevel: number; lowLevel: number }>;
@@ -62,6 +63,7 @@ export function PriceChart({
   ticker,
   className,
   showVCPOverlay = true,
+  showVolume = true,
   vcpAnnotations,
   atr,
   contractionZones,
@@ -70,11 +72,6 @@ export function PriceChart({
   const chartRef = useRef<IChartApi | null>(null);
   const { theme } = useTheme();
   const [tooltipData, setTooltipData] = useState<ChartTooltipData | null>(null);
-  const [showEMA9, setShowEMA9] = useState(true);
-  const [showEMA21, setShowEMA21] = useState(true);
-  const [showEMA50, setShowEMA50] = useState(false);
-  const [showVolume, setShowVolume] = useState(true);
-  const [showLevels, setShowLevels] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -135,7 +132,8 @@ export function PriceChart({
     });
 
     let volumeSeries: any = null;
-    if (showVolume) {
+    const hasVolumeData = showVolume && data.some(d => d.volume && d.volume > 0);
+    if (hasVolumeData) {
       volumeSeries = chart.addSeries(HistogramSeries, {
         color: isDark ? "#3b82f680" : "#3b82f660",
         priceFormat: { type: "volume" },
@@ -168,7 +166,7 @@ export function PriceChart({
       }
     }
 
-    if (showEMA9 && ema9 && data.length > 0) {
+    if (ema9 && ema9.length > 0 && data.length > 0) {
       const ema9Series = chart.addSeries(LineSeries, {
         color: "#f59e0b",
         lineWidth: 1,
@@ -183,7 +181,7 @@ export function PriceChart({
       ema9Series.setData(ema9Data as any);
     }
 
-    if (showEMA21 && ema21 && data.length > 0) {
+    if (ema21 && ema21.length > 0 && data.length > 0) {
       const ema21Series = chart.addSeries(LineSeries, {
         color: "#3b82f6",
         lineWidth: 1,
@@ -198,7 +196,7 @@ export function PriceChart({
       ema21Series.setData(ema21Data as any);
     }
 
-    if (showEMA50 && ema50 && data.length > 0) {
+    if (ema50 && ema50.length > 0 && data.length > 0) {
       const ema50Series = chart.addSeries(LineSeries, {
         color: "#8b5cf6",
         lineWidth: 1,
@@ -213,7 +211,7 @@ export function PriceChart({
       ema50Series.setData(ema50Data as any);
     }
 
-    if (showLevels && resistanceLevel && data.length > 0) {
+    if (resistanceLevel && data.length > 0) {
       const resistanceLine = chart.addSeries(LineSeries, {
         color: "#22c55e",
         lineWidth: 2,
@@ -237,7 +235,7 @@ export function PriceChart({
       });
     }
 
-    if (showLevels && stopLevel && data.length > 0) {
+    if (stopLevel && data.length > 0) {
       const stopLine = chart.addSeries(LineSeries, {
         color: "#ef4444",
         lineWidth: 2,
@@ -355,7 +353,7 @@ export function PriceChart({
       window.removeEventListener("resize", handleResize);
       chart.remove();
     };
-  }, [data, ema9, ema21, ema50, resistanceLevel, stopLevel, theme, showVCPOverlay, vcpAnnotations, contractionZones, showEMA9, showEMA21, showEMA50, showVolume, showLevels]);
+  }, [data, ema9, ema21, ema50, resistanceLevel, stopLevel, theme, showVCPOverlay, showVolume, vcpAnnotations, contractionZones]);
 
   const formatVolume = (vol: number) => {
     if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(2)}M`;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +61,7 @@ const VCP_STAGES = [
 ];
 
 export default function Scanner() {
+  const [, navigate] = useLocation();
   const [filters, setFilters] = useState<ScannerFilters>(defaultFilters);
   const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
@@ -68,6 +69,10 @@ export default function Scanner() {
   const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
+
+  const handleRowClick = (result: ScanResult) => {
+    navigate(`/charts/${result.ticker}`);
+  };
 
   const { data: storedResults, isLoading, refetch } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
@@ -282,7 +287,7 @@ export default function Scanner() {
           </CardContent>
         </Card>
       ) : (
-        <ScannerTable results={results || []} isLoading={isLoading} />
+        <ScannerTable results={results || []} isLoading={isLoading} onRowClick={handleRowClick} />
       )}
     </div>
   );
