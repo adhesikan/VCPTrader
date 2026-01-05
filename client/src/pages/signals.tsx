@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriceChart, TechnicalAnalysisWidget, VolumeProfileWidget } from "@/components/price-chart";
-import type { Alert } from "@shared/schema";
 
 interface ChartData {
   candles: Array<{
@@ -355,24 +354,25 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
-  const { data: alerts, isLoading } = useQuery<Alert[]>({
-    queryKey: ["/api/alerts"],
-  });
-
-  const { data: scanResults } = useQuery<any[]>({
+  const { data: scanResults, isLoading } = useQuery<any[]>({
     queryKey: ["/api/scan/results"],
   });
 
-  const signalData = alerts?.map(alert => {
-    const scanResult = scanResults?.find(s => s.ticker === alert.ticker);
-    return {
-      ...alert,
-      resistance: alert.targetPrice || scanResult?.resistance || alert.price * 1.1,
-      stopLoss: alert.stopPrice || scanResult?.stopLoss || alert.price * 0.93,
-      rvol: scanResult?.rvol || 1.5,
-      atr: scanResult?.atr || alert.price * 0.02,
-    };
-  }) || [];
+  const signalData = scanResults?.map(result => ({
+    id: result.ticker,
+    ticker: result.ticker,
+    type: result.stage,
+    price: result.price,
+    resistance: result.resistance,
+    stopLoss: result.stopLoss,
+    rvol: result.rvol || 1.0,
+    atr: result.atr || result.price * 0.02,
+    message: result.stage === "BREAKOUT" 
+      ? "Broke resistance with high volume" 
+      : result.stage === "APPROACHING" 
+        ? "Within 2% of resistance level"
+        : "VCP pattern ready for breakout",
+  })) || [];
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">

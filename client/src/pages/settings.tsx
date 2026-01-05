@@ -377,9 +377,14 @@ export default function Settings() {
                           />
                         </div>
                       )}
-                      <p className="text-xs text-muted-foreground">
-                        Your credentials are stored securely and never shared.
-                      </p>
+                      <div className="bg-muted/50 border border-border p-3 rounded-md space-y-2">
+                        <p className="text-xs font-medium">Security Notice</p>
+                        <p className="text-xs text-muted-foreground">
+                          VCP Trader only uses your API token to fetch market data (quotes and charts). 
+                          We never access your account balance, positions, or execute any trades. 
+                          Your credentials are encrypted at rest and never shared with third parties.
+                        </p>
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button
