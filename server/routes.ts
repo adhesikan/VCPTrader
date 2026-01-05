@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAlertSchema, insertWatchlistSchema, scannerFilters, UserRole } from "@shared/schema";
+import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, scannerFilters, UserRole, RuleConditionType, PatternStage } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { 
@@ -210,6 +210,144 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to mark alerts as read" });
+    }
+  });
+
+  app.get("/api/alert-rules", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const rules = await storage.getAlertRules(userId);
+      res.json(rules);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert rules" });
+    }
+  });
+
+  app.get("/api/alert-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const rule = await storage.getAlertRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Alert rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json(rule);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert rule" });
+    }
+  });
+
+  app.post("/api/alert-rules", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const ruleData = insertAlertRuleSchema.parse({
+        ...req.body,
+        userId,
+      });
+      
+      const rule = await storage.createAlertRule(ruleData);
+      res.json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create alert rule" });
+      }
+    }
+  });
+
+  app.patch("/api/alert-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const rule = await storage.getAlertRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Alert rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const updated = await storage.updateAlertRule(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update alert rule" });
+    }
+  });
+
+  app.delete("/api/alert-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const rule = await storage.getAlertRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Alert rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      await storage.deleteAlertRule(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete alert rule" });
+    }
+  });
+
+  app.get("/api/alert-events", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const ruleId = req.query.ruleId as string | undefined;
+      const events = await storage.getAlertEvents(userId, ruleId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert events" });
+    }
+  });
+
+  app.get("/api/alert-events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const event = await storage.getAlertEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Alert event not found" });
+      }
+      if (event.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert event" });
+    }
+  });
+
+  app.patch("/api/alert-events/:id/read", isAuthenticated, async (req, res) => {
+    try {
+      const event = await storage.getAlertEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Alert event not found" });
+      }
+      if (event.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const updated = await storage.markAlertEventRead(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark event as read" });
+    }
+  });
+
+  app.post("/api/alert-events/mark-all-read", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await storage.markAllAlertEventsRead(userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark events as read" });
     }
   });
 
