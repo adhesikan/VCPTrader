@@ -292,7 +292,10 @@ export default function Backtest() {
                     <p className="text-2xl font-bold font-mono">{latestResult.totalTrades}</p>
                   </div>
                   <div className="text-center p-4 rounded-md bg-muted/50">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Avg Return</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Avg Return
+                      <InfoTooltip term="avgReturn" />
+                    </p>
                     <p className={`text-2xl font-bold font-mono ${latestResult.avgReturn >= 0 ? "text-chart-2" : "text-destructive"}`}>
                       {latestResult.avgReturn >= 0 ? "+" : ""}{latestResult.avgReturn.toFixed(1)}%
                     </p>

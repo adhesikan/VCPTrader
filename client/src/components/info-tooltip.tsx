@@ -32,6 +32,7 @@ export const tradingTerms: Record<string, string> = {
   maxDrawdown: "Largest peak-to-trough decline during the backtest. Lower values indicate less volatile returns.",
   profitFactor: "Ratio of gross profits to gross losses. Values above 1.0 mean the strategy is profitable overall.",
   totalTrades: "Total number of buy/sell transactions executed during the backtest period.",
+  avgReturn: "Average percentage return per trade. Shows the typical gain or loss you can expect from each position.",
 };
 
 interface InfoTooltipProps {
