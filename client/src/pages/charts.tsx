@@ -253,6 +253,7 @@ export default function Charts() {
                   stopLevel={showLevels ? chartData.stopLoss : undefined}
                   ticker={selectedTicker}
                   showVCPOverlay={showVCPOverlay}
+                  showVolume={showVolume}
                   vcpAnnotations={chartData.vcpAnnotations}
                   contractionZones={chartData.contractionZones}
                   atr={chartData.atr}
