@@ -352,7 +352,7 @@ function TrustStrip() {
   const features = [
     { icon: Search, text: "Market-wide scanning" },
     { icon: Bell, text: "Real-time alerts (push + email)" },
-    { icon: Link2, text: "Broker-connected data (optional)" },
+    { icon: Link2, text: "Broker-connected data" },
   ];
 
   return (
