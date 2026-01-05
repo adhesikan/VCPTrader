@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings } from "lucide-react";
+import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X } from "lucide-react";
+import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -67,6 +69,8 @@ export default function Scanner() {
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
   const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all");
   const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
 
@@ -74,13 +78,19 @@ export default function Scanner() {
     navigate(`/charts/${result.ticker}`);
   };
 
-  const { data: storedResults, isLoading, refetch } = useQuery<ScanResult[]>({
+  const { data: storedResults, isLoading, refetch, dataUpdatedAt } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
   });
 
   const { data: watchlists } = useQuery<Watchlist[]>({
     queryKey: ["/api/watchlists"],
   });
+
+  useEffect(() => {
+    if (dataUpdatedAt && storedResults && storedResults.length > 0 && !liveResults) {
+      setLastScanTime(new Date(dataUpdatedAt));
+    }
+  }, [dataUpdatedAt, storedResults, liveResults]);
 
   const rawResults = liveResults || storedResults;
   const isLiveData = !!liveResults;
@@ -126,6 +136,7 @@ export default function Scanner() {
     onSuccess: (data) => {
       if (Array.isArray(data)) {
         setLiveResults(data);
+        setLastScanTime(new Date());
         toast({
           title: "Live Scan Complete",
           description: `Fetched ${data.length} stocks from your broker`,
@@ -270,6 +281,38 @@ export default function Scanner() {
         </CollapsibleContent>
       </Collapsible>
 
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by ticker or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-8"
+            data-testid="input-search"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => setSearchQuery("")}
+              data-testid="button-clear-search"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        {lastScanTime && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>
+              {isLiveData ? "Live scan" : "Loaded"}: {format(lastScanTime, "MMM d, h:mm:ss a")}
+            </span>
+          </div>
+        )}
+      </div>
+
       {!isLoading && (!results || results.length === 0) && !isConnected ? (
         <Card>
           <CardContent className="p-8 text-center">
@@ -287,7 +330,7 @@ export default function Scanner() {
           </CardContent>
         </Card>
       ) : (
-        <ScannerTable results={results || []} isLoading={isLoading} onRowClick={handleRowClick} />
+        <ScannerTable results={results || []} isLoading={isLoading} onRowClick={handleRowClick} searchQuery={searchQuery} />
       )}
     </div>
   );

@@ -14,13 +14,21 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ScanResult, PatternStageType } from "@shared/schema";
 
-type SortField = "ticker" | "price" | "changePercent" | "volume" | "rvol" | "patternScore";
+type SortField = "ticker" | "price" | "changePercent" | "volume" | "rvol" | "patternScore" | "stage";
 type SortDirection = "asc" | "desc";
+
+const STAGE_ORDER: Record<string, number> = {
+  "BREAKOUT": 4,
+  "READY": 3,
+  "APPROACHING": 2,
+  "FORMING": 1,
+};
 
 interface ScannerTableProps {
   results: ScanResult[];
   isLoading?: boolean;
   onRowClick?: (result: ScanResult) => void;
+  searchQuery?: string;
 }
 
 function formatVolume(vol: number | null | undefined): string {
@@ -54,7 +62,7 @@ function getStageBadgeVariant(stage: PatternStageType): "default" | "secondary" 
   }
 }
 
-export function ScannerTable({ results, isLoading, onRowClick }: ScannerTableProps) {
+export function ScannerTable({ results, isLoading, onRowClick, searchQuery = "" }: ScannerTableProps) {
   const [sortField, setSortField] = useState<SortField>("patternScore");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -68,10 +76,26 @@ export function ScannerTable({ results, isLoading, onRowClick }: ScannerTablePro
     }
   };
 
-  const sortedResults = [...results].sort((a, b) => {
+  const filteredResults = results.filter((r) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      r.ticker.toLowerCase().includes(query) ||
+      (r.name && r.name.toLowerCase().includes(query))
+    );
+  });
+
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    const modifier = sortDirection === "asc" ? 1 : -1;
+    
+    if (sortField === "stage") {
+      const aOrder = STAGE_ORDER[a.stage] ?? 0;
+      const bOrder = STAGE_ORDER[b.stage] ?? 0;
+      return (aOrder - bOrder) * modifier;
+    }
+    
     const aVal = a[sortField] ?? 0;
     const bVal = b[sortField] ?? 0;
-    const modifier = sortDirection === "asc" ? 1 : -1;
     if (typeof aVal === "string" && typeof bVal === "string") {
       return aVal.localeCompare(bVal) * modifier;
     }
@@ -165,7 +189,9 @@ export function ScannerTable({ results, isLoading, onRowClick }: ScannerTablePro
             <TableHead className="text-right">
               <SortHeader field="rvol">RVOL</SortHeader>
             </TableHead>
-            <TableHead>Stage</TableHead>
+            <TableHead>
+              <SortHeader field="stage">Stage</SortHeader>
+            </TableHead>
             <TableHead className="text-right">Resistance</TableHead>
             <TableHead className="text-right">Stop</TableHead>
             <TableHead className="text-right">
