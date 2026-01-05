@@ -69,7 +69,7 @@ export default function Charts() {
   
   const [searchInput, setSearchInput] = useState(initialTicker);
   const [selectedTicker, setSelectedTicker] = useState(initialTicker);
-  const timeframe = "1D";
+  const timeframe = "3M";
   
   const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA21, setShowEMA21] = useState(true);
