@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Plus, Check, Trash2, Filter } from "lucide-react";
+import { Bell, Plus, Check, Trash2, Filter, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,10 +24,11 @@ import {
 import { AlertList } from "@/components/alert-card";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Alert, AlertTypeValue, InsertAlert } from "@shared/schema";
+import type { Alert, AlertTypeValue, InsertAlert, Watchlist } from "@shared/schema";
 
 export default function Alerts() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("");
   const [newAlert, setNewAlert] = useState({
     ticker: "",
     type: "BREAKOUT" as AlertTypeValue,
@@ -40,6 +41,18 @@ export default function Alerts() {
   const { data: alerts, isLoading } = useQuery<Alert[]>({
     queryKey: ["/api/alerts"],
   });
+
+  const { data: watchlists } = useQuery<Watchlist[]>({
+    queryKey: ["/api/watchlists"],
+  });
+
+  const selectedWatchlistData = watchlists?.find(w => w.id === selectedWatchlist);
+
+  useEffect(() => {
+    if (selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0) {
+      setNewAlert(prev => ({ ...prev, ticker: selectedWatchlistData.symbols![0] }));
+    }
+  }, [selectedWatchlistData]);
 
   const dismissMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -168,16 +181,54 @@ export default function Alerts() {
                 <DialogTitle>Create Price Alert</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
+                {watchlists && watchlists.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>From Watchlist (optional)</Label>
+                    <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+                      <SelectTrigger data-testid="select-alert-watchlist">
+                        <List className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Select a watchlist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None - enter manually</SelectItem>
+                        {watchlists.map((wl) => (
+                          <SelectItem key={wl.id} value={wl.id}>
+                            {wl.name} ({wl.symbols?.length || 0} symbols)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="ticker">Symbol</Label>
-                  <Input
-                    id="ticker"
-                    placeholder="AAPL"
-                    value={newAlert.ticker}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, ticker: e.target.value.toUpperCase() }))}
-                    className="font-mono uppercase"
-                    data-testid="input-alert-ticker"
-                  />
+                  {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
+                    <Select
+                      value={newAlert.ticker}
+                      onValueChange={(value) => setNewAlert(prev => ({ ...prev, ticker: value }))}
+                    >
+                      <SelectTrigger className="font-mono" data-testid="input-alert-ticker">
+                        <SelectValue placeholder="Select symbol" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedWatchlistData.symbols.map((symbol) => (
+                          <SelectItem key={symbol} value={symbol}>
+                            {symbol}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="ticker"
+                      placeholder="AAPL"
+                      value={newAlert.ticker}
+                      onChange={(e) => setNewAlert(prev => ({ ...prev, ticker: e.target.value.toUpperCase() }))}
+                      className="font-mono uppercase"
+                      data-testid="input-alert-ticker"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">

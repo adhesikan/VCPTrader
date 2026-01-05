@@ -377,8 +377,11 @@ export default function Settings() {
                           />
                         </div>
                       )}
-                      <div className="bg-muted/50 border border-border p-3 rounded-md space-y-2">
-                        <p className="text-xs font-medium">Security Notice</p>
+                      <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-md space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-blue-500" />
+                          <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Security Notice</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           VCP Trader only uses your API token to fetch market data (quotes and charts). 
                           We never access your account balance, positions, or execute any trades. 
