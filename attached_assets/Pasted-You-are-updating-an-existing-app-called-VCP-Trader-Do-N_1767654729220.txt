@@ -1,0 +1,149 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Add a NEW scan strategy called “Classic Pullback” alongside the existing VCP scanner, using the same UI/UX patterns, data pipeline, alerts engine, and watchlist features.
+
+STRATEGY DEFINITION (Classic Pullback)
+A ticker qualifies when:
+1) Price is above both EMA 9 and EMA 21 (trend filter)
+2) After an uptrend, price pulls back slightly and forms a small flag / tight consolidation (small contraction)
+3) Entry condition (Breakout):
+   - Price breaks above the pullback/flag resistance level
+   - Breakout is confirmed with strong volume (relative volume vs average)
+4) Stop loss:
+   - Below the breakout/entry candle low (tight stop)
+5) Exit condition:
+   - Hold until price closes below EMA 21
+
+IMPORTANT: This app is educational/informational only. Do not use “buy/sell recommendations” language in the UI. Use “Entry condition”, “Breakout trigger”, “Stop level”, “Exit condition”.
+
+REQUIREMENTS
+
+1) STRATEGY ARCHITECTURE (PLUGIN STYLE)
+Refactor the scanner backend to support multiple strategies via a common interface:
+- scan(strategyId, universe, filters, timeframe) -> results[]
+- computeLevels(result) -> { resistance, entryTrigger, stopLevel, exitRule }
+- explain(result) -> short educational explanation
+- classifyStage(result) -> { stage: "FORMING"|"READY"|"TRIGGERED" }  (for Classic Pullback)
+
+Add a new strategy module:
+- strategies/classicPullback.ts (or similar)
+
+2) DETECTION LOGIC (BACKEND)
+Use OHLCV candles for the selected timeframe (default 5m and 15m; support 1h, 1d if already supported).
+
+Compute:
+- EMA9, EMA21
+- Avg volume baseline (e.g., 20-bar SMA of volume)
+- Relative Volume (RVOL = current volume / avgVolume)
+
+Define pullback/flag detection (keep it robust + explainable):
+A) Trend filter:
+- close > EMA9 and close > EMA21 for at least N bars (default N=20)
+- EMA9 > EMA21 (optional but recommended)
+
+B) Pullback window:
+- Identify recent impulse leg up:
+  - price advanced at least X% from swing low to swing high within last M bars (defaults: X=3%, M=60 for intraday)
+- Then identify a consolidation/pullback segment near highs:
+  - last K bars (default K=8–20) have a tighter range than the impulse (contraction)
+  - pullback depth is shallow:
+    - max drawdown from recent swing high <= D% (default D=2.5% intraday; 5% daily)
+  - optional: descending or flat highs (flag) and higher lows OR tightening range
+
+C) Resistance line:
+- Resistance = highest high of the pullback segment (or linear regression/flat top if you already do lines; keep it simple)
+- READY state when price is still below resistance but the pullback criteria holds
+
+D) Breakout trigger:
+- TRIGGERED when:
+  - close crosses above resistance (or high breaks above resistance) AND
+  - volume >= (avgVolume * VOL_MULT) where default VOL_MULT=1.5
+- Save the breakout candle index/time for event keys
+
+E) Stop level:
+- stopLevel = low of the breakout candle (or slightly below by a small buffer; buffer configurable, default 0%)
+
+F) Exit rule:
+- Exit condition is met when candle CLOSE < EMA21
+(For alerts, this becomes an exit alert if user enables it)
+
+All thresholds must be configurable in UI with sensible defaults:
+- TrendBars N (default 20)
+- PullbackBars K min/max (8–20)
+- PullbackDepth D% (2.5% intraday)
+- ImpulseMinMove X% (3%)
+- ImpulseLookback M (60)
+- VolumeMultiplier VOL_MULT (1.5)
+
+3) SCANNER UI CHANGES
+- Add strategy selector dropdown at top of scanner:
+  - “VCP”
+  - “Classic Pullback”
+- When Classic Pullback is selected:
+  - Show relevant filters/inputs (the defaults above)
+  - Results table columns:
+    - Symbol
+    - Stage (FORMING / READY / TRIGGERED)
+    - Resistance
+    - Entry Trigger
+    - Stop Level
+    - RVOL
+    - Timeframe
+    - Score (optional)
+  - Clicking a row opens detail view with:
+    - chart
+    - resistance line
+    - EMA9/EMA21
+    - entry/stop markers
+    - explanation text
+
+4) ALERTS INTEGRATION (RULE-BASED)
+Integrate with the new rules-based alert engine:
+Allow users to create alert rules for Classic Pullback:
+- Condition: “Stage entered TRIGGERED” (breakout alert)
+- Optional: “Exit condition met (Close below EMA21)”
+- Optional: “Approaching resistance (within X% of resistance)” where X default 0.5%
+
+Alert dedupe:
+- Trigger only on state transition READY->TRIGGERED
+- Use event_key including breakout candle timestamp
+
+Alert message format (educational):
+Title: “{SYMBOL} Classic Pullback triggered ({TIMEFRAME})”
+Body includes resistance, close price, RVOL, stop level, and:
+“This alert is informational only and not investment advice.”
+
+5) DATA + CACHING
+Reuse existing candle caching logic. If none exists:
+- Cache candles per symbol/timeframe with TTL (e.g., 30–60s for intraday)
+- Avoid refetching repeatedly in the scan loop
+
+6) BACKTEST SUPPORT (OPTIONAL IF APP HAS IT)
+If the app has backtests:
+- Add Classic Pullback to backtest dropdown
+- Use entry = breakout trigger
+- stop = breakout candle low
+- exit = first close below EMA21
+Return simple stats: win rate, avg R, max drawdown per trade (basic)
+
+7) EDUCATIONAL COPY (ADD STRATEGY GUIDE)
+Add a new page or section:
+- /strategies/classic-pullback
+Explain the strategy in neutral, educational language (no “buy” wording).
+Include:
+- Requirements
+- Entry condition
+- Risk management
+- Exit rule
+Include the footer disclaimer.
+
+8) TESTS
+Add tests (if test framework exists):
+- Detect READY when price above EMAs and pullback criteria holds
+- Detect TRIGGERED only when breakout + volume condition holds
+- Ensure no repeated TRIGGERED alerts while still above resistance
+- Exit triggers on close below EMA21
+
+DELIVERABLE
+Add the Classic Pullback strategy end-to-end: backend strategy module + UI selector + results/detail view + alerts rule conditions + guide page. Ensure it works alongside VCP without breaking existing features.

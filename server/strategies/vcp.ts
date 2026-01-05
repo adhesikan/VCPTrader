@@ -1,0 +1,71 @@
+import { QuoteData } from "../broker-service";
+import { 
+  Strategy, 
+  StrategyId, 
+  StrategyClassification, 
+  StrategyLevels,
+  Candle,
+  StrategyConfig 
+} from "./types";
+import { PatternStage } from "@shared/schema";
+
+export const vcpStrategy: Strategy = {
+  id: StrategyId.VCP,
+  name: "VCP (Volatility Contraction Pattern)",
+  description: "Identifies stocks forming tight consolidation patterns with decreasing volatility before potential breakouts.",
+
+  classify(quote: QuoteData, _candles?: Candle[], _config?: StrategyConfig): StrategyClassification {
+    const priceFromHigh = ((quote.high - quote.last) / quote.high) * 100;
+    const volumeRatio = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+    
+    let stage: string;
+    let score: number;
+    
+    if (quote.change > 0 && quote.changePercent > 2 && volumeRatio > 1.5) {
+      stage = PatternStage.BREAKOUT;
+      score = Math.min(100, 80 + Math.floor(volumeRatio * 5));
+    } else if (priceFromHigh < 5 && quote.change > 0) {
+      stage = PatternStage.READY;
+      score = Math.min(95, 65 + Math.floor((5 - priceFromHigh) * 6));
+    } else {
+      stage = PatternStage.FORMING;
+      score = Math.max(30, 60 - Math.floor(priceFromHigh * 2));
+    }
+    
+    const levels = this.computeLevels(quote);
+    
+    return {
+      stage,
+      levels,
+      score,
+      ema9: quote.last * 0.99,
+      ema21: quote.last * 0.97,
+      rvol: volumeRatio,
+      explanation: this.explain({ stage, levels, score, rvol: volumeRatio, explanation: "" }),
+    };
+  },
+
+  computeLevels(quote: QuoteData): StrategyLevels {
+    const resistance = quote.high * 1.02;
+    const stopLevel = quote.last * 0.93;
+    
+    return {
+      resistance: Number(resistance.toFixed(2)),
+      entryTrigger: Number(resistance.toFixed(2)),
+      stopLevel: Number(stopLevel.toFixed(2)),
+      exitRule: "Close below 21 EMA or stop hit",
+    };
+  },
+
+  explain(classification: StrategyClassification): string {
+    const { stage, rvol } = classification;
+    
+    if (stage === PatternStage.BREAKOUT) {
+      return `VCP breakout detected with ${rvol?.toFixed(1)}x relative volume. Pattern has contracted and is now expanding.`;
+    } else if (stage === PatternStage.READY) {
+      return "VCP pattern is tightening near resistance. Watch for volume confirmation on breakout.";
+    } else {
+      return "VCP pattern is forming. Waiting for volatility contraction and base tightening.";
+    }
+  },
+};
