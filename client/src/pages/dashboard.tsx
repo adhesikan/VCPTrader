@@ -8,6 +8,8 @@ import {
   ArrowRight,
   BarChart3,
   Activity,
+  Settings,
+  Plug,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertList } from "@/components/alert-card";
 import { ScannerTable } from "@/components/scanner-table";
+import { useBrokerStatus } from "@/hooks/use-broker-status";
 import type { ScanResult, Alert, MarketStats } from "@shared/schema";
 
 export default function Dashboard() {
+  const { isConnected } = useBrokerStatus();
+  
   const { data: scanResults, isLoading: scanLoading } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
   });
@@ -146,7 +151,23 @@ export default function Dashboard() {
               </Link>
             </CardHeader>
             <CardContent>
-              <ScannerTable results={topResults} isLoading={scanLoading} />
+              {!scanLoading && topResults.length === 0 && !isConnected ? (
+                <div className="py-8 text-center">
+                  <Plug className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+                  <p className="text-muted-foreground font-medium">No broker connected</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
+                    Connect your brokerage to see live VCP data
+                  </p>
+                  <Link href="/settings">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Settings className="h-4 w-4" />
+                      Go to Settings
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <ScannerTable results={topResults} isLoading={scanLoading} />
+              )}
             </CardContent>
           </Card>
         </div>
@@ -167,6 +188,11 @@ export default function Dashboard() {
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Skeleton key={i} className="h-24 w-full" />
                   ))}
+                </div>
+              ) : recentAlerts.length === 0 ? (
+                <div className="py-6 text-center">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No alerts yet</p>
                 </div>
               ) : (
                 <AlertList alerts={recentAlerts} />

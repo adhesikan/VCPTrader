@@ -361,11 +361,8 @@ export class MemStorage implements IStorage {
   }
 
   private initializeMockData() {
-    const mockResults = generateMockScanResults();
-    mockResults.forEach(r => this.scanResults.set(r.id, r));
-
-    const mockAlerts = generateMockAlerts();
-    mockAlerts.forEach(a => this.alerts.set(a.id, a));
+    // No longer initialize mock scan results or alerts
+    // Data comes from live broker connections only
 
     const defaultWatchlist: Watchlist = {
       id: randomUUID(),

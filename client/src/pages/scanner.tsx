@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Loader2, RefreshCw, List, DollarSign, Info } from "lucide-react";
+import { Link } from "wouter";
+import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScannerTable } from "@/components/scanner-table";
 import { ScannerFiltersPanel, defaultFilters } from "@/components/scanner-filters";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -229,7 +231,25 @@ export default function Scanner() {
         </CollapsibleContent>
       </Collapsible>
 
-      <ScannerTable results={results || []} isLoading={isLoading} />
+      {!isLoading && (!results || results.length === 0) && !isConnected ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <p className="text-muted-foreground font-medium">No broker connected</p>
+            <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
+              Connect your brokerage account to scan for VCP patterns
+            </p>
+            <Link href="/settings">
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Connect Broker
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <ScannerTable results={results || []} isLoading={isLoading} />
+      )}
     </div>
   );
 }

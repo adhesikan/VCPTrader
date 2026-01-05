@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
+import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings } from "lucide-react";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriceChart, TechnicalAnalysisWidget, VolumeProfileWidget } from "@/components/price-chart";
+import { useBrokerStatus } from "@/hooks/use-broker-status";
 
 interface ChartData {
   candles: Array<{
@@ -353,6 +355,7 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
 
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const { isConnected } = useBrokerStatus();
 
   const { data: scanResults, isLoading } = useQuery<any[]>({
     queryKey: ["/api/scan/results"],
@@ -409,9 +412,27 @@ export default function Signals() {
       ) : signalData.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <p className="text-muted-foreground">No active signals at this time</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">Check back later for new trade opportunities</p>
+            {!isConnected ? (
+              <>
+                <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                <p className="text-muted-foreground font-medium">No broker connected</p>
+                <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
+                  Connect your brokerage account to see live trade signals
+                </p>
+                <Link href="/settings">
+                  <Button variant="outline" className="gap-2">
+                    <Settings className="h-4 w-4" />
+                    Connect Broker
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                <p className="text-muted-foreground">No active signals at this time</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Check back later for new trade opportunities</p>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (

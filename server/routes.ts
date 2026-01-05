@@ -50,20 +50,21 @@ export async function registerRoutes(
             }
             return res.json(liveResults);
           } catch (brokerError: any) {
-            console.error("Broker fetch failed, falling back to mock data:", brokerError.message);
+            console.error("Broker fetch failed, falling back to stored results:", brokerError.message);
+            const storedResults = await storage.getScanResults();
             if (includeMeta) {
-              const results = await storage.getScanResults();
-              return res.json({ data: results, isLive: false, error: brokerError.message });
+              return res.json({ data: storedResults, isLive: false, error: brokerError.message });
             }
+            return res.json(storedResults);
           }
         }
       }
       
-      const results = await storage.getScanResults();
+      const storedResults = await storage.getScanResults();
       if (includeMeta) {
-        return res.json({ data: results, isLive: false });
+        return res.json({ data: storedResults, isLive: false, requiresBroker: !storedResults.length });
       }
-      res.json(results);
+      res.json(storedResults);
     } catch (error) {
       res.status(500).json({ error: "Failed to get scan results" });
     }
