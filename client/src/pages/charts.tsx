@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Clock, ChevronRight, ExternalLink, Plug, Settings } from "lucide-react";
+import { Search, ChevronRight, ExternalLink, Plug, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,29 +63,13 @@ interface ChartData {
   isLive?: boolean;
 }
 
-const intervals = [
-  { value: "5m", label: "5m" },
-  { value: "15m", label: "15m" },
-  { value: "30m", label: "30m" },
-  { value: "1h", label: "1h" },
-];
-
-const timeframes = [
-  { value: "1D", label: "1D" },
-  { value: "1W", label: "1W" },
-  { value: "1M", label: "1M" },
-  { value: "3M", label: "3M" },
-  { value: "6M", label: "6M" },
-  { value: "1Y", label: "1Y" },
-];
-
 export default function Charts() {
   const [, params] = useRoute("/charts/:ticker");
   const initialTicker = params?.ticker || "";
   
   const [searchInput, setSearchInput] = useState(initialTicker);
   const [selectedTicker, setSelectedTicker] = useState(initialTicker);
-  const [timeframe, setTimeframe] = useState("3M");
+  const timeframe = "1D";
   
   const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA21, setShowEMA21] = useState(true);
@@ -134,55 +118,24 @@ export default function Charts() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px] lg:w-64">
-            <Input
-              placeholder="Enter symbol..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="font-mono pr-10"
-              data-testid="input-ticker-search"
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full"
-              onClick={handleSearch}
-              data-testid="button-search"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="flex gap-1 flex-wrap">
-            <div className="flex gap-0.5 items-center border-r pr-2 mr-1">
-              {intervals.map((iv) => (
-                <Button
-                  key={iv.value}
-                  variant={timeframe === iv.value ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setTimeframe(iv.value)}
-                  className="font-mono text-xs px-2"
-                  data-testid={`button-interval-${iv.value}`}
-                >
-                  {iv.label}
-                </Button>
-              ))}
-            </div>
-            {timeframes.map((tf) => (
-              <Button
-                key={tf.value}
-                variant={timeframe === tf.value ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setTimeframe(tf.value)}
-                className="font-mono text-xs px-2"
-                data-testid={`button-timeframe-${tf.value}`}
-              >
-                {tf.label}
-              </Button>
-            ))}
-          </div>
+        <div className="relative flex-1 min-w-[180px] lg:w-64 lg:flex-none">
+          <Input
+            placeholder="Enter symbol..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            className="font-mono pr-10"
+            data-testid="input-ticker-search"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full"
+            onClick={handleSearch}
+            data-testid="button-search"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
