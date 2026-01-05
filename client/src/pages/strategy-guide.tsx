@@ -18,8 +18,9 @@ export default function StrategyGuide() {
       </div>
 
       <Tabs defaultValue="vcp" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="vcp" data-testid="tab-vcp">VCP Strategy</TabsTrigger>
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsTrigger value="vcp" data-testid="tab-vcp">Intraday VCP</TabsTrigger>
+          <TabsTrigger value="vcp-multiday" data-testid="tab-vcp-multiday">Multi-day VCP</TabsTrigger>
           <TabsTrigger value="pullback" data-testid="tab-pullback">Classic Pullback</TabsTrigger>
         </TabsList>
 
@@ -204,6 +205,198 @@ export default function StrategyGuide() {
                       <li className="flex items-center gap-2">
                         <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                         Risk/reward ratio at least 2:1
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="vcp-multiday" className="space-y-6 mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card data-testid="card-vcp-multiday-overview">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  What is Multi-timeframe VCP?
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  The <strong>Multi-timeframe VCP</strong> strategy analyzes historical daily or weekly candles to detect
+                  true volatility contraction patterns. Unlike the Intraday VCP which uses quote-level data, this strategy
+                  identifies multiple contracting bases (T1, T2, T3) that develop over days or weeks.
+                </p>
+                <p>
+                  This is the classic Mark Minervini-style VCP that swing traders look for - patterns that show progressively
+                  tighter price ranges as the stock consolidates before a potential breakout.
+                </p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <p className="font-medium">Key Characteristics:</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Historical candle analysis over 30+ days</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Detects multiple contracting bases (T1 larger than T2, T2 larger than T3)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Verifies uptrend via EMA 9 above EMA 21</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Requires broker connection for historical data access</span>
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-vcp-multiday-entry">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Multi-day VCP Entry Strategy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  Entry is triggered when price breaks above the <strong>pivot point</strong> (the high of the last contraction)
+                  with volume confirmation of at least 1.5x average.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">1</Badge>
+                    <div>
+                      <p className="font-medium">Pattern Detection</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Scanner identifies 2+ contracting bases with each smaller than the previous
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">2</Badge>
+                    <div>
+                      <p className="font-medium">Pivot Identification</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        The highest point of the final contraction becomes the pivot/breakout level
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">3</Badge>
+                    <div>
+                      <p className="font-medium">Breakout Confirmation</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Enter when price closes above pivot with 1.5x+ volume and 1%+ gain
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">4</Badge>
+                    <div>
+                      <p className="font-medium">Stop Placement</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Stop below the last contraction low (typically 5-10% risk)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-vcp-multiday-stages">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Multi-day VCP Pattern Stages
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  The scanner classifies multi-day VCP patterns based on contraction quality and proximity to breakout.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
+                    <Badge variant="outline">FORMING</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Early consolidation detected. May have 1 base but needs more time for volatility contraction
+                        to develop properly.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
+                    <Badge variant="secondary">READY</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Multiple contracting bases confirmed (T1 larger than T2). Price near pivot and in uptrend.
+                        High-probability setup forming.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
+                    <Badge variant="default">BREAKOUT</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Price has broken above the pivot with volume surge. Pattern has fully matured and triggered.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-vcp-multiday-comparison">
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Intraday vs Multi-day VCP</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <p className="font-medium text-sm">Intraday VCP</p>
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Uses real-time quote data
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Detects same-day momentum
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Faster signals, shorter holds
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Works without historical data
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-medium text-sm">Multi-timeframe VCP</p>
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Analyzes 30+ days of candles
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        True volatility contraction detection
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Swing trade timeframe (days to weeks)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Requires broker connection for data
                       </li>
                     </ul>
                   </div>
