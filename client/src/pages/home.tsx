@@ -264,7 +264,7 @@ function ScreenshotCarousel() {
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
-      const scrollAmount = scrollRef.current.clientWidth * 0.8;
+      const scrollAmount = scrollRef.current.clientWidth * 0.85;
       scrollRef.current.scrollBy({
         left: direction === "left" ? -scrollAmount : scrollAmount,
         behavior: "smooth",
@@ -285,11 +285,11 @@ function ScreenshotCarousel() {
           </p>
         </div>
 
-        <div className="relative">
+        <div className="relative px-12 md:px-14">
           <Button
             variant="outline"
             size="icon"
-            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur ${!canScrollLeft ? "invisible" : ""}`}
+            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background shadow-md border ${!canScrollLeft ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => scroll("left")}
             data-testid="button-carousel-left"
           >
@@ -298,25 +298,26 @@ function ScreenshotCarousel() {
 
           <div
             ref={scrollRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4"
+            className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 px-1"
             onScroll={updateScrollButtons}
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {screenshots.map((screenshot, index) => (
               <div
                 key={index}
-                className="flex-shrink-0 snap-center first:ml-0 last:mr-0"
-                style={{ width: "min(85vw, 600px)" }}
+                className="flex-shrink-0 snap-center"
+                style={{ width: "min(90vw, 900px)" }}
               >
-                <div className="rounded-lg overflow-hidden border bg-background shadow-sm">
+                <div className="rounded-lg overflow-hidden border-2 border-border bg-card shadow-lg">
                   <img
                     src={screenshot.src}
                     alt={screenshot.alt}
-                    className="w-full h-auto object-cover"
+                    className="w-full h-auto"
+                    style={{ imageRendering: "auto" }}
                     data-testid={`img-screenshot-${index}`}
                   />
                 </div>
-                <p className="mt-3 text-center text-sm text-muted-foreground" data-testid={`text-screenshot-caption-${index}`}>
+                <p className="mt-4 text-center text-base font-medium text-foreground" data-testid={`text-screenshot-caption-${index}`}>
                   {screenshot.caption}
                 </p>
               </div>
@@ -326,7 +327,7 @@ function ScreenshotCarousel() {
           <Button
             variant="outline"
             size="icon"
-            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur ${!canScrollRight ? "invisible" : ""}`}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background shadow-md border ${!canScrollRight ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => scroll("right")}
             data-testid="button-carousel-right"
           >
@@ -334,7 +335,7 @@ function ScreenshotCarousel() {
           </Button>
         </div>
 
-        <div className="text-center mt-8">
+        <div className="text-center mt-10">
           <Link href={isAuthenticated ? "/dashboard" : "/auth"}>
             <Button size="lg" data-testid="button-carousel-cta">
               {isAuthenticated ? "Go to Dashboard" : "Start Free Trial"}
