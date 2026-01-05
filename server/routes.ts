@@ -225,7 +225,17 @@ export async function registerRoutes(
     try {
       const userId = req.session.userId!;
       const connection = await storage.getBrokerConnection(userId);
-      res.json(connection);
+      if (!connection) {
+        return res.json(null);
+      }
+      const sanitizedConnection = {
+        id: connection.id,
+        userId: connection.userId,
+        provider: connection.provider,
+        isConnected: connection.isConnected,
+        lastSync: connection.lastSync,
+      };
+      res.json(sanitizedConnection);
     } catch (error) {
       res.status(500).json({ error: "Failed to get broker status" });
     }
@@ -234,16 +244,27 @@ export async function registerRoutes(
   app.post("/api/broker/connect", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { provider } = req.body;
+      const { provider, accessToken } = req.body;
       if (!provider) {
         return res.status(400).json({ error: "Provider is required" });
       }
+      if (!accessToken || typeof accessToken !== "string" || !accessToken.trim()) {
+        return res.status(400).json({ error: "Access token is required" });
+      }
       const connection = await storage.setBrokerConnection(userId, {
         provider,
+        accessToken: accessToken.trim(),
         isConnected: true,
         lastSync: new Date(),
       });
-      res.json(connection);
+      const sanitizedConnection = {
+        id: connection.id,
+        userId: connection.userId,
+        provider: connection.provider,
+        isConnected: connection.isConnected,
+        lastSync: connection.lastSync,
+      };
+      res.json(sanitizedConnection);
     } catch (error) {
       res.status(500).json({ error: "Failed to connect broker" });
     }

@@ -10,6 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,21 +39,27 @@ const brokerProviders = [
 export default function Settings() {
   const { toast } = useToast();
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState("");
 
   const { data: brokerStatus } = useQuery<BrokerConnection | null>({
     queryKey: ["/api/broker/status"],
   });
 
   const connectBrokerMutation = useMutation({
-    mutationFn: async (provider: string) => {
-      const response = await apiRequest("POST", "/api/broker/connect", { provider });
+    mutationFn: async ({ provider, accessToken }: { provider: string; accessToken: string }) => {
+      const response = await apiRequest("POST", "/api/broker/connect", { provider, accessToken });
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      setConnectDialogOpen(false);
+      setAccessToken("");
+      setSelectedProvider(null);
       toast({
         title: "Broker Connected",
-        description: `Successfully connected to ${data.provider}`,
+        description: `Successfully connected to ${brokerProviders.find(b => b.id === data.provider)?.name || data.provider}`,
       });
     },
     onError: (error) => {
@@ -56,6 +70,17 @@ export default function Settings() {
       });
     },
   });
+
+  const handleProviderClick = (providerId: string) => {
+    setSelectedProvider(providerId);
+    setAccessToken("");
+    setConnectDialogOpen(true);
+  };
+
+  const handleConnect = () => {
+    if (!selectedProvider || !accessToken.trim()) return;
+    connectBrokerMutation.mutate({ provider: selectedProvider, accessToken: accessToken.trim() });
+  };
 
   const disconnectBrokerMutation = useMutation({
     mutationFn: async () => {
@@ -186,7 +211,7 @@ export default function Settings() {
                       <Card 
                         key={broker.id}
                         className={`cursor-pointer hover-elevate ${isConnected ? "border-primary" : ""}`}
-                        onClick={() => !isConnected && connectBrokerMutation.mutate(broker.id)}
+                        onClick={() => !isConnected && handleProviderClick(broker.id)}
                         data-testid={`broker-${broker.id}`}
                       >
                         <CardContent className="p-4">
@@ -208,6 +233,47 @@ export default function Settings() {
                     );
                   })}
                 </div>
+
+                <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        Connect to {brokerProviders.find(b => b.id === selectedProvider)?.name}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Enter your API access token to connect your brokerage account. You can find this in your broker's developer settings.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Label htmlFor="accessToken">Access Token</Label>
+                      <Input
+                        id="accessToken"
+                        type="password"
+                        placeholder="Enter your API access token"
+                        value={accessToken}
+                        onChange={(e) => setAccessToken(e.target.value)}
+                        className="mt-2"
+                        data-testid="input-access-token"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setConnectDialogOpen(false)}
+                        data-testid="button-cancel-connect"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleConnect}
+                        disabled={!accessToken.trim() || connectBrokerMutation.isPending}
+                        data-testid="button-confirm-connect"
+                      >
+                        {connectBrokerMutation.isPending ? "Connecting..." : "Connect"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </div>
