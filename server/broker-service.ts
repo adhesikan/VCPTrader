@@ -205,7 +205,7 @@ async function fetchTastyTradeQuotes(accessToken: string, symbols: string[]): Pr
             high: quote.high || 0,
             low: quote.low || 0,
             open: quote.open || 0,
-            previousClose: quote.previousClose || 0,
+            prevClose: quote.previousClose || 0,
           });
         }
       }
@@ -357,10 +357,10 @@ function isIntradayTimeframe(timeframe: string): boolean {
   return ["5m", "15m", "30m", "1h"].includes(timeframe);
 }
 
-function getDateRange(timeframe: string): { start: string; end: string } {
+function getDateRange(timeframe: string): { start: string; end: string; isIntraday: boolean } {
   const now = new Date();
-  const end = now.toISOString().split('T')[0];
   let startDate = new Date(now);
+  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   switch (timeframe) {
     case "5m":
@@ -391,7 +391,19 @@ function getDateRange(timeframe: string): { start: string; end: string } {
       startDate.setMonth(startDate.getMonth() - 3);
   }
   
-  return { start: startDate.toISOString().split('T')[0], end };
+  if (isIntraday) {
+    return { 
+      start: startDate.toISOString().replace('Z', ''),
+      end: now.toISOString().replace('Z', ''),
+      isIntraday 
+    };
+  }
+  
+  return { 
+    start: startDate.toISOString().split('T')[0], 
+    end: now.toISOString().split('T')[0],
+    isIntraday 
+  };
 }
 
 function getTradierInterval(timeframe: string): string {
@@ -432,9 +444,8 @@ export async function fetchTradierHistory(
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
-  const { start, end } = getDateRange(timeframe);
+  const { start, end, isIntraday } = getDateRange(timeframe);
   const interval = getTradierInterval(timeframe);
-  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   const endpoint = isIntraday 
     ? `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`
@@ -486,9 +497,8 @@ export async function fetchPolygonHistory(
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
-  const { start, end } = getDateRange(timeframe);
+  const { start, end, isIntraday } = getDateRange(timeframe);
   const { multiplier, span } = getPolygonParams(timeframe);
-  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   const response = await fetch(
     `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${span}/${start}/${end}?apiKey=${accessToken}&limit=5000`
@@ -517,9 +527,8 @@ export async function fetchAlpacaHistory(
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
-  const { start, end } = getDateRange(timeframe);
+  const { start, end, isIntraday } = getDateRange(timeframe);
   const tf = getAlpacaTimeframe(timeframe);
-  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   const headers: Record<string, string> = {
     "APCA-API-KEY-ID": accessToken,
@@ -556,8 +565,7 @@ export async function fetchTastyTradeHistory(
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
-  const { start, end } = getDateRange(timeframe);
-  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
+  const { start, end, isIntraday } = getDateRange(timeframe);
   
   const periodType = isIntraday ? "minute" : "day";
   const period = isIntraday ? 5 : 1;
@@ -595,8 +603,7 @@ export async function fetchTradeStationHistory(
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
-  const { start, end } = getDateRange(timeframe);
-  const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
+  const { start, end, isIntraday } = getDateRange(timeframe);
   
   let interval = "Daily";
   if (isIntraday) {
