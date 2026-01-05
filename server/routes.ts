@@ -151,7 +151,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/alerts", async (req, res) => {
+  app.get("/api/alerts", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const alerts = await storage.getAlerts();
       res.json(alerts);
