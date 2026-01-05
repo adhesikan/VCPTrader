@@ -33,8 +33,7 @@ import {
 import logoUrl from "@assets/ChatGPT_Image_Jan_1,_2026,_01_38_07_PM_1767292703801.png";
 import vcpChartImg from "@assets/VCPChart_1767652266272.png";
 import vcpAlertConfigImg from "@assets/VCPAlertConfig_1767652266274.png";
-import vcpBreakoutAlertsImg from "@assets/VCPBreakoutAlerts_1767652266274.png";
-import vcpBacktestImg from "@assets/VCPBacktest_1767652266275.png";
+import vcpDashboardImg from "@assets/VCPDash_1767654008800.png";
 import { useState, useRef, useCallback, useMemo } from "react";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
 
@@ -248,10 +247,9 @@ function ScreenshotCarousel() {
   const [canScrollRight, setCanScrollRight] = useState(true);
 
   const screenshots = [
-    { src: vcpBreakoutAlertsImg, alt: "Breakout Alerts Dashboard", caption: "Real-time breakout alerts with key metrics" },
+    { src: vcpDashboardImg, alt: "VCP Dashboard", caption: "Track breakouts, ready setups, and forming patterns" },
     { src: vcpChartImg, alt: "VCP Chart Analysis", caption: "Interactive charts with technical analysis" },
     { src: vcpAlertConfigImg, alt: "Alert Configuration", caption: "Customizable alert rules for any stock" },
-    { src: vcpBacktestImg, alt: "Strategy Backtesting", caption: "Test your strategy with historical data" },
   ];
 
   const updateScrollButtons = useCallback(() => {
