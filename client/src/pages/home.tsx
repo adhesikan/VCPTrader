@@ -25,13 +25,58 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  TrendingUp,
+  LineChart,
+  Brain,
+  BookOpen,
+  TestTube,
 } from "lucide-react";
 import logoUrl from "@assets/ChatGPT_Image_Jan_1,_2026,_01_38_07_PM_1767292703801.png";
 import vcpChartImg from "@assets/VCPChart_1767652266272.png";
 import vcpAlertConfigImg from "@assets/VCPAlertConfig_1767652266274.png";
 import vcpBreakoutAlertsImg from "@assets/VCPBreakoutAlerts_1767652266274.png";
 import vcpBacktestImg from "@assets/VCPBacktest_1767652266275.png";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
+import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
+
+function PromoBanner() {
+  const promoActive = useMemo(() => isPromoActive(), []);
+  
+  if (!promoActive) return null;
+
+  const handleClick = () => {
+    const pricingSection = document.getElementById("pricing");
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  return (
+    <div className="bg-primary text-primary-foreground py-2 px-4" data-testid="banner-promo">
+      <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4" />
+          <span className="font-medium text-sm">
+            Early Bird Access — 50% off VCP Trader Pro until {PROMO_CONFIG.endDateDisplay}.
+          </span>
+        </div>
+        <span className="text-xs opacity-90 hidden md:inline">
+          Lock in ${PROMO_CONFIG.promoPrice}/mo (normally ${PROMO_CONFIG.standardPrice}/mo). Cancel anytime.
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleClick}
+          className="shrink-0"
+          data-testid="button-promo-cta"
+        >
+          Claim Early Bird
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function NavBar() {
   const { isAuthenticated } = useAuth();
@@ -327,104 +372,178 @@ function TrustStrip() {
   );
 }
 
-function PricingTiersSection() {
+function VCPTraderProSection() {
   const { isAuthenticated } = useAuth();
+  const promoActive = useMemo(() => isPromoActive(), []);
 
-  const tiers = [
+  const featureGroups = [
     {
-      id: "scanner",
-      title: "Scanner",
-      subtitle: "Run your own scans. Set your own alerts.",
-      price: "$79",
+      title: "Market Scanner",
+      icon: Search,
       features: [
-        "Scan thousands of stocks with price/volume filters",
-        "Detect FORMING / READY / BREAKOUT patterns",
-        "Resistance & stop levels plotted automatically",
+        "Scan the entire U.S. stock market",
+        "VCP pattern detection (FORMING, READY, BREAKOUT)",
+        "Price, volume, RVOL, ATR% filters",
+        "Multi-timeframe support",
       ],
-      cta: "Get Scanner",
-      popular: false,
     },
     {
-      id: "education",
-      title: "Education Alerts",
-      subtitle: "Model-generated educational alerts.",
-      price: "$59",
+      title: "Alerts",
+      icon: Bell,
       features: [
-        "Daily watchlists: Forming, Ready, Breakout",
-        "Push alerts when educational conditions trigger",
-        "AI explanation for every alert",
+        "Real-time breakout alerts",
+        "Stop-loss & EMA-21 exit alerts",
+        '"Approaching breakout" notifications',
+        "Push notifications (mobile PWA)",
+        "Email & in-app alerts",
       ],
-      disclaimer: "Educational examples only. Not personalized recommendations.",
-      cta: "Get Education Alerts",
-      popular: false,
     },
     {
-      id: "pro",
-      title: "Pro",
-      subtitle: "Scanner + Education Alerts together.",
-      price: "$129",
+      title: "Charts & Levels",
+      icon: LineChart,
       features: [
-        "Everything in Scanner + Education Alerts",
-        "Compare your scans vs the model feed",
-        "Best for active traders",
+        "Interactive candlestick charts",
+        "EMA 9 & EMA 21",
+        "Auto-drawn resistance lines",
+        "Auto-calculated stops",
       ],
-      cta: "Go Pro",
-      popular: true,
+    },
+    {
+      title: "AI Analysis",
+      icon: Brain,
+      features: [
+        "AI explanations for every setup",
+        "Pattern quality scores",
+        "Ranked opportunity list",
+      ],
+    },
+    {
+      title: "Educational Model Feed",
+      icon: BookOpen,
+      features: [
+        '"Today\'s Breakouts"',
+        '"Forming Bases"',
+        '"Ready Setups"',
+        "Model-generated educational alerts",
+      ],
+    },
+    {
+      title: "Broker Connectivity",
+      icon: Link2,
+      features: [
+        "Tradier / tastytrade market data (optional)",
+        "Live bid/ask breakout confirmation",
+      ],
+    },
+    {
+      title: "Backtesting",
+      icon: TestTube,
+      features: [
+        "Test how VCP breakouts performed historically",
+      ],
+    },
+    {
+      title: "Mobile App",
+      icon: Smartphone,
+      features: [
+        "Installable PWA",
+        "Real-time push alerts",
+      ],
     },
   ];
 
+  const ctaUrl = isAuthenticated 
+    ? "/settings" 
+    : promoActive 
+      ? `/auth?promo=${PROMO_CODE}` 
+      : "/auth";
+
   return (
-    <section className="py-16 md:py-24" id="choose-mode">
+    <section className="py-16 md:py-24" id="pricing">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold" data-testid="text-mode-heading">Choose Your Mode</h2>
+          <h2 className="text-2xl md:text-3xl font-bold" data-testid="text-pricing-heading">
+            One plan. Everything included.
+          </h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-            Select the subscription that matches your trading style
+            Cancel anytime. No long-term commitment.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-          {tiers.map((tier) => (
-            <Card key={tier.id} className={`relative flex flex-col ${tier.popular ? "border-primary" : ""}`}>
-              {tier.popular && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2" data-testid="badge-popular">
-                  Most Popular
-                </Badge>
-              )}
-              <CardHeader>
-                <CardTitle data-testid={`text-tier-title-${tier.id}`}>{tier.title}</CardTitle>
-                <CardDescription data-testid={`text-tier-subtitle-${tier.id}`}>{tier.subtitle}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <div className="mb-6">
-                  <span className="text-3xl font-bold" data-testid={`text-tier-price-${tier.id}`}>{tier.price}</span>
+
+        <Card className="max-w-4xl mx-auto border-primary relative">
+          {promoActive && (
+            <Badge className="absolute -top-3 left-1/2 -translate-x-1/2" data-testid="badge-early-bird">
+              Early Bird 50% Off
+            </Badge>
+          )}
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-2xl" data-testid="text-plan-name">
+              {PROMO_CONFIG.planName}
+            </CardTitle>
+            <CardDescription>
+              Complete VCP scanning, alerting, and analysis platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center mb-8">
+              {promoActive ? (
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-4xl font-bold text-primary" data-testid="text-promo-price">
+                    ${PROMO_CONFIG.promoPrice}
+                  </span>
+                  <span className="text-xl text-muted-foreground line-through" data-testid="text-standard-price">
+                    ${PROMO_CONFIG.standardPrice}
+                  </span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
-                <ul className="space-y-3 mb-6 flex-1">
-                  {tier.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                      <span data-testid={`text-tier-feature-${tier.id}-${index}`}>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                {tier.disclaimer && (
-                  <p className="text-xs text-muted-foreground mb-4 p-2 bg-muted/50 rounded" data-testid={`text-tier-disclaimer-${tier.id}`}>
-                    {tier.disclaimer}
-                  </p>
-                )}
-                <Link href={isAuthenticated ? "/settings" : "/auth"}>
-                  <Button
-                    className="w-full"
-                    variant={tier.popular ? "default" : "outline"}
-                    data-testid={`button-tier-cta-${tier.id}`}
-                  >
-                    {tier.cta}
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              ) : (
+                <div>
+                  <span className="text-4xl font-bold" data-testid="text-price">
+                    ${PROMO_CONFIG.standardPrice}
+                  </span>
+                  <span className="text-muted-foreground">/mo</span>
+                </div>
+              )}
+              {promoActive && (
+                <p className="text-sm text-muted-foreground mt-2" data-testid="text-promo-ends">
+                  Ends {PROMO_CONFIG.endDateDisplay}
+                </p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {featureGroups.map((group, groupIndex) => (
+                <div key={groupIndex} className="space-y-2">
+                  <div className="flex items-center gap-2 font-medium">
+                    <group.icon className="h-4 w-4 text-primary" />
+                    <span data-testid={`text-feature-group-${groupIndex}`}>{group.title}</span>
+                  </div>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {group.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-start gap-2">
+                        <Check className="h-3 w-3 text-primary mt-1 shrink-0" />
+                        <span data-testid={`text-feature-${groupIndex}-${featureIndex}`}>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Link href={ctaUrl}>
+                <Button size="lg" className="px-8" data-testid="button-subscribe">
+                  {isAuthenticated ? "Manage Subscription" : "Start Free Trial"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <p className="text-center mt-8 text-xs text-muted-foreground max-w-2xl mx-auto" data-testid="text-compliance">
+          All data, alerts, and model outputs are provided for educational and informational purposes only. VCP Trader does not provide investment advice.
+        </p>
       </div>
     </section>
   );
@@ -503,44 +622,6 @@ function HowItWorksSection() {
   );
 }
 
-function PricingSection() {
-  const { isAuthenticated } = useAuth();
-
-  const plans = [
-    { name: "Scanner", price: "$79" },
-    { name: "Education Alerts", price: "$59" },
-    { name: "Pro", price: "$129" },
-  ];
-
-  return (
-    <section className="py-16 md:py-24 bg-muted/30" id="pricing">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold" data-testid="text-pricing-heading">Simple Pricing</h2>
-          <p className="mt-4 text-muted-foreground">Cancel anytime. No long-term commitment.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
-          {plans.map((plan, index) => (
-            <div key={index} className="text-center">
-              <p className="text-lg font-semibold" data-testid={`text-plan-name-${index}`}>{plan.name}</p>
-              <p className="text-2xl font-bold" data-testid={`text-plan-price-${index}`}>{plan.price}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
-            </div>
-          ))}
-        </div>
-        <div className="text-center">
-          <Link href={isAuthenticated ? "/settings" : "/auth"}>
-            <Button size="lg" data-testid="button-pricing-cta">
-              {isAuthenticated ? "Manage Subscription" : "Start Free Trial"}
-            </Button>
-          </Link>
-          <p className="mt-4 text-xs text-muted-foreground max-w-md mx-auto" data-testid="text-pricing-disclaimer">
-            No guarantees. Past performance does not predict future results.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function FAQSection() {
   const faqs = [
@@ -630,14 +711,14 @@ function LandingFooter() {
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
+      <PromoBanner />
       <NavBar />
       <HeroSection />
       <ScreenshotCarousel />
       <TrustStrip />
-      <PricingTiersSection />
+      <VCPTraderProSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <PricingSection />
       <FAQSection />
       <LandingFooter />
     </div>

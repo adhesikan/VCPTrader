@@ -1,0 +1,124 @@
+You are updating an existing app/website called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+1) Replace all existing tiered pricing with a SINGLE plan called “VCP Trader Pro”.
+2) Add a time-sensitive promotional banner across the site: “Early Bird Access — 50% off until Jan 30, 2026”.
+3) Ensure the promo is automatically hidden after Jan 30, 2026 (America/New_York).
+
+PRICING (NEW SINGLE PLAN)
+Plan name: “VCP Trader Pro”
+Standard price: $129 / month
+Promo price: $59 / month (Early Bird)
+Billing: monthly subscription
+
+What the plan includes (use these exact section headings and bullets):
+
+- Market Scanner
+  • Scan the entire U.S. stock market  
+  • VCP pattern detection (FORMING, READY, BREAKOUT)  
+  • Price, volume, RVOL, ATR% filters  
+  • Multi-timeframe support  
+
+- Alerts  
+  • Real-time breakout alerts  
+  • Stop-loss & EMA-21 exit alerts  
+  • “Approaching breakout” notifications  
+  • Push notifications (mobile PWA)  
+  • Email & in-app alerts  
+
+- Charts & Levels  
+  • Interactive candlestick charts  
+  • EMA 9 & EMA 21  
+  • Auto-drawn resistance lines  
+  • Auto-calculated stops  
+
+- AI Analysis  
+  • AI explanations for every setup  
+  • Pattern quality scores  
+  • Ranked opportunity list  
+
+- Educational Model Feed  
+  • “Today’s Breakouts”  
+  • “Forming Bases”  
+  • “Ready Setups”  
+  • Model-generated educational alerts  
+
+- Broker Connectivity (Optional)  
+  • Tradier / tastytrade market data (optional)  
+  • Live bid/ask breakout confirmation  
+
+- Backtesting  
+  • Test how VCP breakouts performed historically  
+
+- Mobile App  
+  • Installable PWA  
+  • Real-time push alerts  
+
+COMPLIANCE TEXT (SHOW ON PRICING)
+Under the pricing, add this exact text:
+“All data, alerts, and model outputs are provided for educational and informational purposes only. VCP Trader does not provide investment advice.”
+
+WHERE TO UPDATE
+- Homepage pricing section  
+- /pricing page (if it exists)  
+- Any plan comparison tables (remove them)  
+- Checkout/Subscribe UI (if present) should only show VCP Trader Pro.
+
+PROMO BANNER REQUIREMENTS
+Banner text:
+“Early Bird Access — 50% off VCP Trader Pro until Jan 30, 2026.”
+
+Subtext:
+“Lock in $59/mo (normally $129/mo). Cancel anytime.”
+
+CTA button:
+“Claim Early Bird”
+
+CTA behavior:
+- Scroll to pricing section or route to /pricing  
+- If a checkout exists, pass a query param (?promo=EARLYBIRD50) so checkout can apply promo.
+
+Automatic expiry:
+- After Jan 30, 2026 11:59 PM America/New_York, the banner must not show.
+- Use a single source of truth constant:
+  PROMO_END_ISO="2026-01-31T04:59:59.999Z" (this equals Jan 30 11:59:59.999 PM ET)
+- In UI logic: show banner only if Date.now() < PROMO_END_ISO.
+- Also include a server-side check for promo eligibility to prevent client spoofing.
+
+PROMO CODE / DISCOUNT LOGIC
+If the app already uses Stripe:
+- Create/expect a promo code “EARLYBIRD50” or coupon that applies 50% off recurring.
+- In checkout, if query param promo=EARLYBIRD50 and now < promo end:
+  apply discount
+- If expired, ignore promo and show standard price.
+
+If Stripe isn’t integrated yet:
+- Still implement UI for promo display + passing query param + placeholder “Coming soon” on checkout.
+
+UI/UX
+- Banner should be sticky at the top but not cover nav (use a compact height).
+- Add a small countdown text like: “Ends Jan 30, 2026” (no live ticking required).
+- Use Tailwind and match existing design.
+- Mobile friendly.
+
+CONTENT UPDATES
+Replace any old pricing copy with:
+“One plan. Everything included.”
+
+PRICING CARD LAYOUT
+Create one clean pricing card that includes:
+- Plan name  
+- Promo badge “Early Bird 50% Off”  
+- Promo price $59/mo  
+- Strikethrough $129/mo  
+- CTA “Start Free Trial” or “Subscribe”  
+- Features list grouped as above  
+
+TESTING
+- Add a small unit test (if tests exist) that:
+  - Banner is visible before promo end timestamp  
+  - Banner is hidden after promo end timestamp  
+  - Pricing page shows only one plan  
+
+DELIVERABLE
+Implement the single plan pricing across the site, add the promo banner with auto-expiry, wire the promo query param through to checkout if present, and ensure all pages reflect the new one-plan model.

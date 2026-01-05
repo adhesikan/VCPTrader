@@ -14,6 +14,7 @@ import {
   NASDAQ_100_TOP,
   SP500_TOP
 } from "./broker-service";
+import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -33,6 +34,15 @@ export async function registerRoutes(
 
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  app.get("/api/promo/status", (req, res) => {
+    const active = isPromoActive();
+    res.json({
+      active,
+      code: active ? PROMO_CODE : null,
+      config: active ? PROMO_CONFIG : null,
+    });
+  });
 
   app.get("/api/market/stats", async (req, res) => {
     try {
