@@ -11,23 +11,34 @@ import type { ScanResult, ScannerFilters } from "@shared/schema";
 
 export default function Scanner() {
   const [filters, setFilters] = useState<ScannerFilters>(defaultFilters);
+  const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
   const { toast } = useToast();
 
-  const { data: results, isLoading, refetch } = useQuery<ScanResult[]>({
+  const { data: storedResults, isLoading, refetch } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
   });
 
+  const results = liveResults || storedResults;
+
   const runScanMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/scan/run", filters);
+      const response = await apiRequest("POST", "/api/scan/live", {});
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/scan/results"] });
-      toast({
-        title: "Scan Complete",
-        description: "VCP patterns have been analyzed",
-      });
+    onSuccess: (data) => {
+      if (Array.isArray(data)) {
+        setLiveResults(data);
+        toast({
+          title: "Live Scan Complete",
+          description: `Fetched ${data.length} stocks from your broker`,
+        });
+      } else {
+        toast({
+          title: "Scan Failed",
+          description: data.error || "Unknown error",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error) => {
       toast({

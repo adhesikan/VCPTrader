@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertAlertSchema, insertWatchlistSchema, scannerFilters, UserRole } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { fetchQuotesFromBroker, quotesToScanResults, DEFAULT_SCAN_SYMBOLS } from "./broker-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -62,6 +63,28 @@ export async function registerRoutes(
       } else {
         res.status(500).json({ error: "Failed to run scan" });
       }
+    }
+  });
+
+  app.post("/api/scan/live", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.status(400).json({ 
+          error: "No broker connection. Please connect a brokerage in Settings first." 
+        });
+      }
+
+      const symbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
+      const quotes = await fetchQuotesFromBroker(connection, symbols);
+      const results = quotesToScanResults(quotes);
+      
+      res.json(results);
+    } catch (error: any) {
+      console.error("Live scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to run live scan" });
     }
   });
 
