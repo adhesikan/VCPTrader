@@ -48,6 +48,7 @@ export type PatternStageType = typeof PatternStage[keyof typeof PatternStage];
 
 export const StrategyType = {
   VCP: "VCP",
+  VCP_MULTIDAY: "VCP_MULTIDAY",
   CLASSIC_PULLBACK: "CLASSIC_PULLBACK",
 } as const;
 

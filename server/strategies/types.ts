@@ -2,6 +2,7 @@ import { QuoteData } from "../broker-service";
 
 export const StrategyId = {
   VCP: "VCP",
+  VCP_MULTIDAY: "VCP_MULTIDAY",
   CLASSIC_PULLBACK: "CLASSIC_PULLBACK",
 } as const;
 

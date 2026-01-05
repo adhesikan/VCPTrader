@@ -11,8 +11,8 @@ import { PatternStage } from "@shared/schema";
 
 export const vcpStrategy: Strategy = {
   id: StrategyId.VCP,
-  name: "VCP (Volatility Contraction Pattern)",
-  description: "Identifies stocks forming tight consolidation patterns with decreasing volatility before potential breakouts.",
+  name: "Intraday VCP",
+  description: "Same-day VCP detection using intraday quote data - identifies momentum breakouts with volume confirmation.",
 
   classify(quote: QuoteData, _candles?: Candle[], _config?: StrategyConfig): StrategyClassification {
     const priceFromHigh = ((quote.high - quote.last) / quote.high) * 100;

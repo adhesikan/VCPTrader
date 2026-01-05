@@ -1,5 +1,6 @@
 import { Strategy, StrategyId, StrategyIdType, ScanResultItem, StrategyConfig, Candle } from "./types";
 import { vcpStrategy } from "./vcp";
+import { vcpMultidayStrategy } from "./vcpMultiday";
 import { classicPullbackStrategy } from "./classicPullback";
 import { QuoteData } from "../broker-service";
 
@@ -7,6 +8,7 @@ export * from "./types";
 
 const strategies: Map<StrategyIdType, Strategy> = new Map([
   [StrategyId.VCP, vcpStrategy],
+  [StrategyId.VCP_MULTIDAY, vcpMultidayStrategy],
   [StrategyId.CLASSIC_PULLBACK, classicPullbackStrategy],
 ]);
 
@@ -58,4 +60,4 @@ export function classifyQuote(
   };
 }
 
-export { vcpStrategy, classicPullbackStrategy };
+export { vcpStrategy, vcpMultidayStrategy, classicPullbackStrategy };
