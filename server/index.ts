@@ -2,6 +2,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { db } from "./db";
+import { brokerConnections } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
@@ -59,7 +62,35 @@ app.use((req, res, next) => {
   next();
 });
 
+async function restoreBrokerConnections() {
+  try {
+    const connections = await db
+      .select()
+      .from(brokerConnections)
+      .where(eq(brokerConnections.isConnected, true));
+    
+    if (connections.length > 0) {
+      log(`Restored ${connections.length} broker connection(s) from database`);
+      
+      for (const conn of connections) {
+        if (conn.accessTokenExpiresAt && conn.accessTokenExpiresAt < new Date()) {
+          log(`Broker connection for user ${conn.userId} has expired token - will need re-authentication`);
+          await db
+            .update(brokerConnections)
+            .set({ isConnected: false, updatedAt: new Date() })
+            .where(eq(brokerConnections.id, conn.id));
+        }
+      }
+    } else {
+      log("No active broker connections found in database");
+    }
+  } catch (error) {
+    log(`Error restoring broker connections: ${error}`);
+  }
+}
+
 (async () => {
+  await restoreBrokerConnections();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

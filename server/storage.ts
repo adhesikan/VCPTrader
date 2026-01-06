@@ -1,5 +1,8 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey } from "./crypto";
+import { db } from "./db";
+import { brokerConnections } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import type {
   User,
   InsertUser,
@@ -372,7 +375,6 @@ export class MemStorage implements IStorage {
   private scanResults: Map<string, ScanResult>;
   private alerts: Map<string, Alert>;
   private watchlists: Map<string, Watchlist>;
-  private brokerConnections: Map<string, BrokerConnection>;
   private pushSubscriptions: Map<string, PushSubscription>;
   private chartDataCache: Map<string, ReturnType<typeof generateChartData>>;
 
@@ -382,7 +384,6 @@ export class MemStorage implements IStorage {
     this.scanResults = new Map();
     this.alerts = new Map();
     this.watchlists = new Map();
-    this.brokerConnections = new Map();
     this.pushSubscriptions = new Map();
     this.chartDataCache = new Map();
 
@@ -553,11 +554,16 @@ export class MemStorage implements IStorage {
   }
 
   async getBrokerConnection(userId: string): Promise<BrokerConnection | null> {
-    return this.brokerConnections.get(userId) || null;
+    const [connection] = await db
+      .select()
+      .from(brokerConnections)
+      .where(eq(brokerConnections.userId, userId))
+      .limit(1);
+    return connection || null;
   }
 
   async getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null> {
-    const connection = this.brokerConnections.get(userId);
+    const connection = await this.getBrokerConnection(userId);
     if (!connection) return null;
     
     if (connection.encryptedCredentials && connection.credentialsIv && connection.credentialsAuthTag) {
@@ -582,25 +588,49 @@ export class MemStorage implements IStorage {
   }
 
   async setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection> {
-    const existing = this.brokerConnections.get(userId);
-    const id = existing?.id || randomUUID();
+    if (connection.encryptedCredentials && !connection.credentialsIv) {
+      throw new Error("Invalid broker connection: credentials appear to be unencrypted. Use setBrokerConnectionWithTokens() to store tokens securely.");
+    }
+    
+    const existing = await this.getBrokerConnection(userId);
     const now = new Date();
-    const brokerConnection: BrokerConnection = { 
-      id, 
-      userId, 
-      provider: connection.provider,
-      encryptedCredentials: connection.encryptedCredentials ?? null,
-      credentialsIv: connection.credentialsIv ?? null,
-      credentialsAuthTag: connection.credentialsAuthTag ?? null,
-      accessTokenExpiresAt: connection.accessTokenExpiresAt ?? null,
-      isConnected: connection.isConnected ?? null,
-      lastSync: connection.lastSync ?? null,
-      permissions: connection.permissions ?? null,
-      createdAt: existing?.createdAt || now,
-      updatedAt: now,
-    };
-    this.brokerConnections.set(userId, brokerConnection);
-    return brokerConnection;
+    
+    if (existing) {
+      const [updated] = await db
+        .update(brokerConnections)
+        .set({
+          provider: connection.provider,
+          encryptedCredentials: connection.encryptedCredentials ?? null,
+          credentialsIv: connection.credentialsIv ?? null,
+          credentialsAuthTag: connection.credentialsAuthTag ?? null,
+          accessTokenExpiresAt: connection.accessTokenExpiresAt ?? null,
+          isConnected: connection.isConnected ?? null,
+          lastSync: connection.lastSync ?? null,
+          permissions: connection.permissions ?? null,
+          updatedAt: now,
+        })
+        .where(eq(brokerConnections.userId, userId))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db
+      .insert(brokerConnections)
+      .values({
+        userId,
+        provider: connection.provider,
+        encryptedCredentials: connection.encryptedCredentials ?? null,
+        credentialsIv: connection.credentialsIv ?? null,
+        credentialsAuthTag: connection.credentialsAuthTag ?? null,
+        accessTokenExpiresAt: connection.accessTokenExpiresAt ?? null,
+        isConnected: connection.isConnected ?? null,
+        lastSync: connection.lastSync ?? null,
+        permissions: connection.permissions ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    return created;
   }
 
   async setBrokerConnectionWithTokens(
@@ -632,17 +662,21 @@ export class MemStorage implements IStorage {
   }
 
   async updateBrokerConnectionStatus(userId: string, isConnected: boolean): Promise<void> {
-    const existing = this.brokerConnections.get(userId);
-    if (existing) {
-      existing.isConnected = isConnected;
-      existing.lastSync = isConnected ? new Date() : existing.lastSync;
-      existing.updatedAt = new Date();
-      this.brokerConnections.set(userId, existing);
-    }
+    const now = new Date();
+    await db
+      .update(brokerConnections)
+      .set({
+        isConnected,
+        lastSync: isConnected ? now : undefined,
+        updatedAt: now,
+      })
+      .where(eq(brokerConnections.userId, userId));
   }
 
   async clearBrokerConnection(userId: string): Promise<void> {
-    this.brokerConnections.delete(userId);
+    await db
+      .delete(brokerConnections)
+      .where(eq(brokerConnections.userId, userId));
   }
 
   async getPushSubscriptions(): Promise<PushSubscription[]> {
