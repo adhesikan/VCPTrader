@@ -105,15 +105,15 @@ function AlertRuleCard({
         {profiles && profiles.length > 0 && onUpdateProfile && (
           <div className="mt-3">
             <Select
-              value={rule.automationProfileId || ""}
-              onValueChange={(value) => onUpdateProfile(rule.id, value || null)}
+              value={rule.automationProfileId || "none"}
+              onValueChange={(value) => onUpdateProfile(rule.id, value === "none" ? null : value)}
             >
               <SelectTrigger className="h-8 text-xs" data-testid={`select-profile-${rule.id}`}>
                 <Zap className="h-3 w-3 mr-1" />
                 <SelectValue placeholder="No automation profile" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No automation profile</SelectItem>
+                <SelectItem value="none">No automation profile</SelectItem>
                 {profiles.map((profile) => (
                   <SelectItem key={profile.id} value={profile.id}>
                     {profile.name} ({profile.mode})
@@ -230,7 +230,7 @@ export default function Alerts() {
   const [newRule, setNewRule] = useState({
     symbol: "",
     targetStage: "BREAKOUT" as string,
-    automationProfileId: "" as string,
+    automationProfileId: "none" as string,
   });
   const { toast } = useToast();
 
@@ -266,7 +266,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationProfileId: "" });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationProfileId: "none" });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -339,7 +339,7 @@ export default function Alerts() {
         strategy: "VCP",
         timeframe: "1d",
         isEnabled: true,
-        automationProfileId: newRule.automationProfileId || null,
+        automationProfileId: newRule.automationProfileId === "none" || !newRule.automationProfileId ? null : newRule.automationProfileId,
         watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
       });
     }
@@ -468,7 +468,7 @@ export default function Alerts() {
                     <SelectValue placeholder="Select automation profile" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None - use default</SelectItem>
+                    <SelectItem value="none">None - use default</SelectItem>
                     {automationProfiles.map((profile) => (
                       <SelectItem key={profile.id} value={profile.id}>
                         <div className="flex flex-col items-start">
