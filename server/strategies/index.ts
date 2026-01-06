@@ -10,6 +10,7 @@ import { trendContinuationStrategy } from "./trendContinuation";
 import { volatilitySqueezeStrategy } from "./volatilitySqueeze";
 import { QuoteData } from "../broker-service";
 import { CandleData } from "../engine/indicators";
+import { getStrategyConfig, STRATEGY_CONFIGS, type StrategyCategory } from "@shared/strategies";
 
 export * from "./types";
 
@@ -52,22 +53,26 @@ export function getAllStrategyIds(): StrategyIdType[] {
   ];
 }
 
-export function getStrategyList(): { id: StrategyIdType; name: string; description: string; category?: string }[] {
-  const legacyList = Array.from(strategies.values()).map(s => ({
-    id: s.id,
-    name: s.name,
-    description: s.description,
-    category: "swing" as const,
+export interface StrategyListItem {
+  id: StrategyIdType;
+  name: string;
+  displayName: string;
+  description: string;
+  shortDescription: string;
+  category: StrategyCategory;
+  legacyName: string;
+}
+
+export function getStrategyList(): StrategyListItem[] {
+  return STRATEGY_CONFIGS.map(config => ({
+    id: config.id as StrategyIdType,
+    name: config.displayName,
+    displayName: config.displayName,
+    description: config.shortDescription,
+    shortDescription: config.shortDescription,
+    category: config.category,
+    legacyName: config.legacyName,
   }));
-  
-  const pluginList = Array.from(strategyPlugins.values()).map(s => ({
-    id: s.id,
-    name: s.name,
-    description: s.description,
-    category: s.category,
-  }));
-  
-  return [...legacyList, ...pluginList];
 }
 
 export const STRATEGY_PRESETS = {

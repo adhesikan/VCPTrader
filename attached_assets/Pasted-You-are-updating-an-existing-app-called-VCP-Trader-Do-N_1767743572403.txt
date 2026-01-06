@@ -1,0 +1,113 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Update strategy DISPLAY names (no trademarks) across the app and update the Strategy Guide page to match these new names and descriptions. Do NOT change strategy logic, IDs, DB values, or API parameters.
+
+IMPORTANT
+- Keep internal strategy IDs exactly the same for backwards compatibility.
+- Only change display labels, descriptions, and user-facing copy.
+- Keep all language educational/informational (no buy/sell recommendations).
+
+NEW DISPLAY NAME MAPPING (USE EVERYWHERE)
+1) Intraday VCP  ->  “Momentum Breakout”
+2) Multi-timeframe VCP  ->  “Power Breakout”
+3) Classic Pullback  ->  “Precision Pullback”
+4) VWAP Reclaim  ->  “Institutional Reclaim”
+5) ORB 5m  ->  “Open Drive (5m)”
+6) ORB 15m  ->  “Open Drive (15m)”
+7) High RVOL Breakout  ->  “Volume Surge”
+8) Gap & Go  ->  “Gap Force”
+9) Trend Continuation  ->  “Trend Pilot”
+10) Volatility Squeeze  ->  “Pressure Break”
+
+Confluence / multi-strategy matches (if present):
+- “Fusion Engine”
+
+SHORT DESCRIPTIONS (FOR UI TOOLTIP/SUBTEXT)
+- Momentum Breakout: “Intraday contraction breakouts with trend and volume confirmation.”
+- Power Breakout: “Multi-timeframe contraction breakouts for swing and position traders.”
+- Precision Pullback: “Shallow pullback/flag setups in an uptrend with breakout triggers and tight risk.”
+- Institutional Reclaim: “VWAP reclaim conditions that can signal professional accumulation intraday.”
+- Open Drive (5m): “Five-minute opening range breakouts with volume expansion.”
+- Open Drive (15m): “Fifteen-minute opening range breakouts with volume expansion.”
+- Volume Surge: “High relative-volume breakouts from tight consolidations.”
+- Gap Force: “Gap-up momentum conditions with continuation triggers.”
+- Trend Pilot: “Trend continuation pullbacks using moving-average structure.”
+- Pressure Break: “Volatility compression setups designed to catch expansion moves.”
+- Fusion Engine: “Ranks symbols where multiple strategy conditions align at the same time.”
+
+WHERE TO UPDATE (UI)
+1) Strategy selector dropdown/menu
+2) Scanner page headings, tabs, cards, and filters
+3) Results tables (strategy column)
+4) Alert creation UI (strategy pickers) + alert titles/bodies + notification history
+5) Any strategy-related tooltips/help text
+6) Any existing “VCP Strategy Guide” page content
+
+IMPLEMENTATION REQUIREMENTS
+A) Create a single source of truth mapping file:
+- /src/config/strategies.ts (or /lib/strategies.ts depending on repo structure)
+
+Export an array/map containing:
+- id (existing internal strategy id)
+- legacyName (old label for reference only, not shown publicly)
+- displayName (new label)
+- shortDescription
+- category: "Momentum Engine" | "Trend Engine" | "Volatility Engine"
+- guideSlug (string)
+
+B) Update all components to render displayName and shortDescription from this mapping (remove hard-coded strings).
+
+C) Alerts/notifications:
+- Continue using internal strategy IDs for rules and evaluation
+- Use displayName in all user-facing alert templates
+Example:
+Old: “NVDA ORB 5m triggered”
+New: “NVDA Open Drive (5m) triggered”
+Append to every alert message body:
+“This alert is informational only and not investment advice.”
+
+STRATEGY GUIDE PAGE (CREATE/UPDATE)
+Create or update a page at:
+- /strategy-guide
+Title: “Strategy Guide”
+Subtitle: “Educational patterns and alert conditions used by VCP Trader.”
+
+Add a short intro paragraph explaining these are technical setups and the app provides educational alerts.
+
+Group strategies under:
+1) Momentum Engine:
+   - Momentum Breakout, Power Breakout, Open Drive (5m), Open Drive (15m), Volume Surge, Gap Force
+2) Trend Engine:
+   - Precision Pullback, Trend Pilot, Institutional Reclaim
+3) Volatility Engine:
+   - Pressure Break
+4) Fusion Engine (if confluence exists):
+   - Fusion Engine description + how ranking works
+
+For EACH strategy, add sections:
+- What it looks for (1 line)
+- Core conditions (bullets)
+- Trigger alerts (bullets)
+- Risk/exit reference (bullets)
+Use compliance-safe wording: “trigger”, “entry condition”, “stop level reference”, “exit reference”.
+Do NOT use: “buy”, “sell”, “recommendation”, “guarantee”.
+
+Add footer disclaimer to the guide page:
+“Educational & informational only. Not investment advice.”
+
+UI POLISH
+- In the strategy dropdown, show grouped headers:
+  - Momentum Engine
+  - Trend Engine
+  - Volatility Engine
+- Optionally show shortDescription as subtext.
+
+TESTS / VERIFICATION
+- Verify no user-facing instances of old names remain.
+- Verify saved alert rules still function (IDs unchanged).
+- Verify strategy guide renders correctly and links work.
+- Add a small test if tests exist: mapping renders expected display names.
+
+DELIVERABLE
+Rebrand strategy display names throughout the app using a central mapping, update/replace the Strategy Guide content to match the new names and descriptions, keep all internal IDs and logic untouched, and ensure alerts/notifications show the new names.
