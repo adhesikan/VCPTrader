@@ -469,22 +469,16 @@ export default function Alerts() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None - use default</SelectItem>
-                    {automationProfiles.length === 0 ? (
-                      <SelectItem value="_empty" disabled>
-                        <span className="text-muted-foreground">No profiles created yet</span>
+                    {automationProfiles.map((profile) => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{profile.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Mode: {profile.mode}
+                          </span>
+                        </div>
                       </SelectItem>
-                    ) : (
-                      automationProfiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{profile.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              Mode: {profile.mode}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
