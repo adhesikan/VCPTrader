@@ -104,13 +104,20 @@ Preferred communication style: Simple, everyday language.
 - **Purpose**: Subscription-based access to trade signals
 - **Required Keys**: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`
 
-### Brokerage Integrations (Planned)
-The app is designed to connect to multiple brokerage providers for market data:
+### Brokerage Integrations
+The app connects to multiple brokerage providers for market data:
 - Tradier (commission-free trading)
 - Alpaca (API-first stock trading)
 - Interactive Brokers (professional trading)
 - Charles Schwab (full-service)
 - Polygon.io (market data only)
+
+**Broker Connection Persistence**: Broker connections are stored in the PostgreSQL database with encrypted tokens (AES-256-GCM). Connections survive Railway deployments and server restarts. On server startup, the app:
+1. Restores all active broker connections from the database
+2. Validates token expiry and marks expired connections as disconnected
+3. Users with expired tokens will need to re-authenticate
+
+**Security**: Broker credentials are encrypted with `BROKER_TOKEN_KEY` environment variable before storage. Never stored in plaintext.
 
 ### Push Notifications
 - Web Push API with VAPID keys for real-time alert delivery
