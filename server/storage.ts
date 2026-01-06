@@ -1060,7 +1060,11 @@ export class MemStorage implements IStorage {
 
     if (profile.encryptedApiKey && profile.apiKeyIv && profile.apiKeyAuthTag && hasEncryptionKey()) {
       try {
-        const decrypted = decryptToken(profile.encryptedApiKey, profile.apiKeyIv, profile.apiKeyAuthTag);
+        const decrypted = decryptToken({
+          ciphertext: profile.encryptedApiKey,
+          iv: profile.apiKeyIv,
+          authTag: profile.apiKeyAuthTag,
+        });
         const parsed = JSON.parse(decrypted);
         return { ...profile, apiKey: parsed.apiKey };
       } catch (e) {

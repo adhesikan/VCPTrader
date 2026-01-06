@@ -1357,5 +1357,354 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/automation-profiles", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const profiles = await storage.getAutomationProfiles(userId);
+      const sanitizedProfiles = profiles.map(p => ({
+        ...p,
+        encryptedApiKey: undefined,
+        apiKeyIv: undefined,
+        apiKeyAuthTag: undefined,
+        hasApiKey: !!p.encryptedApiKey,
+      }));
+      
+      res.json(sanitizedProfiles);
+    } catch (error) {
+      console.error("Failed to get automation profiles:", error);
+      res.status(500).json({ error: "Failed to get automation profiles" });
+    }
+  });
+
+  app.post("/api/automation-profiles", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { name, webhookUrl, apiKey, mode, isEnabled, guardrails } = req.body;
+      
+      if (!name || !webhookUrl) {
+        return res.status(400).json({ error: "Name and webhook URL are required" });
+      }
+      
+      const existingProfiles = await storage.getAutomationProfiles(userId);
+      if (existingProfiles.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+        return res.status(400).json({ error: "A profile with this name already exists" });
+      }
+      
+      const profile = await storage.createAutomationProfile({
+        userId,
+        name,
+        webhookUrl,
+        mode: mode || "NOTIFY_ONLY",
+        isEnabled: isEnabled ?? true,
+        guardrails: guardrails || null,
+      }, apiKey);
+      
+      res.json({
+        ...profile,
+        encryptedApiKey: undefined,
+        apiKeyIv: undefined,
+        apiKeyAuthTag: undefined,
+        hasApiKey: !!apiKey,
+      });
+    } catch (error) {
+      console.error("Failed to create automation profile:", error);
+      res.status(500).json({ error: "Failed to create automation profile" });
+    }
+  });
+
+  app.put("/api/automation-profiles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { id } = req.params;
+      const { name, webhookUrl, apiKey, mode, isEnabled, guardrails } = req.body;
+      
+      const existingProfile = await storage.getAutomationProfile(id);
+      if (!existingProfile || existingProfile.userId !== userId) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      if (name) {
+        const existingProfiles = await storage.getAutomationProfiles(userId);
+        if (existingProfiles.some(p => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) {
+          return res.status(400).json({ error: "A profile with this name already exists" });
+        }
+      }
+      
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (webhookUrl !== undefined) updateData.webhookUrl = webhookUrl;
+      if (mode !== undefined) updateData.mode = mode;
+      if (isEnabled !== undefined) updateData.isEnabled = isEnabled;
+      if (guardrails !== undefined) updateData.guardrails = guardrails;
+      
+      const updated = await storage.updateAutomationProfile(id, updateData, apiKey);
+      
+      res.json({
+        ...updated,
+        encryptedApiKey: undefined,
+        apiKeyIv: undefined,
+        apiKeyAuthTag: undefined,
+        hasApiKey: !!(updated?.encryptedApiKey || apiKey),
+      });
+    } catch (error) {
+      console.error("Failed to update automation profile:", error);
+      res.status(500).json({ error: "Failed to update automation profile" });
+    }
+  });
+
+  app.delete("/api/automation-profiles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { id } = req.params;
+      
+      const existingProfile = await storage.getAutomationProfile(id);
+      if (!existingProfile || existingProfile.userId !== userId) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      await storage.deleteAutomationProfile(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete automation profile:", error);
+      res.status(500).json({ error: "Failed to delete automation profile" });
+    }
+  });
+
+  app.post("/api/automation-profiles/:id/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { id } = req.params;
+      
+      const profileWithKey = await storage.getAutomationProfileWithApiKey(id);
+      if (!profileWithKey || profileWithKey.userId !== userId) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      if (!profileWithKey.webhookUrl) {
+        return res.status(400).json({ error: "Profile has no webhook URL configured" });
+      }
+      
+      const testSignal: EntrySignal = {
+        symbol: "TEST",
+        lastPrice: 100.00,
+        targetPrice: 110.00,
+        stopLoss: 95.00,
+      };
+      
+      const testSettings = {
+        ...profileWithKey,
+        id: profileWithKey.id,
+        userId: profileWithKey.userId,
+        isEnabled: true,
+        autoEntryEnabled: true,
+        autoExitEnabled: true,
+        minScore: 0,
+        maxPositions: 5,
+        defaultPositionSize: 1000,
+        createdAt: profileWithKey.createdAt,
+        updatedAt: profileWithKey.updatedAt,
+      };
+      
+      const result = await sendEntrySignal(testSettings, testSignal, profileWithKey.apiKey);
+      
+      await storage.updateProfileTestResult(id, result.success ? 200 : 500, result.message);
+      
+      res.json({
+        success: result.success,
+        message: result.message,
+        error: result.error,
+      });
+    } catch (error) {
+      console.error("Failed to test automation profile:", error);
+      res.status(500).json({ error: "Failed to test automation profile" });
+    }
+  });
+
+  app.get("/api/user-automation-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const settings = await storage.getUserAutomationSettings(userId);
+      res.json(settings || { userId, globalDefaultProfileId: null });
+    } catch (error) {
+      console.error("Failed to get user automation settings:", error);
+      res.status(500).json({ error: "Failed to get user automation settings" });
+    }
+  });
+
+  app.put("/api/user-automation-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { globalDefaultProfileId } = req.body;
+      
+      if (globalDefaultProfileId) {
+        const profile = await storage.getAutomationProfile(globalDefaultProfileId);
+        if (!profile || profile.userId !== userId) {
+          return res.status(400).json({ error: "Invalid profile ID" });
+        }
+      }
+      
+      const settings = await storage.setUserAutomationSettings(userId, { 
+        userId,
+        globalDefaultProfileId: globalDefaultProfileId || null,
+      });
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to update user automation settings:", error);
+      res.status(500).json({ error: "Failed to update user automation settings" });
+    }
+  });
+
+  app.get("/api/automation-events", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 50;
+      const events = await storage.getAutomationEvents(userId, limit);
+      res.json(events);
+    } catch (error) {
+      console.error("Failed to get automation events:", error);
+      res.status(500).json({ error: "Failed to get automation events" });
+    }
+  });
+
+  app.get("/api/automation-events/pending", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const events = await storage.getPendingAutomationEvents(userId);
+      res.json(events);
+    } catch (error) {
+      console.error("Failed to get pending automation events:", error);
+      res.status(500).json({ error: "Failed to get pending events" });
+    }
+  });
+
+  app.post("/api/automation-events/:id/approve", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { id } = req.params;
+      const events = await storage.getAutomationEvents(userId, 1000);
+      const event = events.find(e => e.id === id);
+      
+      if (!event || event.userId !== userId) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      if (event.action !== "QUEUED") {
+        return res.status(400).json({ error: "Event is not pending approval" });
+      }
+      
+      const profileWithKey = await storage.getAutomationProfileWithApiKey(event.profileId);
+      if (!profileWithKey) {
+        return res.status(400).json({ error: "Profile not found" });
+      }
+      
+      const payload = event.payload as any;
+      const testSettings = {
+        ...profileWithKey,
+        id: profileWithKey.id,
+        userId: profileWithKey.userId,
+        isEnabled: true,
+        autoEntryEnabled: true,
+        autoExitEnabled: true,
+        minScore: 0,
+        maxPositions: 5,
+        defaultPositionSize: 1000,
+        createdAt: profileWithKey.createdAt,
+        updatedAt: profileWithKey.updatedAt,
+      };
+      
+      const signal: EntrySignal = {
+        symbol: event.symbol,
+        lastPrice: payload?.lastPrice || 0,
+        targetPrice: payload?.targetPrice || 0,
+        stopLoss: payload?.stopLoss || 0,
+      };
+      
+      const result = await sendEntrySignal(testSettings, signal, profileWithKey.apiKey);
+      
+      await storage.updateAutomationEvent(id, {
+        action: result.success ? "APPROVED" : "BLOCKED",
+        responseStatus: result.success ? 200 : 500,
+        responseBody: result.message,
+      });
+      
+      res.json({ success: result.success, message: result.message });
+    } catch (error) {
+      console.error("Failed to approve automation event:", error);
+      res.status(500).json({ error: "Failed to approve event" });
+    }
+  });
+
+  app.post("/api/automation-events/:id/reject", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { id } = req.params;
+      const events = await storage.getAutomationEvents(userId, 1000);
+      const event = events.find(e => e.id === id);
+      
+      if (!event || event.userId !== userId) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      if (event.action !== "QUEUED") {
+        return res.status(400).json({ error: "Event is not pending approval" });
+      }
+      
+      await storage.updateAutomationEvent(id, {
+        action: "REJECTED",
+        reason: "Manually rejected by user",
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to reject automation event:", error);
+      res.status(500).json({ error: "Failed to reject event" });
+    }
+  });
+
   return httpServer;
 }
