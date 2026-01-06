@@ -457,20 +457,24 @@ export default function Alerts() {
                 </p>
               </div>
 
-              {automationProfiles.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Automation Profile (optional)</Label>
-                  <Select
-                    value={newRule.automationProfileId}
-                    onValueChange={(value) => setNewRule(prev => ({ ...prev, automationProfileId: value }))}
-                  >
-                    <SelectTrigger data-testid="select-rule-automation-profile">
-                      <Zap className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Select automation profile" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None - use default</SelectItem>
-                      {automationProfiles.map((profile) => (
+              <div className="space-y-2">
+                <Label>Automation Profile (optional)</Label>
+                <Select
+                  value={newRule.automationProfileId}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, automationProfileId: value }))}
+                >
+                  <SelectTrigger data-testid="select-rule-automation-profile">
+                    <Zap className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Select automation profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None - use default</SelectItem>
+                    {automationProfiles.length === 0 ? (
+                      <SelectItem value="_empty" disabled>
+                        <span className="text-muted-foreground">No profiles created yet</span>
+                      </SelectItem>
+                    ) : (
+                      automationProfiles.map((profile) => (
                         <SelectItem key={profile.id} value={profile.id}>
                           <div className="flex flex-col items-start">
                             <span className="font-medium">{profile.name}</span>
@@ -479,14 +483,14 @@ export default function Alerts() {
                             </span>
                           </div>
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Link this alert to a specific automation profile for webhook delivery
-                  </p>
-                </div>
-              )}
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Link this alert to a specific automation profile for webhook delivery
+                </p>
+              </div>
 
               <Button
                 onClick={handleCreateRule}
