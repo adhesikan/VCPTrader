@@ -2,7 +2,8 @@ import { storage } from "./storage";
 import { fetchQuotesFromBroker, type QuoteData } from "./broker-service";
 import type { AlertRule, AlertEvent, InsertAlertEvent, BrokerConnection, PatternStageType } from "@shared/schema";
 import { PatternStage, RuleConditionType } from "@shared/schema";
-import { sendEntrySignal, sendExitSignal, createAutomationLogEntry, type EntrySignal, type ExitSignal } from "./algopilotx";
+import { sendEntrySignalToProfile, createAutomationLogEntry, type EntrySignal } from "./algopilotx";
+import { resolveAutomationProfileForSignal, createAutomationEvent, type AutomationSignalContext } from "./automation-resolver";
 
 const ALERT_DISCLAIMER = "This alert is for educational purposes only and not investment advice.";
 
@@ -226,45 +227,64 @@ export async function processAlertRules(
         
         console.log(`[AlertEngine] Event created: ${rule.symbol} ${result.fromState || "N/A"} -> ${result.toState}`);
         
-        try {
-          const automationSettings = await storage.getAutomationSettingsWithApiKey(rule.userId);
-          if (automationSettings && automationSettings.isEnabled && automationSettings.autoEntryEnabled) {
-            if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
-              const alertScore = (eventData.payload as any)?.score || 75;
-              const minScore = automationSettings.minScore || 0;
+        if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
+          try {
+            const alertScore = (eventData.payload as any)?.score || 75;
+            const targetPrice = classification.resistance * 1.03;
+            
+            const signalContext: AutomationSignalContext = {
+              userId: rule.userId,
+              symbol: rule.symbol,
+              strategy: "VCP",
+              alertRuleId: rule.id,
+              alertRuleProfileId: rule.automationProfileId || undefined,
+              lastPrice: result.price,
+              targetPrice: Number(targetPrice.toFixed(2)),
+              stopLoss: Number(classification.stopLoss.toFixed(2)),
+              score: alertScore,
+            };
+            
+            const decision = await resolveAutomationProfileForSignal(signalContext);
+            console.log(`[AlertEngine] Automation decision for ${rule.symbol}: ${decision.action} - ${decision.reason}`);
+            
+            await createAutomationEvent(signalContext, decision);
+            
+            if (decision.action === "SEND" && decision.profile) {
+              const entrySignal: EntrySignal = {
+                symbol: rule.symbol,
+                lastPrice: result.price,
+                targetPrice: signalContext.targetPrice,
+                stopLoss: signalContext.stopLoss,
+              };
               
-              if (alertScore < minScore) {
-                console.log(`[AlertEngine] Skipping webhook for ${rule.symbol}: score ${alertScore} below minimum ${minScore}`);
+              const webhookResult = await sendEntrySignalToProfile(
+                decision.profile.webhookUrl,
+                entrySignal,
+                decision.profile.apiKey
+              );
+              
+              const logEntry = createAutomationLogEntry(
+                rule.userId,
+                "entry",
+                rule.symbol,
+                webhookResult.message,
+                webhookResult
+              );
+              await storage.createAutomationLog(logEntry);
+              
+              if (webhookResult.success) {
+                console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
               } else {
-                const targetPrice = classification.resistance * 1.03;
-                const entrySignal: EntrySignal = {
-                  symbol: rule.symbol,
-                  lastPrice: result.price,
-                  targetPrice: Number(targetPrice.toFixed(2)),
-                  stopLoss: Number(classification.stopLoss.toFixed(2)),
-                };
-                
-                const webhookResult = await sendEntrySignal(automationSettings, entrySignal, automationSettings.apiKey);
-                
-                const logEntry = createAutomationLogEntry(
-                  rule.userId,
-                  "entry",
-                  rule.symbol,
-                  webhookResult.message,
-                  webhookResult
-                );
-                await storage.createAutomationLog(logEntry);
-                
-                if (webhookResult.success) {
-                  console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
-                } else {
-                  console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
-                }
+                console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
               }
+            } else if (decision.action === "QUEUE") {
+              console.log(`[AlertEngine] Signal queued for approval: ${rule.symbol}`);
+            } else if (decision.action === "BLOCKED") {
+              console.log(`[AlertEngine] Signal blocked: ${rule.symbol} - ${decision.blockedReason}`);
             }
+          } catch (webhookError) {
+            console.error(`[AlertEngine] Error in automation for ${rule.symbol}:`, webhookError);
           }
-        } catch (webhookError) {
-          console.error(`[AlertEngine] Error sending webhook for ${rule.symbol}:`, webhookError);
         }
       } else {
         await storage.updateAlertRule(rule.id, {

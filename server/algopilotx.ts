@@ -92,6 +92,22 @@ export async function sendEntrySignal(
   };
 }
 
+export async function sendEntrySignalToProfile(
+  webhookUrl: string,
+  signal: EntrySignal,
+  apiKey?: string
+): Promise<{ success: boolean; message: string; response?: any; error?: string }> {
+  const message = formatEntryMessage(signal);
+  console.log(`[AlgoPilotX] Sending entry signal to profile: ${message}`);
+  
+  const result = await sendWebhook({ webhookUrl }, message, apiKey);
+  
+  return {
+    ...result,
+    message,
+  };
+}
+
 export async function sendExitSignal(
   settings: AutomationSettings,
   signal: ExitSignal,
