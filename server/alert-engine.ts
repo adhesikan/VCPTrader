@@ -230,29 +230,36 @@ export async function processAlertRules(
           const automationSettings = await storage.getAutomationSettingsWithApiKey(rule.userId);
           if (automationSettings && automationSettings.isEnabled && automationSettings.autoEntryEnabled) {
             if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
-              const targetPrice = classification.resistance * 1.03;
-              const entrySignal: EntrySignal = {
-                symbol: rule.symbol,
-                lastPrice: result.price,
-                targetPrice: Number(targetPrice.toFixed(2)),
-                stopLoss: Number(classification.stopLoss.toFixed(2)),
-              };
+              const alertScore = (eventData.payload as any)?.score || 75;
+              const minScore = automationSettings.minScore || 0;
               
-              const webhookResult = await sendEntrySignal(automationSettings, entrySignal, automationSettings.apiKey);
-              
-              const logEntry = createAutomationLogEntry(
-                rule.userId,
-                "entry",
-                rule.symbol,
-                webhookResult.message,
-                webhookResult
-              );
-              await storage.createAutomationLog(logEntry);
-              
-              if (webhookResult.success) {
-                console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
+              if (alertScore < minScore) {
+                console.log(`[AlertEngine] Skipping webhook for ${rule.symbol}: score ${alertScore} below minimum ${minScore}`);
               } else {
-                console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+                const targetPrice = classification.resistance * 1.03;
+                const entrySignal: EntrySignal = {
+                  symbol: rule.symbol,
+                  lastPrice: result.price,
+                  targetPrice: Number(targetPrice.toFixed(2)),
+                  stopLoss: Number(classification.stopLoss.toFixed(2)),
+                };
+                
+                const webhookResult = await sendEntrySignal(automationSettings, entrySignal, automationSettings.apiKey);
+                
+                const logEntry = createAutomationLogEntry(
+                  rule.userId,
+                  "entry",
+                  rule.symbol,
+                  webhookResult.message,
+                  webhookResult
+                );
+                await storage.createAutomationLog(logEntry);
+                
+                if (webhookResult.success) {
+                  console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
+                } else {
+                  console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+                }
               }
             }
           }

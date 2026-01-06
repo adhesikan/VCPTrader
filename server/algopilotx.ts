@@ -18,11 +18,11 @@ export function formatEntryMessage(signal: EntrySignal): string {
 }
 
 export function formatExitMessage(signal: ExitSignal): string {
-  const parts = [`exit sym=${signal.symbol} reason="${signal.reason}"`];
+  let message = `exit sym=${signal.symbol} reason="${signal.reason}"`;
   if (signal.targetPrice !== undefined) {
-    parts[0] += ` tp=${signal.targetPrice.toFixed(2)}`;
+    message += ` tp=${signal.targetPrice.toFixed(2)}`;
   }
-  return parts[0];
+  return message;
 }
 
 export async function sendWebhook(

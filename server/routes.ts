@@ -1274,11 +1274,15 @@ export async function registerRoutes(
       
       const settingsWithKey = await storage.getAutomationSettingsWithApiKey(userId);
       if (!settingsWithKey) {
-        return res.status(400).json({ error: "Automation not configured" });
+        return res.status(400).json({ error: "Please configure automation settings first" });
       }
       
       if (!settingsWithKey.webhookUrl) {
-        return res.status(400).json({ error: "Webhook URL not configured" });
+        return res.status(400).json({ error: "Please enter a webhook URL before testing" });
+      }
+      
+      if (!settingsWithKey.apiKey) {
+        return res.status(400).json({ error: "Please enter an API key before testing" });
       }
       
       const testSignal: EntrySignal = {
@@ -1306,11 +1310,11 @@ export async function registerRoutes(
       res.json({
         success: result.success,
         message: result.message,
-        error: result.error,
+        error: result.error ? "Webhook request failed. Please check your URL and API key." : undefined,
       });
     } catch (error) {
       console.error("Automation test failed:", error);
-      res.status(500).json({ error: "Failed to send test signal" });
+      res.status(500).json({ error: "Test failed. Please check your settings and try again." });
     }
   });
 

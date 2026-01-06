@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -246,6 +246,10 @@ export default function Settings() {
           <TabsTrigger value="legal" className="gap-2" data-testid="tab-legal">
             <FileText className="h-4 w-4" />
             Legal
+          </TabsTrigger>
+          <TabsTrigger value="automation" className="gap-2" data-testid="tab-automation">
+            <Bot className="h-4 w-4" />
+            Automation
           </TabsTrigger>
         </TabsList>
 
@@ -548,6 +552,10 @@ export default function Settings() {
         <TabsContent value="legal">
           <LegalSettings />
         </TabsContent>
+
+        <TabsContent value="automation">
+          <AutomationSettings />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -706,6 +714,353 @@ function LegalSettings() {
               Print All Documents
             </Button>
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface AutomationSettingsData {
+  isEnabled: boolean;
+  webhookUrl: string | null;
+  hasApiKey: boolean;
+  autoEntryEnabled: boolean;
+  autoExitEnabled: boolean;
+  minScore: number;
+  maxPositions: number;
+  defaultPositionSize: number;
+}
+
+interface AutomationLogEntry {
+  id: string;
+  signalType: string;
+  symbol: string;
+  message: string;
+  success: boolean;
+  createdAt: string;
+}
+
+function AutomationSettings() {
+  const { toast } = useToast();
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [autoEntryEnabled, setAutoEntryEnabled] = useState(true);
+  const [autoExitEnabled, setAutoExitEnabled] = useState(true);
+  const [minScore, setMinScore] = useState(70);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  const { data: settings, isLoading } = useQuery<AutomationSettingsData>({
+    queryKey: ["/api/automation/settings"],
+  });
+
+  const { data: logs } = useQuery<AutomationLogEntry[]>({
+    queryKey: ["/api/automation/logs"],
+  });
+
+  useEffect(() => {
+    if (settings && !initialized) {
+      setWebhookUrl(settings.webhookUrl || "");
+      setIsEnabled(settings.isEnabled);
+      setAutoEntryEnabled(settings.autoEntryEnabled);
+      setAutoExitEnabled(settings.autoExitEnabled);
+      setMinScore(settings.minScore);
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (data: {
+      webhookUrl: string;
+      apiKey?: string;
+      isEnabled: boolean;
+      autoEntryEnabled: boolean;
+      autoExitEnabled: boolean;
+      minScore: number;
+    }) => {
+      const response = await apiRequest("POST", "/api/automation/settings", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation/settings"] });
+      setApiKey("");
+      setHasChanges(false);
+      toast({
+        title: "Settings Saved",
+        description: "Automation settings have been updated",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Save",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testWebhookMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/automation/test", {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation/logs"] });
+      if (data.success) {
+        toast({
+          title: "Test Successful",
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: "Test Failed",
+          description: data.error || "Webhook test failed",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Test Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    saveSettingsMutation.mutate({
+      webhookUrl: webhookUrl.trim(),
+      apiKey: apiKey.trim() || undefined,
+      isEnabled,
+      autoEntryEnabled,
+      autoExitEnabled,
+      minScore,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            AlgoPilotX Integration
+          </CardTitle>
+          <CardDescription>
+            Connect to AlgoPilotX for automated trade execution based on breakout alerts
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Enable Automation</p>
+              <p className="text-sm text-muted-foreground">
+                Automatically send signals when alerts trigger
+              </p>
+            </div>
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={(checked) => {
+                setIsEnabled(checked);
+                setHasChanges(true);
+              }}
+              data-testid="switch-automation-enabled"
+            />
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-2">
+              <Label htmlFor="webhookUrl">Webhook URL</Label>
+              <Input
+                id="webhookUrl"
+                type="url"
+                placeholder="https://algopilotx.com/webhook/..."
+                value={webhookUrl}
+                onChange={(e) => {
+                  setWebhookUrl(e.target.value);
+                  setHasChanges(true);
+                }}
+                data-testid="input-webhook-url"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your AlgoPilotX webhook URL for receiving trade signals
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">
+                API Key {settings?.hasApiKey && <Badge variant="secondary" className="ml-2 text-xs">Configured</Badge>}
+              </Label>
+              <Input
+                id="apiKey"
+                type="password"
+                placeholder={settings?.hasApiKey ? "Enter new key to replace existing" : "Enter your AlgoPilotX API key"}
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setHasChanges(true);
+                }}
+                data-testid="input-api-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your API key is encrypted and stored securely
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="text-sm font-medium">Signal Types</h4>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="auto-entry">Auto Entry Signals</Label>
+                <p className="text-xs text-muted-foreground">Send entry signals on BREAKOUT alerts</p>
+              </div>
+              <Switch
+                id="auto-entry"
+                checked={autoEntryEnabled}
+                onCheckedChange={(checked) => {
+                  setAutoEntryEnabled(checked);
+                  setHasChanges(true);
+                }}
+                data-testid="switch-auto-entry"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="auto-exit">Auto Exit Signals</Label>
+                <p className="text-xs text-muted-foreground">Send exit signals on stop loss triggers</p>
+              </div>
+              <Switch
+                id="auto-exit"
+                checked={autoExitEnabled}
+                onCheckedChange={(checked) => {
+                  setAutoExitEnabled(checked);
+                  setHasChanges(true);
+                }}
+                data-testid="switch-auto-exit"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="minScore">Minimum Score</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  id="minScore"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={minScore}
+                  onChange={(e) => {
+                    setMinScore(parseInt(e.target.value) || 0);
+                    setHasChanges(true);
+                  }}
+                  className="w-24 font-mono"
+                  data-testid="input-min-score"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Only send signals for alerts with scores above this threshold
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-md space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Risk Warning</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Automated trading carries significant risk. Always monitor your positions and ensure 
+              proper risk management is in place. VCP Trader is not responsible for any trading losses.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => testWebhookMutation.mutate()}
+              disabled={!settings?.hasApiKey || !webhookUrl || testWebhookMutation.isPending}
+              data-testid="button-test-webhook"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {testWebhookMutation.isPending ? "Testing..." : "Test Webhook"}
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!hasChanges || saveSettingsMutation.isPending}
+              data-testid="button-save-automation"
+            >
+              {saveSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>
+            Latest webhook signals sent to AlgoPilotX
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!logs || logs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No signals sent yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                  data-testid={`log-entry-${log.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    {log.success ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {log.signalType === "entry" ? "ENTRY" : "EXIT"}
+                        </Badge>
+                        <span className="font-medium text-sm">{log.symbol}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate max-w-xs">
+                        {log.message}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(log.createdAt).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
