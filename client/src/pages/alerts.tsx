@@ -26,8 +26,9 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue } from "@shared/schema";
+import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationProfile } from "@shared/schema";
 import { RuleConditionType, PatternStage } from "@shared/schema";
+import { Zap } from "lucide-react";
 
 function getStageBadgeVariant(stage: string): "default" | "secondary" | "destructive" | "outline" {
   switch (stage) {
@@ -45,15 +46,20 @@ function getStageBadgeVariant(stage: string): "default" | "secondary" | "destruc
 function AlertRuleCard({ 
   rule, 
   onToggle, 
-  onDelete 
+  onDelete,
+  profiles,
+  onUpdateProfile,
 }: { 
   rule: AlertRule; 
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
+  profiles?: AutomationProfile[];
+  onUpdateProfile?: (id: string, profileId: string | null) => void;
 }) {
   const payload = rule.conditionPayload as { targetStage?: string } | null;
   const targetStage = payload?.targetStage || "BREAKOUT";
   const lastState = rule.lastState as { stage?: string; price?: number } | null;
+  const assignedProfile = profiles?.find(p => p.id === rule.automationProfileId);
   
   return (
     <Card 
@@ -62,12 +68,18 @@ function AlertRuleCard({
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
             <Badge variant={getStageBadgeVariant(targetStage)} className="gap-1">
               <TrendingUp className="h-3 w-3" />
               {targetStage}
             </Badge>
+            {assignedProfile && (
+              <Badge variant="secondary" className="gap-1">
+                <Zap className="h-3 w-3" />
+                {assignedProfile.name}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Switch
@@ -78,7 +90,6 @@ function AlertRuleCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive"
               onClick={() => onDelete(rule.id)}
               data-testid={`button-delete-rule-${rule.id}`}
             >
@@ -90,6 +101,28 @@ function AlertRuleCard({
         <div className="mt-2 text-sm text-muted-foreground">
           Alert when {rule.symbol} enters {targetStage} stage
         </div>
+
+        {profiles && profiles.length > 0 && onUpdateProfile && (
+          <div className="mt-3">
+            <Select
+              value={rule.automationProfileId || ""}
+              onValueChange={(value) => onUpdateProfile(rule.id, value || null)}
+            >
+              <SelectTrigger className="h-8 text-xs" data-testid={`select-profile-${rule.id}`}>
+                <Zap className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="No automation profile" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No automation profile</SelectItem>
+                {profiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name} ({profile.mode})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
@@ -197,6 +230,7 @@ export default function Alerts() {
   const [newRule, setNewRule] = useState({
     symbol: "",
     targetStage: "BREAKOUT" as string,
+    automationProfileId: "" as string,
   });
   const { toast } = useToast();
 
@@ -210,6 +244,10 @@ export default function Alerts() {
 
   const { data: watchlists } = useQuery<Watchlist[]>({
     queryKey: ["/api/watchlists"],
+  });
+
+  const { data: automationProfiles } = useQuery<AutomationProfile[]>({
+    queryKey: ["/api/automation-profiles"],
   });
 
   const selectedWatchlistData = watchlists?.find(w => w.id === selectedWatchlist);
@@ -228,7 +266,8 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT" });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationProfileId: "" });
+      setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
         description: "You'll be notified when conditions are met",
@@ -262,6 +301,16 @@ export default function Alerts() {
     },
   });
 
+  const updateRuleProfileMutation = useMutation({
+    mutationFn: async ({ id, profileId }: { id: string; profileId: string | null }) => {
+      await apiRequest("PATCH", `/api/alert-rules/${id}`, { automationProfileId: profileId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+      toast({ title: "Automation profile updated" });
+    },
+  });
+
   const markEventReadMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("PATCH", `/api/alert-events/${id}/read`, {});
@@ -290,6 +339,8 @@ export default function Alerts() {
         strategy: "VCP",
         timeframe: "1d",
         isEnabled: true,
+        automationProfileId: newRule.automationProfileId || null,
+        watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
       });
     }
   };
@@ -406,6 +457,37 @@ export default function Alerts() {
                 </p>
               </div>
 
+              {automationProfiles && automationProfiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Automation Profile (optional)</Label>
+                  <Select
+                    value={newRule.automationProfileId}
+                    onValueChange={(value) => setNewRule(prev => ({ ...prev, automationProfileId: value }))}
+                  >
+                    <SelectTrigger data-testid="select-rule-automation-profile">
+                      <Zap className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Select automation profile" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None - use default</SelectItem>
+                      {automationProfiles.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{profile.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Mode: {profile.mode}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Link this alert to a specific automation profile for webhook delivery
+                  </p>
+                </div>
+              )}
+
               <Button
                 onClick={handleCreateRule}
                 disabled={!newRule.symbol || createRuleMutation.isPending}
@@ -456,6 +538,8 @@ export default function Alerts() {
                   rule={rule}
                   onToggle={(id, enabled) => toggleRuleMutation.mutate({ id, enabled })}
                   onDelete={(id) => deleteRuleMutation.mutate(id)}
+                  profiles={automationProfiles}
+                  onUpdateProfile={(id, profileId) => updateRuleProfileMutation.mutate({ id, profileId })}
                 />
               ))}
             </div>
