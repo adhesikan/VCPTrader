@@ -155,6 +155,7 @@ export const alertRules = pgTable("alert_rules", {
   conditionPayload: jsonb("condition_payload"),
   scoreThreshold: integer("score_threshold"),
   minStrategies: integer("min_strategies"),
+  automationProfileId: varchar("automation_profile_id"),
   isEnabled: boolean("is_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -396,3 +397,102 @@ export const automationLogs = pgTable("automation_logs", {
 export const insertAutomationLogSchema = createInsertSchema(automationLogs).omit({ id: true, createdAt: true });
 export type InsertAutomationLog = z.infer<typeof insertAutomationLogSchema>;
 export type AutomationLog = typeof automationLogs.$inferSelect;
+
+export const AutomationMode = {
+  OFF: "OFF",
+  AUTO: "AUTO",
+  CONFIRM: "CONFIRM",
+  NOTIFY_ONLY: "NOTIFY_ONLY",
+} as const;
+
+export type AutomationModeType = typeof AutomationMode[keyof typeof AutomationMode];
+
+export const AutomationAction = {
+  SENT: "SENT",
+  QUEUED: "QUEUED",
+  SKIPPED: "SKIPPED",
+  BLOCKED: "BLOCKED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type AutomationActionType = typeof AutomationAction[keyof typeof AutomationAction];
+
+export const guardrailsSchema = z.object({
+  maxPerDay: z.number().min(1).max(100).optional(),
+  cooldownMinutes: z.number().min(1).max(1440).optional(),
+  allowedTimeWindow: z.object({
+    start: z.string().optional(),
+    end: z.string().optional(),
+  }).optional(),
+  allowedStrategies: z.array(z.string()).optional(),
+  allowedWatchlists: z.array(z.string()).optional(),
+  allowedSymbols: z.array(z.string()).optional(),
+});
+
+export type Guardrails = z.infer<typeof guardrailsSchema>;
+
+export const automationProfiles = pgTable("automation_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  webhookUrl: text("webhook_url").notNull(),
+  encryptedApiKey: text("encrypted_api_key"),
+  apiKeyIv: text("api_key_iv"),
+  apiKeyAuthTag: text("api_key_auth_tag"),
+  isEnabled: boolean("is_enabled").default(true),
+  mode: text("mode").notNull().default("NOTIFY_ONLY"),
+  guardrails: jsonb("guardrails"),
+  lastTestStatus: integer("last_test_status"),
+  lastTestAt: timestamp("last_test_at"),
+  lastTestResponse: text("last_test_response"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAutomationProfileSchema = createInsertSchema(automationProfiles).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true,
+  lastTestStatus: true,
+  lastTestAt: true,
+  lastTestResponse: true,
+});
+export type InsertAutomationProfile = z.infer<typeof insertAutomationProfileSchema>;
+export type AutomationProfile = typeof automationProfiles.$inferSelect;
+
+export const userAutomationSettings = pgTable("user_automation_settings", {
+  userId: varchar("user_id").primaryKey(),
+  globalDefaultProfileId: varchar("global_default_profile_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserAutomationSettingsSchema = createInsertSchema(userAutomationSettings).omit({ 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertUserAutomationSettings = z.infer<typeof insertUserAutomationSettingsSchema>;
+export type UserAutomationSettings = typeof userAutomationSettings.$inferSelect;
+
+export const automationEvents = pgTable("automation_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  signalId: varchar("signal_id").notNull(),
+  profileId: varchar("profile_id").notNull(),
+  symbol: text("symbol").notNull(),
+  action: text("action").notNull(),
+  reason: text("reason"),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  payload: jsonb("payload"),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAutomationEventSchema = createInsertSchema(automationEvents).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertAutomationEvent = z.infer<typeof insertAutomationEventSchema>;
+export type AutomationEvent = typeof automationEvents.$inferSelect;

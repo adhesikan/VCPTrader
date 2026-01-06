@@ -1,0 +1,167 @@
+You are working inside the existing “VCP Trader” codebase (already deployed on Railway from GitHub). Implement “Automation Profiles” so users can create multiple AlgoPilotX integrations (named webhook destinations) and select which one to use per Strategy/Alert. This replaces the single webhook URL in Global Settings, but keep backward compatibility by auto-migrating the old single webhook into a default profile.
+
+GOALS
+1) Users can create/edit/delete/disable multiple Automation Profiles:
+   - name (required, unique per user)
+   - webhook_url (required)
+   - is_enabled (bool, default true)
+   - mode (enum: OFF | AUTO | CONFIRM | NOTIFY_ONLY) default NOTIFY_ONLY
+   - optional guardrails JSON (nullable): max_per_day, cooldown_minutes, allowed_time_window (start/end), allowed_strategies, allowed_watchlists, allowed_symbols
+   - created_at, updated_at
+
+2) Users can select an Automation Profile when configuring:
+   A) Strategy scan configuration (recommended default)
+   B) Individual alerts (override)
+   Precedence: Alert override > Strategy config > Global default profile
+
+3) When an entry signal triggers, the system decides:
+   - whether to send webhook now (AUTO)
+   - create a “pending approval” item (CONFIRM)
+   - notify only (NOTIFY_ONLY)
+   - do nothing (OFF or profile disabled)
+   Persist decision + audit trail.
+
+4) Add “Test Webhook” button per profile:
+   - POST a test payload to webhook_url
+   - show last status code + timestamp + response snippet
+
+5) Add idempotency so the same signal won’t fire twice:
+   - idempotency_key = `${userId}:${signalId}:${profileId}:ENTRY`
+   - store outgoing webhook attempts and enforce uniqueness
+
+TECH STACK ASSUMPTIONS (adjust to project if different)
+- Node/Express API + React frontend
+- Postgres via Prisma (or existing ORM)
+- Auth already exists with userId available on API
+
+BACKWARD COMPATIBILITY / MIGRATION
+- If the app currently stores a single webhook URL in Global Settings:
+  - On first visit to Automation page OR on server startup migration:
+    - If user has a webhook_url and no profiles, create a profile:
+      name = “Default AlgoPilotX”
+      webhook_url = existing value
+      mode = NOTIFY_ONLY
+      is_enabled = true
+    - Set this as global_default_profile_id
+  - Do not break existing users.
+
+DATABASE CHANGES
+Create tables (or Prisma models) similar to:
+
+AutomationProfile
+- id (uuid)
+- user_id (fk)
+- name (string)
+- webhook_url (string)
+- is_enabled (boolean)
+- mode (string enum)
+- guardrails (jsonb nullable)
+- last_test_status (int nullable)
+- last_test_at (timestamp nullable)
+- last_test_response (text nullable)
+- created_at, updated_at
+
+UserAutomationSettings
+- user_id (pk, fk)
+- global_default_profile_id (uuid nullable)
+
+StrategyConfig (existing)
+- add automation_profile_id (uuid nullable)
+
+Alert (existing, if applicable)
+- add automation_profile_id (uuid nullable)
+
+AutomationEvent (audit trail)
+- id (uuid)
+- user_id
+- signal_id (string/uuid)
+- profile_id
+- action (enum: SENT | QUEUED | SKIPPED | BLOCKED)
+- reason (text)
+- idempotency_key (string unique)
+- payload (jsonb)
+- response_status (int nullable)
+- response_body (text nullable)
+- created_at
+
+API ENDPOINTS
+Add routes under /api/automation-profiles
+- GET /              -> list user profiles
+- POST /             -> create profile
+- PUT /:id           -> update profile
+- DELETE /:id        -> delete profile (or soft delete)
+- POST /:id/test     -> test webhook (server makes POST)
+
+Add routes under /api/automation-settings
+- GET /              -> get global default profile
+- PUT /              -> set global default profile
+
+Add endpoints for StrategyConfig/Alert updates to set automation_profile_id.
+- If existing endpoints exist, extend them.
+
+SERVER LOGIC: AUTOMATION DECISION
+Create a single function:
+resolveAutomationProfileForSignal({ userId, signalId, strategyConfigId, alertId? })
+- Determine chosen profile by precedence
+- Validate profile is enabled and mode != OFF
+- Evaluate guardrails:
+  - max_per_day: count AutomationEvent(action=SENT) for today for that profile
+  - cooldown_minutes: last SENT for same symbol within window blocks
+  - allowed_time_window
+  - allowed lists if provided
+Return: { profile, decision: AUTO|CONFIRM|NOTIFY_ONLY|OFF, reason }
+
+When a signal triggers:
+- Always create a Signal record (existing) for dashboard + push notifications
+- Then call resolveAutomationProfileForSignal
+- If AUTO:
+  - build payload and POST to webhook_url
+  - store AutomationEvent with action=SENT, response_status/body
+- If CONFIRM:
+  - create AutomationEvent with action=QUEUED
+  - create UI item “Pending Automation” with Approve button
+  - Approve triggers POST and updates event to SENT
+- If NOTIFY_ONLY:
+  - create AutomationEvent action=SKIPPED reason=NOTIFY_ONLY
+- If blocked by guardrails:
+  - create AutomationEvent action=BLOCKED reason=...
+
+FRONTEND UI
+Add a section: Settings -> Global Settings -> Automation
+Tabs:
+1) Automation Profiles
+   - Table list: Name, Mode, Enabled, Webhook host, Last test result, Actions (Edit/Delete/Test)
+   - “Create Profile” modal
+2) Defaults
+   - dropdown: Global default profile
+3) (Optional) Pending Approvals
+   - list queued events with Approve / Reject
+
+Strategy configuration screen:
+- Add dropdown “Automation Profile” with “Use Global Default” option
+
+Alert creation screen:
+- Add dropdown “Automation Profile” with “Use Strategy Default” option
+
+UX DETAILS
+- Validate webhook_url format (https://)
+- Mask webhook URL in UI (show host + last 4 chars) but allow copy button
+- Confirm destructive actions
+- Show clear help text: “Profiles let you route signals to different AlgoPilotX workflows.”
+
+TESTS
+- Add basic unit tests for resolveAutomationProfileForSignal guardrails + precedence.
+- Add integration test for idempotency uniqueness.
+
+DELIVERABLES
+- Implement DB migrations
+- Implement API routes with auth
+- Implement frontend screens/components
+- Implement signal->automation pipeline with audit events
+- Ensure existing users are migrated to a Default profile automatically
+
+After implementation:
+- Provide a short “How to use” guide in the UI (help tooltip).
+- Ensure lint/build passes and app runs locally.
+
+Now implement all of the above in this repo. Be careful to match existing project structure, naming conventions, and UI component library. Do not remove existing features; extend them. 
