@@ -9,6 +9,7 @@ import {
   fetchQuotesFromBroker, 
   quotesToScanResults, 
   fetchHistoryFromBroker,
+  fetchHistoryWithDateRange,
   processChartData,
   DEFAULT_SCAN_SYMBOLS,
   DOW_30_SYMBOLS,
@@ -723,9 +724,13 @@ export async function registerRoutes(
       const connection = await storage.getBrokerConnectionWithToken(userId);
       let candles: any[] = [];
       
+      const warmupStart = new Date(startDate);
+      warmupStart.setDate(warmupStart.getDate() - 100);
+      const warmupStartStr = warmupStart.toISOString().split('T')[0];
+      
       if (connection?.accessToken && connection?.isConnected) {
         try {
-          candles = await fetchHistoryFromBroker(connection, ticker.toUpperCase(), "1Y");
+          candles = await fetchHistoryWithDateRange(connection, ticker.toUpperCase(), warmupStartStr, endDate);
         } catch (brokerError: any) {
           console.error("Broker fetch failed for backtest:", brokerError.message);
         }
@@ -735,13 +740,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No historical data available. Connect a broker to run backtests." });
       }
 
-      const filteredCandles = candles.filter(c => {
-        const candleDate = c.time.split('T')[0];
-        return candleDate >= startDate && candleDate <= endDate;
-      });
-
-      if (filteredCandles.length < 10) {
-        return res.status(400).json({ error: "Not enough data in date range" });
+      if (candles.length < 60) {
+        return res.status(400).json({ error: "Not enough data available. Need at least 60 trading days for accurate analysis." });
+      }
+      
+      const startIdx = candles.findIndex(c => c.time >= startDate);
+      if (startIdx < 0) {
+        return res.status(400).json({ error: "No data available in the requested date range. Try a different date range." });
+      }
+      
+      const lastCandleDate = candles[candles.length - 1].time;
+      if (lastCandleDate < startDate) {
+        return res.status(400).json({ error: "Available data ends before the requested start date. Try an earlier date range." });
+      }
+      
+      const ema50WarmupIdx = 55;
+      const actualStartIdx = Math.max(startIdx, ema50WarmupIdx);
+      
+      if (actualStartIdx >= candles.length) {
+        return res.status(400).json({ error: "Not enough warm-up data before the requested start date. Try a later start date." });
       }
 
       const trades: any[] = [];
@@ -749,38 +766,85 @@ export async function registerRoutes(
       let entryPrice = 0;
       let entryDate = "";
       let stopPrice = 0;
+      let holdingDays = 0;
+      const maxHoldingDays = 60;
 
       const calcEMA = (data: number[], period: number): number[] => {
         const k = 2 / (period + 1);
-        const emaArray: number[] = [];
-        emaArray[0] = data[0];
-        for (let i = 1; i < data.length; i++) {
+        const emaArray: number[] = new Array(data.length).fill(0);
+        
+        if (data.length < period) {
+          return emaArray;
+        }
+        
+        let sum = 0;
+        for (let i = 0; i < period; i++) {
+          sum += data[i];
+          emaArray[i] = sum / (i + 1);
+        }
+        emaArray[period - 1] = sum / period;
+        
+        for (let i = period; i < data.length; i++) {
           emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
         }
         return emaArray;
       };
 
-      const closes = filteredCandles.map(c => c.close);
+      const closes = candles.map(c => c.close);
+      const highs = candles.map(c => c.high);
+      const lows = candles.map(c => c.low);
+      const volumes = candles.map(c => c.volume);
       const ema9 = calcEMA(closes, 9);
       const ema21 = calcEMA(closes, 21);
+      const ema50 = calcEMA(closes, 50);
 
-      for (let i = 50; i < filteredCandles.length; i++) {
-        const candle = filteredCandles[i];
+      for (let i = actualStartIdx; i < candles.length; i++) {
+        const candle = candles[i];
+        const avgVol20 = volumes.slice(i - 20, i).reduce((s, v) => s + v, 0) / 20;
         
         if (!inPosition) {
           let shouldEnter = false;
           
           if (strategy === StrategyType.CLASSIC_PULLBACK) {
-            const inUptrend = ema9[i] > ema21[i] && candle.close > ema9[i];
-            const hadPullback = filteredCandles.slice(i - 10, i).some(c => c.low <= ema9[i - 5] * 1.01);
-            const avgVol = filteredCandles.slice(i - 20, i).reduce((s, c) => s + c.volume, 0) / 20;
-            const volumeSpike = candle.volume > avgVol * 1.5;
-            shouldEnter = inUptrend && hadPullback && volumeSpike && candle.close > candle.open;
+            const inUptrend = ema9[i] > ema21[i] && ema21[i] > ema50[i];
+            const priceAboveEMAs = candle.close > ema9[i];
+            const hadPullback = candles.slice(i - 10, i).some(c => c.low <= ema21[i - 5] * 1.02);
+            const volumeSpike = candle.volume > avgVol20 * 1.3;
+            const bullishCandle = candle.close > candle.open;
+            shouldEnter = inUptrend && priceAboveEMAs && hadPullback && volumeSpike && bullishCandle;
+          } else if (strategy === StrategyType.VCP_MULTIDAY) {
+            const lookback = Math.min(30, i);
+            const recentHighs = highs.slice(i - lookback, i);
+            const recentLows = lows.slice(i - lookback, i);
+            const pivotHigh = Math.max(...recentHighs);
+            const consolidationLow = Math.min(...recentLows);
+            
+            const range1 = Math.max(...highs.slice(i - lookback, i - Math.floor(lookback * 0.66))) - 
+                          Math.min(...lows.slice(i - lookback, i - Math.floor(lookback * 0.66)));
+            const range2 = Math.max(...highs.slice(i - Math.floor(lookback * 0.66), i - Math.floor(lookback * 0.33))) - 
+                          Math.min(...lows.slice(i - Math.floor(lookback * 0.66), i - Math.floor(lookback * 0.33)));
+            const range3 = Math.max(...highs.slice(i - Math.floor(lookback * 0.33), i)) - 
+                          Math.min(...lows.slice(i - Math.floor(lookback * 0.33), i));
+            
+            const volatilityContracting = range1 > range2 && range2 > range3;
+            const breakingOut = candle.close > pivotHigh * 0.99;
+            const volumeConfirm = candle.volume > avgVol20 * 1.5;
+            const inUptrend = ema21[i] > ema50[i];
+            
+            shouldEnter = volatilityContracting && breakingOut && volumeConfirm && inUptrend;
           } else {
-            const recentHigh = Math.max(...filteredCandles.slice(i - 20, i).map(c => c.high));
-            const recentVolatility = filteredCandles.slice(i - 10, i).reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 10;
-            const currentVolatility = Math.abs(candle.close - candle.open);
-            shouldEnter = candle.close > recentHigh && currentVolatility < recentVolatility * 0.7;
+            const lookback = 20;
+            const recentHigh = Math.max(...highs.slice(i - lookback, i));
+            const recentRange = highs.slice(i - 10, i).map((h, idx) => h - lows.slice(i - 10, i)[idx]);
+            const avgRange = recentRange.reduce((s, r) => s + r, 0) / 10;
+            const currentRange = candle.high - candle.low;
+            
+            const tightConsolidation = currentRange < avgRange * 0.8;
+            const breakingOut = candle.close > recentHigh;
+            const volumeConfirm = candle.volume > avgVol20 * 1.2;
+            const inUptrend = ema9[i] > ema21[i];
+            
+            shouldEnter = tightConsolidation && breakingOut && volumeConfirm && inUptrend;
           }
           
           if (shouldEnter) {
@@ -788,8 +852,12 @@ export async function registerRoutes(
             entryPrice = candle.close;
             entryDate = candle.time.split('T')[0];
             stopPrice = entryPrice * (1 - stopLossPercent / 100);
+            holdingDays = 0;
           }
         } else {
+          holdingDays++;
+          const currentReturn = ((candle.close - entryPrice) / entryPrice) * 100;
+          
           if (candle.low <= stopPrice) {
             trades.push({
               ticker,
@@ -801,25 +869,66 @@ export async function registerRoutes(
               exitReason: "Stop Loss",
             });
             inPosition = false;
-          } else if (candle.close > entryPrice * 1.15) {
+          } else if (currentReturn >= 10) {
             trades.push({
               ticker,
               entryDate,
               exitDate: candle.time.split('T')[0],
               entryPrice: Number(entryPrice.toFixed(2)),
               exitPrice: Number(candle.close.toFixed(2)),
-              returnPercent: Number((((candle.close - entryPrice) / entryPrice) * 100).toFixed(2)),
+              returnPercent: Number(currentReturn.toFixed(2)),
               exitReason: "Target",
+            });
+            inPosition = false;
+          } else if (holdingDays >= maxHoldingDays) {
+            trades.push({
+              ticker,
+              entryDate,
+              exitDate: candle.time.split('T')[0],
+              entryPrice: Number(entryPrice.toFixed(2)),
+              exitPrice: Number(candle.close.toFixed(2)),
+              returnPercent: Number(currentReturn.toFixed(2)),
+              exitReason: "Time Exit",
+            });
+            inPosition = false;
+          } else if (currentReturn >= 5 && candle.close < ema9[i]) {
+            trades.push({
+              ticker,
+              entryDate,
+              exitDate: candle.time.split('T')[0],
+              entryPrice: Number(entryPrice.toFixed(2)),
+              exitPrice: Number(candle.close.toFixed(2)),
+              returnPercent: Number(currentReturn.toFixed(2)),
+              exitReason: "Trailing Stop",
             });
             inPosition = false;
           }
         }
       }
 
+      if (inPosition && candles.length > 0) {
+        const lastCandle = candles[candles.length - 1];
+        const currentReturn = ((lastCandle.close - entryPrice) / entryPrice) * 100;
+        trades.push({
+          ticker,
+          entryDate,
+          exitDate: lastCandle.time.split('T')[0],
+          entryPrice: Number(entryPrice.toFixed(2)),
+          exitPrice: Number(lastCandle.close.toFixed(2)),
+          returnPercent: Number(currentReturn.toFixed(2)),
+          exitReason: "Open Position",
+        });
+      }
+
       const wins = trades.filter(t => t.returnPercent > 0).length;
       const avgReturn = trades.length > 0 ? trades.reduce((sum, t) => sum + t.returnPercent, 0) / trades.length : 0;
       const totalReturn = trades.reduce((sum, t) => sum + t.returnPercent, 0);
-      const maxDrawdown = trades.length > 0 ? Math.abs(Math.min(...trades.map(t => t.returnPercent), 0)) : 0;
+      const returns = trades.map(t => t.returnPercent);
+      const maxDrawdown = returns.length > 0 ? Math.abs(Math.min(...returns, 0)) : 0;
+      const stdDev = returns.length > 1 
+        ? Math.sqrt(returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1))
+        : 0;
+      const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252 / Math.max(1, trades.length)) : 0;
 
       const result = await storage.createBacktestResult({
         userId,
@@ -833,7 +942,7 @@ export async function registerRoutes(
         winRate: trades.length > 0 ? (wins / trades.length) * 100 : 0,
         avgReturn,
         maxDrawdown,
-        sharpeRatio: avgReturn > 0 ? avgReturn / (maxDrawdown || 1) : 0,
+        sharpeRatio: Number(sharpeRatio.toFixed(2)),
         totalReturn,
         trades,
       });

@@ -405,6 +405,12 @@ function getDateRange(timeframe: string): { start: string; end: string; isIntrad
     case "1Y":
       startDate.setFullYear(startDate.getFullYear() - 1);
       break;
+    case "2Y":
+      startDate.setFullYear(startDate.getFullYear() - 2);
+      break;
+    case "5Y":
+      startDate.setFullYear(startDate.getFullYear() - 5);
+      break;
     default:
       startDate.setMonth(startDate.getMonth() - 3);
   }
@@ -422,6 +428,20 @@ function getDateRange(timeframe: string): { start: string; end: string; isIntrad
     end: now.toISOString().split('T')[0],
     isIntraday 
   };
+}
+
+export function getTimeframeForDateRange(startDate: string, endDate: string): string {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  
+  if (diffDays <= 30) return "1M";
+  if (diffDays <= 90) return "3M";
+  if (diffDays <= 180) return "6M";
+  if (diffDays <= 365) return "1Y";
+  if (diffDays <= 730) return "2Y";
+  return "5Y";
 }
 
 function getTradierInterval(timeframe: string): string {
@@ -685,6 +705,233 @@ export async function fetchHistoryFromBroker(
     default:
       throw new Error(`Provider ${connection.provider} not supported for historical data`);
   }
+}
+
+export async function fetchHistoryWithDateRange(
+  connection: BrokerConnection,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  if (!connection.accessToken) {
+    throw new Error("No access token available");
+  }
+
+  let candles: CandleData[] = [];
+  
+  try {
+    switch (connection.provider) {
+      case "tradier":
+        candles = await fetchTradierHistoryWithDates(connection.accessToken, symbol, startDate, endDate);
+        break;
+      case "polygon":
+        candles = await fetchPolygonHistoryWithDates(connection.accessToken, symbol, startDate, endDate);
+        break;
+      case "alpaca":
+        candles = await fetchAlpacaHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        break;
+      case "tastytrade":
+        candles = await fetchTastyTradeHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        break;
+      case "tradestation":
+        candles = await fetchTradeStationHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        break;
+      default:
+        try {
+          const fallbackCandles = await fetchHistoryFromBroker(connection, symbol, "5Y");
+          candles = fallbackCandles.filter(c => {
+            const candleDate = c.time.split('T')[0];
+            return candleDate >= startDate && candleDate <= endDate;
+          });
+        } catch {
+          throw new Error(`Provider ${connection.provider} does not support historical data for backtesting. Try connecting Tradier, Polygon, or Alpaca.`);
+        }
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to fetch historical data: ${error.message}`);
+  }
+  
+  candles = candles.map(c => ({
+    ...c,
+    time: c.time.includes('T') ? c.time.split('T')[0] : c.time,
+  }));
+  
+  const uniqueCandles = new Map<string, CandleData>();
+  for (const candle of candles) {
+    if (!uniqueCandles.has(candle.time) || candle.volume > (uniqueCandles.get(candle.time)?.volume || 0)) {
+      uniqueCandles.set(candle.time, candle);
+    }
+  }
+  
+  const sortedCandles = Array.from(uniqueCandles.values());
+  sortedCandles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  
+  return sortedCandles;
+}
+
+async function fetchTradierHistoryWithDates(
+  accessToken: string,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  const endpoint = `https://api.tradier.com/v1/markets/history?symbol=${symbol}&interval=daily&start=${startDate}&end=${endDate}`;
+  
+  const response = await fetch(endpoint, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Tradier history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const history = data.history?.day;
+  if (!history) return [];
+  const historyArray = Array.isArray(history) ? history : [history];
+  
+  return historyArray.map((d: any) => ({
+    time: d.date,
+    open: d.open,
+    high: d.high,
+    low: d.low,
+    close: d.close,
+    volume: d.volume,
+  }));
+}
+
+async function fetchPolygonHistoryWithDates(
+  accessToken: string,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  const response = await fetch(
+    `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate}/${endDate}?apiKey=${accessToken}&limit=50000`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Polygon history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const results = data.results || [];
+  
+  return results.map((d: any) => ({
+    time: new Date(d.t).toISOString().split('T')[0],
+    open: d.o,
+    high: d.h,
+    low: d.l,
+    close: d.c,
+    volume: d.v,
+  }));
+}
+
+async function fetchAlpacaHistoryWithDates(
+  accessToken: string,
+  secretKey: string | null,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  const headers: Record<string, string> = {
+    "APCA-API-KEY-ID": accessToken,
+  };
+  if (secretKey) {
+    headers["APCA-API-SECRET-KEY"] = secretKey;
+  }
+
+  const response = await fetch(
+    `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Alpaca history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const bars = data.bars || [];
+  
+  return bars.map((d: any) => ({
+    time: d.t.split('T')[0],
+    open: d.o,
+    high: d.h,
+    low: d.l,
+    close: d.c,
+    volume: d.v,
+  }));
+}
+
+async function fetchTastyTradeHistoryWithDates(
+  accessToken: string,
+  secretKey: string | null,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const response = await fetch(
+    `https://api.tastyworks.com/market-data/symbols/${symbol}/candles?period-type=day&period=1&start-time=${startDate}T00:00:00Z&end-time=${endDate}T23:59:59Z`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`TastyTrade history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const candles = data.data?.candles || [];
+  
+  return candles.map((d: any) => ({
+    time: d.time.split('T')[0],
+    open: d.open,
+    high: d.high,
+    low: d.low,
+    close: d.close,
+    volume: d.volume,
+  }));
+}
+
+async function fetchTradeStationHistoryWithDates(
+  accessToken: string,
+  secretKey: string | null,
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<CandleData[]> {
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const response = await fetch(
+    `https://api.tradestation.com/v3/marketdata/barcharts/${symbol}?interval=1&unit=Daily&startDate=${startDate}&endDate=${endDate}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`TradeStation history API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const bars = data.Bars || [];
+  
+  return bars.map((d: any) => ({
+    time: d.TimeStamp.split('T')[0],
+    open: d.Open,
+    high: d.High,
+    low: d.Low,
+    close: d.Close,
+    volume: d.TotalVolume,
+  }));
 }
 
 function calculateEMA(data: number[], period: number): number[] {
