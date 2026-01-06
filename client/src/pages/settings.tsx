@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1063,6 +1063,555 @@ function AutomationSettings() {
           )}
         </CardContent>
       </Card>
+
+      <AutomationProfiles />
     </div>
+  );
+}
+
+interface AutomationProfileData {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  hasApiKey: boolean;
+  isEnabled: boolean;
+  mode: "OFF" | "AUTO" | "CONFIRM" | "NOTIFY_ONLY";
+  guardrails: {
+    maxPerDay?: number;
+    cooldownMinutes?: number;
+    minScore?: number;
+    allowedStrategies?: string[];
+    allowedTimeWindow?: { start: string; end: string };
+  } | null;
+  lastTestStatus: number | null;
+  lastTestAt: string | null;
+  createdAt: string;
+}
+
+function AutomationProfiles() {
+  const { toast } = useToast();
+  const [editingProfile, setEditingProfile] = useState<AutomationProfileData | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newProfile, setNewProfile] = useState({
+    name: "",
+    webhookUrl: "",
+    apiKey: "",
+    mode: "NOTIFY_ONLY" as const,
+    maxPerDay: "",
+    cooldownMinutes: "",
+    minScore: "",
+  });
+
+  const { data: profiles, isLoading } = useQuery<AutomationProfileData[]>({
+    queryKey: ["/api/automation-profiles"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: {
+      name: string;
+      webhookUrl: string;
+      apiKey?: string;
+      mode: string;
+      guardrails?: object | null;
+    }) => {
+      const response = await apiRequest("POST", "/api/automation-profiles", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation-profiles"] });
+      setCreateDialogOpen(false);
+      setNewProfile({ name: "", webhookUrl: "", apiKey: "", mode: "NOTIFY_ONLY", maxPerDay: "", cooldownMinutes: "", minScore: "" });
+      toast({ title: "Profile Created", description: "Automation profile has been created" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to Create", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; [key: string]: any }) => {
+      const response = await apiRequest("PUT", `/api/automation-profiles/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation-profiles"] });
+      setEditingProfile(null);
+      toast({ title: "Profile Updated", description: "Automation profile has been updated" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to Update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/automation-profiles/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation-profiles"] });
+      toast({ title: "Profile Deleted", description: "Automation profile has been deleted" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to Delete", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/automation-profiles/${id}/test`, {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/automation-profiles"] });
+      if (data.success) {
+        toast({ title: "Test Successful", description: data.message });
+      } else {
+        toast({ title: "Test Failed", description: data.error || "Webhook test failed", variant: "destructive" });
+      }
+    },
+    onError: (error) => {
+      toast({ title: "Test Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCreateProfile = () => {
+    const guardrails: any = {};
+    if (newProfile.maxPerDay) guardrails.maxPerDay = parseInt(newProfile.maxPerDay);
+    if (newProfile.cooldownMinutes) guardrails.cooldownMinutes = parseInt(newProfile.cooldownMinutes);
+    if (newProfile.minScore) guardrails.minScore = parseInt(newProfile.minScore);
+
+    createMutation.mutate({
+      name: newProfile.name.trim(),
+      webhookUrl: newProfile.webhookUrl.trim(),
+      apiKey: newProfile.apiKey.trim() || undefined,
+      mode: newProfile.mode,
+      guardrails: Object.keys(guardrails).length > 0 ? guardrails : null,
+    });
+  };
+
+  const getModeColor = (mode: string) => {
+    switch (mode) {
+      case "AUTO": return "bg-green-500/10 text-green-600 dark:text-green-400";
+      case "CONFIRM": return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+      case "NOTIFY_ONLY": return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getModeLabel = (mode: string) => {
+    switch (mode) {
+      case "AUTO": return "Auto-Send";
+      case "CONFIRM": return "Requires Approval";
+      case "NOTIFY_ONLY": return "Notify Only";
+      case "OFF": return "Disabled";
+      default: return mode;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Automation Profiles
+            </CardTitle>
+            <CardDescription>
+              Create multiple webhook destinations with different guardrails
+            </CardDescription>
+          </div>
+          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-profile">
+            <Plus className="mr-2 h-4 w-4" />
+            New Profile
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!profiles || profiles.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No automation profiles configured</p>
+            <p className="text-xs mt-1">Create a profile to connect to AlgoPilotX or other webhook destinations</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {profiles.map((profile) => (
+              <div
+                key={profile.id}
+                className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                data-testid={`profile-item-${profile.id}`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`p-2 rounded-md ${profile.isEnabled ? "bg-green-500/10" : "bg-muted"}`}>
+                    <Zap className={`h-4 w-4 ${profile.isEnabled ? "text-green-500" : "text-muted-foreground"}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{profile.name}</span>
+                      <Badge variant="outline" className={`text-xs ${getModeColor(profile.mode)}`}>
+                        {getModeLabel(profile.mode)}
+                      </Badge>
+                      {profile.hasApiKey && (
+                        <Badge variant="secondary" className="text-xs">
+                          API Key
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {profile.webhookUrl}
+                    </p>
+                    {profile.guardrails && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {profile.guardrails.maxPerDay && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Target className="h-3 w-3" />
+                            {profile.guardrails.maxPerDay}/day
+                          </span>
+                        )}
+                        {profile.guardrails.cooldownMinutes && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {profile.guardrails.cooldownMinutes}m cooldown
+                          </span>
+                        )}
+                        {profile.guardrails.minScore && (
+                          <span className="text-xs text-muted-foreground">
+                            Min score: {profile.guardrails.minScore}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => testMutation.mutate(profile.id)}
+                    disabled={testMutation.isPending || !profile.webhookUrl}
+                    title="Test webhook"
+                    data-testid={`button-test-profile-${profile.id}`}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditingProfile(profile)}
+                    title="Edit profile"
+                    data-testid={`button-edit-profile-${profile.id}`}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (confirm(`Delete profile "${profile.name}"?`)) {
+                        deleteMutation.mutate(profile.id);
+                      }
+                    }}
+                    title="Delete profile"
+                    data-testid={`button-delete-profile-${profile.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Automation Profile</DialogTitle>
+            <DialogDescription>
+              Add a new webhook destination for trade signals
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="profile-name">Profile Name</Label>
+              <Input
+                id="profile-name"
+                placeholder="e.g., AlgoPilotX Main"
+                value={newProfile.name}
+                onChange={(e) => setNewProfile({ ...newProfile, name: e.target.value })}
+                data-testid="input-profile-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-webhook">Webhook URL</Label>
+              <Input
+                id="profile-webhook"
+                type="url"
+                placeholder="https://..."
+                value={newProfile.webhookUrl}
+                onChange={(e) => setNewProfile({ ...newProfile, webhookUrl: e.target.value })}
+                data-testid="input-profile-webhook"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-apikey">API Key (optional)</Label>
+              <Input
+                id="profile-apikey"
+                type="password"
+                placeholder="Enter API key"
+                value={newProfile.apiKey}
+                onChange={(e) => setNewProfile({ ...newProfile, apiKey: e.target.value })}
+                data-testid="input-profile-apikey"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-mode">Mode</Label>
+              <Select
+                value={newProfile.mode}
+                onValueChange={(value: any) => setNewProfile({ ...newProfile, mode: value })}
+              >
+                <SelectTrigger data-testid="select-profile-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AUTO">Auto-Send (immediate)</SelectItem>
+                  <SelectItem value="CONFIRM">Requires Approval</SelectItem>
+                  <SelectItem value="NOTIFY_ONLY">Notify Only (no webhook)</SelectItem>
+                  <SelectItem value="OFF">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="profile-maxperday">Max/Day</Label>
+                <Input
+                  id="profile-maxperday"
+                  type="number"
+                  min="0"
+                  placeholder="Unlimited"
+                  value={newProfile.maxPerDay}
+                  onChange={(e) => setNewProfile({ ...newProfile, maxPerDay: e.target.value })}
+                  data-testid="input-profile-maxperday"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-cooldown">Cooldown (min)</Label>
+                <Input
+                  id="profile-cooldown"
+                  type="number"
+                  min="0"
+                  placeholder="None"
+                  value={newProfile.cooldownMinutes}
+                  onChange={(e) => setNewProfile({ ...newProfile, cooldownMinutes: e.target.value })}
+                  data-testid="input-profile-cooldown"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-minscore">Min Score</Label>
+                <Input
+                  id="profile-minscore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="0"
+                  value={newProfile.minScore}
+                  onChange={(e) => setNewProfile({ ...newProfile, minScore: e.target.value })}
+                  data-testid="input-profile-minscore"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProfile}
+              disabled={!newProfile.name || !newProfile.webhookUrl || createMutation.isPending}
+              data-testid="button-save-new-profile"
+            >
+              {createMutation.isPending ? "Creating..." : "Create Profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingProfile} onOpenChange={(open) => !open && setEditingProfile(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              Update profile settings and guardrails
+            </DialogDescription>
+          </DialogHeader>
+          {editingProfile && (
+            <EditProfileForm
+              profile={editingProfile}
+              onSave={(data) => updateMutation.mutate({ id: editingProfile.id, ...data })}
+              onCancel={() => setEditingProfile(null)}
+              isPending={updateMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function EditProfileForm({
+  profile,
+  onSave,
+  onCancel,
+  isPending,
+}: {
+  profile: AutomationProfileData;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [name, setName] = useState(profile.name);
+  const [webhookUrl, setWebhookUrl] = useState(profile.webhookUrl);
+  const [apiKey, setApiKey] = useState("");
+  const [mode, setMode] = useState(profile.mode);
+  const [isEnabled, setIsEnabled] = useState(profile.isEnabled);
+  const [maxPerDay, setMaxPerDay] = useState(profile.guardrails?.maxPerDay?.toString() || "");
+  const [cooldownMinutes, setCooldownMinutes] = useState(profile.guardrails?.cooldownMinutes?.toString() || "");
+  const [minScore, setMinScore] = useState(profile.guardrails?.minScore?.toString() || "");
+
+  const handleSubmit = () => {
+    const guardrails: any = {};
+    if (maxPerDay) guardrails.maxPerDay = parseInt(maxPerDay);
+    if (cooldownMinutes) guardrails.cooldownMinutes = parseInt(cooldownMinutes);
+    if (minScore) guardrails.minScore = parseInt(minScore);
+
+    onSave({
+      name: name.trim(),
+      webhookUrl: webhookUrl.trim(),
+      apiKey: apiKey.trim() || undefined,
+      mode,
+      isEnabled,
+      guardrails: Object.keys(guardrails).length > 0 ? guardrails : null,
+    });
+  };
+
+  return (
+    <>
+      <div className="space-y-4 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Enabled</Label>
+            <p className="text-xs text-muted-foreground">Profile is active and can receive signals</p>
+          </div>
+          <Switch checked={isEnabled} onCheckedChange={setIsEnabled} data-testid="switch-edit-enabled" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-name">Profile Name</Label>
+          <Input
+            id="edit-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            data-testid="input-edit-name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-webhook">Webhook URL</Label>
+          <Input
+            id="edit-webhook"
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            data-testid="input-edit-webhook"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-apikey">
+            API Key {profile.hasApiKey && <Badge variant="secondary" className="ml-2 text-xs">Configured</Badge>}
+          </Label>
+          <Input
+            id="edit-apikey"
+            type="password"
+            placeholder={profile.hasApiKey ? "Enter new key to replace" : "Enter API key"}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            data-testid="input-edit-apikey"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-mode">Mode</Label>
+          <Select value={mode} onValueChange={(v: any) => setMode(v)}>
+            <SelectTrigger data-testid="select-edit-mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AUTO">Auto-Send (immediate)</SelectItem>
+              <SelectItem value="CONFIRM">Requires Approval</SelectItem>
+              <SelectItem value="NOTIFY_ONLY">Notify Only</SelectItem>
+              <SelectItem value="OFF">Disabled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-4 grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="edit-maxperday">Max/Day</Label>
+            <Input
+              id="edit-maxperday"
+              type="number"
+              min="0"
+              placeholder="Unlimited"
+              value={maxPerDay}
+              onChange={(e) => setMaxPerDay(e.target.value)}
+              data-testid="input-edit-maxperday"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-cooldown">Cooldown (min)</Label>
+            <Input
+              id="edit-cooldown"
+              type="number"
+              min="0"
+              placeholder="None"
+              value={cooldownMinutes}
+              onChange={(e) => setCooldownMinutes(e.target.value)}
+              data-testid="input-edit-cooldown"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-minscore">Min Score</Label>
+            <Input
+              id="edit-minscore"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="0"
+              value={minScore}
+              onChange={(e) => setMinScore(e.target.value)}
+              data-testid="input-edit-minscore"
+            />
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={!name || !webhookUrl || isPending} data-testid="button-save-edit-profile">
+          {isPending ? "Saving..." : "Save Changes"}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
