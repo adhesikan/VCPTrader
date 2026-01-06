@@ -1,4 +1,5 @@
 import { StrategyPlugin, ScanResultOutput } from "../strategies/types";
+import { MarketRegimeType, getRegimeAdjustment } from "./regime";
 
 export interface ConfluenceResult {
   symbol: string;
@@ -7,6 +8,7 @@ export interface ConfluenceResult {
   matchedStrategies: string[];
   strategyResults: ScanResultOutput[];
   confluenceScore: number;
+  adjustedScore: number;
   primaryStage: string;
   keyLevels: {
     resistance?: number;
@@ -19,7 +21,8 @@ export interface ConfluenceResult {
 export function aggregateConfluence(
   symbol: string,
   results: ScanResultOutput[],
-  bonusPerMatch: number = 10
+  bonusPerMatch: number = 10,
+  regime?: MarketRegimeType
 ): ConfluenceResult | null {
   const activeResults = results.filter(r => 
     r.stage === "READY" || r.stage === "TRIGGERED" || r.stage === "BREAKOUT"
@@ -30,6 +33,15 @@ export function aggregateConfluence(
   const maxScore = Math.max(...activeResults.map(r => r.score));
   const bonusScore = (activeResults.length - 1) * bonusPerMatch;
   const confluenceScore = Math.min(100, maxScore + bonusScore);
+
+  let adjustedScore = confluenceScore;
+  if (regime) {
+    const regimeAdjustments = activeResults.map(r => 
+      getRegimeAdjustment(regime, r.strategyId)
+    );
+    const avgAdjustment = regimeAdjustments.reduce((a, b) => a + b, 0) / regimeAdjustments.length;
+    adjustedScore = Math.max(0, Math.min(100, confluenceScore + avgAdjustment));
+  }
 
   const primaryResult = activeResults.reduce((best, current) => 
     current.score > best.score ? current : best
@@ -55,6 +67,7 @@ export function aggregateConfluence(
     matchedStrategies,
     strategyResults: activeResults,
     confluenceScore: Math.round(confluenceScore),
+    adjustedScore: Math.round(adjustedScore),
     primaryStage: primaryResult.stage,
     keyLevels: {
       resistance: allResistances.length > 0 ? Math.max(...allResistances) : undefined,

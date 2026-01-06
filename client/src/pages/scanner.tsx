@@ -39,12 +39,19 @@ interface MarketRegime {
 }
 
 interface ConfluenceResult {
-  ticker: string;
-  strategies: string[];
-  aggregatedScore: number;
-  bestStage: string;
-  resistance?: number;
-  stopLoss?: number;
+  symbol: string;
+  name: string;
+  price: number;
+  matchedStrategies: string[];
+  confluenceScore: number;
+  adjustedScore: number;
+  primaryStage: string;
+  keyLevels: {
+    resistance?: number;
+    support?: number;
+    stop?: number;
+  };
+  explanation: string;
 }
 
 import { useBrokerStatus } from "@/hooks/use-broker-status";
@@ -146,17 +153,17 @@ export default function Scanner() {
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
 
-  const { data: marketRegime } = useQuery<MarketRegime>({
-    queryKey: ["/api/market/regime"],
-    enabled: activeTab === "confluence",
-    staleTime: 60000,
-  });
-
-  const { data: confluenceResults, isLoading: isConfluenceLoading } = useQuery<ConfluenceResult[]>({
+  const { data: confluenceData, isLoading: isConfluenceLoading } = useQuery<{
+    results: ConfluenceResult[];
+    marketRegime?: MarketRegime;
+  }>({
     queryKey: ["/api/scan/confluence"],
     enabled: activeTab === "confluence" && isConnected,
     staleTime: 30000,
   });
+
+  const confluenceResults = confluenceData?.results;
+  const marketRegime = confluenceData?.marketRegime;
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -612,28 +619,28 @@ export default function Scanner() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {confluenceResults.map((item) => (
                     <Card 
-                      key={item.ticker}
+                      key={item.symbol}
                       className="hover-elevate active-elevate-2 cursor-pointer"
-                      onClick={() => navigate(`/charts/${item.ticker}`)}
-                      data-testid={`confluence-card-${item.ticker}`}
+                      onClick={() => navigate(`/charts/${item.symbol}`)}
+                      data-testid={`confluence-card-${item.symbol}`}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
-                            <span className="text-lg font-bold font-mono">{item.ticker}</span>
+                            <span className="text-lg font-bold font-mono">{item.symbol}</span>
                             <Badge variant="secondary" className="ml-2 text-xs">
-                              {item.bestStage}
+                              {item.primaryStage}
                             </Badge>
                           </div>
                           <Badge 
-                            variant={item.aggregatedScore >= 80 ? "default" : item.aggregatedScore >= 60 ? "secondary" : "outline"}
+                            variant={item.adjustedScore >= 80 ? "default" : item.adjustedScore >= 60 ? "secondary" : "outline"}
                             className="font-mono"
                           >
-                            {item.aggregatedScore}
+                            {item.adjustedScore}
                           </Badge>
                         </div>
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {item.strategies.map((strat) => (
+                          {item.matchedStrategies.map((strat) => (
                             <Badge key={strat} variant="outline" className="text-xs">
                               {strat.replace(/_/g, " ")}
                             </Badge>
@@ -643,13 +650,13 @@ export default function Scanner() {
                           <div>
                             <p className="text-xs text-muted-foreground">Resistance</p>
                             <p className="font-mono font-medium text-chart-2">
-                              ${item.resistance?.toFixed(2) || "-"}
+                              ${item.keyLevels.resistance?.toFixed(2) || "-"}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Stop Loss</p>
                             <p className="font-mono font-medium text-destructive">
-                              ${item.stopLoss?.toFixed(2) || "-"}
+                              ${item.keyLevels.stop?.toFixed(2) || "-"}
                             </p>
                           </div>
                         </div>

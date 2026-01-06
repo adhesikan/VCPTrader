@@ -128,6 +128,8 @@ export const RuleConditionType = {
   ANY_STRATEGY_TRIGGERED: "ANY_STRATEGY_TRIGGERED",
   APPROACHING_TRIGGER: "APPROACHING_TRIGGER",
   EXIT_CONDITION: "EXIT_CONDITION",
+  CONFLUENCE_MATCH: "CONFLUENCE_MATCH",
+  SCORE_THRESHOLD: "SCORE_THRESHOLD",
 } as const;
 
 export type RuleConditionTypeValue = typeof RuleConditionType[keyof typeof RuleConditionType];
@@ -147,9 +149,12 @@ export const alertRules = pgTable("alert_rules", {
   userId: varchar("user_id").notNull(),
   symbol: text("symbol").notNull(),
   strategy: text("strategy").notNull().default("VCP"),
+  strategies: text("strategies").array(),
   timeframe: text("timeframe").notNull().default("1d"),
   conditionType: text("condition_type").notNull(),
   conditionPayload: jsonb("condition_payload"),
+  scoreThreshold: integer("score_threshold"),
+  minStrategies: integer("min_strategies"),
   isEnabled: boolean("is_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

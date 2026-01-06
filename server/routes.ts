@@ -166,6 +166,35 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/market/regime", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.status(400).json({ 
+          error: "No broker connection. Please connect a brokerage in Settings first." 
+        });
+      }
+
+      const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
+      const spyCandles: CandleData[] = spyHistory.map(c => ({
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+        time: c.time,
+      }));
+      
+      const regime = classifyMarketRegime(spyCandles);
+      res.json(regime);
+    } catch (error: any) {
+      console.error("Market regime error:", error);
+      res.status(500).json({ error: error.message || "Failed to get market regime" });
+    }
+  });
+
   app.post("/api/scan/confluence", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId!;
@@ -178,6 +207,22 @@ export async function registerRoutes(
       }
 
       const { symbols = DEFAULT_SCAN_SYMBOLS, minMatches = 2, timeframe = "1d" } = req.body;
+      
+      let marketRegime;
+      try {
+        const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
+        const spyCandles: CandleData[] = spyHistory.map(c => ({
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
+          time: c.time,
+        }));
+        marketRegime = classifyMarketRegime(spyCandles);
+      } catch (e) {
+        console.error("Failed to get market regime, using default:", e);
+      }
       
       const quotes = await fetchQuotesFromBroker(connection, symbols);
       const confluenceResults: ConfluenceResult[] = [];
@@ -205,7 +250,12 @@ export async function registerRoutes(
           );
           
           if (pluginResults.length > 0) {
-            const confluence = aggregateConfluence(quote.symbol, pluginResults);
+            const confluence = aggregateConfluence(
+              quote.symbol, 
+              pluginResults, 
+              10, 
+              marketRegime?.regime
+            );
             if (confluence) {
               confluenceResults.push(confluence);
             }
@@ -218,7 +268,7 @@ export async function registerRoutes(
       const filtered = filterByMinMatches(confluenceResults, minMatches);
       const ranked = rankByConfluence(filtered);
       
-      res.json(ranked);
+      res.json({ results: ranked, marketRegime });
     } catch (error: any) {
       console.error("Confluence scan error:", error);
       res.status(500).json({ error: error.message || "Failed to run confluence scan" });
