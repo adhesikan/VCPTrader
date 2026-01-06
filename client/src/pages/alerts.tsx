@@ -246,7 +246,7 @@ export default function Alerts() {
     queryKey: ["/api/watchlists"],
   });
 
-  const { data: automationProfiles } = useQuery<AutomationProfile[]>({
+  const { data: automationProfiles = [] } = useQuery<AutomationProfile[]>({
     queryKey: ["/api/automation-profiles"],
   });
 
@@ -457,7 +457,7 @@ export default function Alerts() {
                 </p>
               </div>
 
-              {automationProfiles && automationProfiles.length > 0 && (
+              {automationProfiles.length > 0 && (
                 <div className="space-y-2">
                   <Label>Automation Profile (optional)</Label>
                   <Select
