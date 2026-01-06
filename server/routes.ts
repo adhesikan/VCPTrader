@@ -2,7 +2,10 @@ import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
-import { getStrategyList, classifyQuote, StrategyId, PullbackStage } from "./strategies";
+import { getStrategyList, classifyQuote, StrategyId, PullbackStage, runAllPluginScans, STRATEGY_PRESETS, getAllStrategyIds, StrategyIdType } from "./strategies";
+import { classifyMarketRegime, getRegimeAdjustment } from "./engine/regime";
+import { aggregateConfluence, rankByConfluence, filterByMinMatches, ConfluenceResult } from "./engine/confluence";
+import { CandleData } from "./engine/indicators";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { 
@@ -54,6 +57,172 @@ export async function registerRoutes(
         : [PullbackStage.FORMING, PullbackStage.READY, PullbackStage.TRIGGERED],
     }));
     res.json(strategies);
+  });
+
+  app.get("/api/strategies/presets", (req, res) => {
+    res.json({
+      BREAKOUTS: STRATEGY_PRESETS.BREAKOUTS,
+      INTRADAY: STRATEGY_PRESETS.INTRADAY,
+      SWING: STRATEGY_PRESETS.SWING,
+      ALL: STRATEGY_PRESETS.ALL,
+    });
+  });
+
+  app.get("/api/market/regime", async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      let candles: CandleData[] = [];
+      
+      if (userId) {
+        const connection = await storage.getBrokerConnectionWithToken(userId);
+        if (connection?.accessToken && connection?.isConnected) {
+          try {
+            const history = await fetchHistoryFromBroker(connection, "SPY", "3M");
+            candles = history.map(c => ({
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.volume,
+              time: c.time,
+            }));
+          } catch (e) {
+            console.error("Failed to fetch SPY for regime:", e);
+          }
+        }
+      }
+      
+      if (candles.length < 30) {
+        return res.json({
+          regime: "CHOPPY",
+          strength: 0,
+          ema21Slope: 0,
+          priceVsEma21: 0,
+          description: "Insufficient market data for regime classification",
+        });
+      }
+      
+      const regime = classifyMarketRegime(candles);
+      res.json(regime);
+    } catch (error) {
+      console.error("Regime classification error:", error);
+      res.status(500).json({ error: "Failed to classify market regime" });
+    }
+  });
+
+  app.post("/api/scan/multi-strategy", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.status(400).json({ 
+          error: "No broker connection. Please connect a brokerage in Settings first." 
+        });
+      }
+
+      const { symbols = DEFAULT_SCAN_SYMBOLS, strategyIds, timeframe = "1d" } = req.body;
+      const selectedStrategies: StrategyIdType[] = strategyIds || getAllStrategyIds();
+      
+      const quotes = await fetchQuotesFromBroker(connection, symbols);
+      const allResults: any[] = [];
+      
+      for (const quote of quotes) {
+        try {
+          const history = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
+          const candles: CandleData[] = history.map(c => ({
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            time: c.time,
+          }));
+          
+          if (candles.length < 20) continue;
+          
+          const pluginResults = runAllPluginScans(
+            quote.symbol,
+            candles,
+            timeframe,
+            selectedStrategies.filter(id => 
+              id !== StrategyId.VCP && 
+              id !== StrategyId.VCP_MULTIDAY && 
+              id !== StrategyId.CLASSIC_PULLBACK
+            ) as StrategyIdType[],
+            quote
+          );
+          
+          allResults.push(...pluginResults);
+        } catch (e) {
+          console.error(`Failed to scan ${quote.symbol}:`, e);
+        }
+      }
+      
+      res.json(allResults);
+    } catch (error: any) {
+      console.error("Multi-strategy scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to run multi-strategy scan" });
+    }
+  });
+
+  app.post("/api/scan/confluence", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connection = await storage.getBrokerConnectionWithToken(userId);
+      
+      if (!connection || !connection.accessToken) {
+        return res.status(400).json({ 
+          error: "No broker connection. Please connect a brokerage in Settings first." 
+        });
+      }
+
+      const { symbols = DEFAULT_SCAN_SYMBOLS, minMatches = 2, timeframe = "1d" } = req.body;
+      
+      const quotes = await fetchQuotesFromBroker(connection, symbols);
+      const confluenceResults: ConfluenceResult[] = [];
+      
+      for (const quote of quotes) {
+        try {
+          const history = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
+          const candles: CandleData[] = history.map(c => ({
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            time: c.time,
+          }));
+          
+          if (candles.length < 20) continue;
+          
+          const pluginResults = runAllPluginScans(
+            quote.symbol,
+            candles,
+            timeframe,
+            undefined,
+            quote
+          );
+          
+          if (pluginResults.length > 0) {
+            const confluence = aggregateConfluence(quote.symbol, pluginResults);
+            if (confluence) {
+              confluenceResults.push(confluence);
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to confluence scan ${quote.symbol}:`, e);
+        }
+      }
+      
+      const filtered = filterByMinMatches(confluenceResults, minMatches);
+      const ranked = rankByConfluence(filtered);
+      
+      res.json(ranked);
+    } catch (error: any) {
+      console.error("Confluence scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to run confluence scan" });
+    }
   });
 
   app.get("/api/market/stats", async (req, res) => {

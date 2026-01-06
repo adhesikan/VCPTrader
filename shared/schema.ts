@@ -50,6 +50,13 @@ export const StrategyType = {
   VCP: "VCP",
   VCP_MULTIDAY: "VCP_MULTIDAY",
   CLASSIC_PULLBACK: "CLASSIC_PULLBACK",
+  VWAP_RECLAIM: "VWAP_RECLAIM",
+  ORB5: "ORB5",
+  ORB15: "ORB15",
+  HIGH_RVOL: "HIGH_RVOL",
+  GAP_AND_GO: "GAP_AND_GO",
+  TREND_CONTINUATION: "TREND_CONTINUATION",
+  VOLATILITY_SQUEEZE: "VOLATILITY_SQUEEZE",
 } as const;
 
 export type StrategyTypeValue = typeof StrategyType[keyof typeof StrategyType];
@@ -118,6 +125,9 @@ export const RuleConditionType = {
   PRICE_ABOVE: "PRICE_ABOVE",
   PRICE_BELOW: "PRICE_BELOW",
   VOLUME_SPIKE: "VOLUME_SPIKE",
+  ANY_STRATEGY_TRIGGERED: "ANY_STRATEGY_TRIGGERED",
+  APPROACHING_TRIGGER: "APPROACHING_TRIGGER",
+  EXIT_CONDITION: "EXIT_CONDITION",
 } as const;
 
 export type RuleConditionTypeValue = typeof RuleConditionType[keyof typeof RuleConditionType];
@@ -279,3 +289,69 @@ export const marketStats = z.object({
 });
 
 export type MarketStats = z.infer<typeof marketStats>;
+
+export const MarketRegime = {
+  TRENDING: "TRENDING",
+  CHOPPY: "CHOPPY",
+  RISK_OFF: "RISK_OFF",
+} as const;
+
+export type MarketRegimeType = typeof MarketRegime[keyof typeof MarketRegime];
+
+export const strategiesEnabled = pgTable("strategies_enabled", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  enabledStrategyIds: jsonb("enabled_strategy_ids").notNull().default([]),
+  presetName: text("preset_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStrategiesEnabledSchema = createInsertSchema(strategiesEnabled).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStrategiesEnabled = z.infer<typeof insertStrategiesEnabledSchema>;
+export type StrategiesEnabled = typeof strategiesEnabled.$inferSelect;
+
+export const scanResultsCache = pgTable("scan_results_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  symbol: text("symbol").notNull(),
+  timeframe: text("timeframe").notNull(),
+  strategyId: text("strategy_id").notNull(),
+  stage: text("stage").notNull(),
+  score: integer("score").notNull(),
+  levels: jsonb("levels"),
+  explanation: text("explanation"),
+  computedAt: timestamp("computed_at").defaultNow(),
+});
+
+export const insertScanResultsCacheSchema = createInsertSchema(scanResultsCache).omit({ id: true, computedAt: true });
+export type InsertScanResultsCache = z.infer<typeof insertScanResultsCacheSchema>;
+export type ScanResultsCache = typeof scanResultsCache.$inferSelect;
+
+export const confluenceResults = pgTable("confluence_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  symbol: text("symbol").notNull(),
+  matchedStrategies: jsonb("matched_strategies").notNull(),
+  confluenceScore: integer("confluence_score").notNull(),
+  primaryStage: text("primary_stage").notNull(),
+  keyLevels: jsonb("key_levels"),
+  explanation: text("explanation"),
+  computedAt: timestamp("computed_at").defaultNow(),
+});
+
+export const insertConfluenceResultSchema = createInsertSchema(confluenceResults).omit({ id: true, computedAt: true });
+export type InsertConfluenceResult = z.infer<typeof insertConfluenceResultSchema>;
+export type ConfluenceResult = typeof confluenceResults.$inferSelect;
+
+export const marketRegimeHistory = pgTable("market_regime_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  regime: text("regime").notNull(),
+  strength: integer("strength").notNull(),
+  ema21Slope: real("ema21_slope"),
+  priceVsEma21: real("price_vs_ema21"),
+  description: text("description"),
+  recordedAt: timestamp("recorded_at").defaultNow(),
+});
+
+export const insertMarketRegimeHistorySchema = createInsertSchema(marketRegimeHistory).omit({ id: true, recordedAt: true });
+export type InsertMarketRegimeHistory = z.infer<typeof insertMarketRegimeHistorySchema>;
+export type MarketRegimeHistory = typeof marketRegimeHistory.$inferSelect;

@@ -1,0 +1,182 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Expand VCP Trader from 3 strategies to a multi-strategy scanning platform by adding:
+1) VWAP Reclaim (intraday)
+2) Opening Range Breakout (ORB 5m / ORB 15m)
+3) High Relative Volume (RVOL) Breakout
+4) Gap & Go
+5) Trend Continuation (pullback to EMA9/EMA21 in trend)
+6) Volatility Squeeze (Bollinger/Keltner “TTM Squeeze”-style)
+
+Also add high-value platform features:
+A) Confluence Engine (stocks matching multiple strategies)
+B) Strategy Scoring (0–100)
+C) Multi-strategy Alerts (alert when ANY selected strategy triggers)
+D) Market Regime Filter (Trending/Choppy/Risk-Off) to adjust ranking
+
+IMPORTANT COMPLIANCE
+This is an educational/informational platform. Do not use “buy/sell recommendations” language.
+Use: “setup”, “condition”, “trigger”, “educational alert”, “potential breakout condition”.
+Append to all triggered alerts:
+“This alert is informational only and not investment advice.”
+
+ARCHITECTURE REQUIREMENT (DO THIS FIRST)
+Refactor scanner + alerts into a strategy plugin system (if not already done):
+Create a shared interface:
+
+StrategyPlugin = {
+  id: string,
+  name: string,
+  description: string,
+  timeframesSupported: string[],
+  defaultParams: object,
+  scan(input: { symbol, candles, timeframe, params, indicators }): ScanResult | null,
+  classify(scanResult): { stage: "FORMING"|"READY"|"TRIGGERED" },
+  levels(scanResult): { resistance?, support?, entryTrigger?, stopLevel?, exitRule? },
+  score(scanResult, context): number, // 0-100
+  explain(scanResult): string
+}
+
+Add these folders:
+- /strategies (plugins)
+- /engine (shared indicator + scanning runner)
+- /engine/indicators (EMA, VWAP, ATR, RVOL, BB, KC)
+- /engine/regime (market regime classifier)
+- /engine/confluence (multi-strategy aggregation)
+
+DATABASE CHANGES
+Add/extend tables:
+
+1) strategies_enabled (optional)
+- user_id
+- enabled_strategy_ids (jsonb)
+- created_at, updated_at
+
+2) scan_results_cache
+- id, symbol, timeframe, strategy_id
+- stage, score
+- levels (jsonb)
+- explanation (text)
+- computed_at
+- unique(symbol, timeframe, strategy_id, computed_at_bucket)
+
+3) alert_rules (extend existing rules engine)
+- strategy_id
+- condition_type: STAGE_ENTERED | ANY_STRATEGY_TRIGGERED | APPROACHING_TRIGGER | EXIT_CONDITION
+- condition_payload jsonb
+
+4) alert_events (existing) for dedupe with unique event_key per rule
+
+STRATEGY IMPLEMENTATIONS
+Add these plugins with clear, explainable logic and configurable params (UI inputs):
+
+1) VWAP Reclaim
+- Trend: price above EMA21 optional
+- Trigger when price crosses ABOVE VWAP after being below it for N bars
+- Volume confirmation: RVOL >= 1.5 default
+- Stop: below VWAP or below reclaim candle low (config)
+- Exit: close below VWAP or close below EMA21 (config)
+
+2) ORB (Opening Range Breakout)
+- Define opening range: first 5m or 15m after market open
+- Trigger when price breaks above OR high with RVOL >= 1.5
+- Stop: below OR low or below breakout candle low (config)
+- Add both ORB5 and ORB15 as separate strategy ids or param
+
+3) High RVOL Breakout
+- Filter: RVOL >= 2.0 default
+- Setup: tight consolidation last K bars (range contraction)
+- Trigger: break above consolidation high + volume threshold
+- Stop: breakout candle low
+
+4) Gap & Go
+- Gap% >= X (default 2%)
+- Holds above VWAP after open (or reclaims VWAP)
+- Trigger: breaks premarket high (or first pullback high) with volume
+- Stop: below VWAP or premarket low (config)
+Note: If you don’t have premarket data, implement a simplified variant:
+- “Gap from prior close + ORB breakout”
+
+5) Trend Continuation Pullback
+- Price above EMA21 and EMA50 (EMA50 optional if already available)
+- Pullback to EMA9/EMA21 zone without violating EMA21 close
+- Trigger: break above pullback resistance with RVOL >= 1.3
+- Exit: close below EMA21
+
+6) Volatility Squeeze
+- Compute Bollinger Bands (20, 2) and Keltner Channels (20, 1.5)
+- Squeeze on: BB inside KC for N bars (default 5)
+- Trigger: first close outside BB with volume expansion OR break above squeeze range high
+- Exit: close back inside range or close below EMA21 (config)
+
+CONFLUENCE ENGINE (FEATURE A)
+Implement a “Confluence” view:
+- For each symbol, run all enabled strategies
+- If multiple strategies return stage READY/TRIGGERED, aggregate into one row:
+  - strategiesMatched: [ids]
+  - confluenceScore = max(score) + bonus per additional match
+- Add page/tab: “Confluence”
+- Add filter: minimum matched strategies (1–3)
+
+STRATEGY SCORE (FEATURE B)
+Implement scoring per strategy with a common rubric:
+- Trend strength (EMA separation / slope)
+- Tightness (contraction %)
+- Volume quality (RVOL)
+- Liquidity (avg volume, price)
+- Clean trigger distance (how close to breakout)
+Normalize to 0–100.
+Show score in results and use it for ranking.
+
+MULTI-STRATEGY ALERTS (FEATURE C)
+Extend alert rules engine:
+- New rule type: ANY_STRATEGY_TRIGGERED
+- Payload: { "symbol": "NVDA", "strategyIds": ["VCP_INTRADAY","VWAP_RECLAIM","ORB5"], "timeframe": "5m" }
+Evaluation:
+- If any strategy’s stage transitions to TRIGGERED => create one alert_event with which strategy triggered
+- Dedupe: unique event per strategy per candle timestamp
+
+MARKET REGIME FILTER (FEATURE D)
+Implement a simple regime classifier using a broad index (SPY or QQQ):
+- Trending: price above EMA21 & EMA21 slope up
+- Risk-off: price below EMA21 & slope down
+- Choppy: frequent crosses around EMA21 / low directional slope
+Use regime to:
+- Re-rank results (e.g., penalize breakout strategies in choppy regime)
+- Show a small badge at top of scanner: “Market Regime: Trending/Choppy/Risk-Off”
+
+UI REQUIREMENTS
+1) Strategy selector:
+- Multi-select list of strategies to scan
+- Presets: “Breakouts”, “Intraday”, “Swing”, “All”
+2) Each strategy has “Info” (modal/side panel) showing rules and parameters
+3) Results table:
+- Symbol, Strategy, Stage, Score, Key Level (VWAP/Resistance/ORB), RVOL, Timeframe
+4) Confluence tab:
+- Symbol, Matched Strategies, Confluence Score, Stage summary, Key levels
+5) Alerts UI:
+- Create alert rule:
+  - Single strategy stage entered (e.g., VCP BREAKOUT)
+  - Any strategy triggered (multi-select)
+  - Exit condition (EMA21 close below)
+  - Approaching trigger (within X%)
+6) Keep existing VCP + Classic Pullback working exactly as before.
+
+DATA FETCHING / PERFORMANCE
+- Use candle caching and batch fetches wherever possible.
+- If scanning large universes, add a queue/batching system:
+  - process in chunks (e.g., 100 symbols)
+  - store results in scan_results_cache
+  - stream progress to UI if you already support it (optional)
+
+TESTS
+Add tests (if framework exists):
+- VWAP reclaim transition triggers once
+- ORB range calc works and triggers on breakout
+- Squeeze identifies BB inside KC
+- Confluence dedupe works and scores add bonus
+- ANY_STRATEGY_TRIGGERED rule triggers once per event
+
+DELIVERABLE
+Implement the 6 new strategies as plugins, add Confluence + Scoring + Market Regime + Multi-strategy Alerts, update UI to support strategy selection and confluence view, and ensure existing strategies/alerts continue to work.
