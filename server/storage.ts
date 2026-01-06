@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { encryptCredentials, decryptCredentials, hasEncryptionKey } from "./crypto";
+import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
 import { brokerConnections } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -921,11 +921,11 @@ export class MemStorage implements IStorage {
 
     if (settings.encryptedApiKey && settings.apiKeyIv && settings.apiKeyAuthTag && hasEncryptionKey()) {
       try {
-        const decrypted = decryptCredentials(
-          settings.encryptedApiKey,
-          settings.apiKeyIv,
-          settings.apiKeyAuthTag
-        );
+        const decrypted = decryptToken({
+          ciphertext: settings.encryptedApiKey,
+          iv: settings.apiKeyIv,
+          authTag: settings.apiKeyAuthTag,
+        });
         const parsed = JSON.parse(decrypted);
         return { ...settings, apiKey: parsed.apiKey };
       } catch (error) {
@@ -981,9 +981,9 @@ export class MemStorage implements IStorage {
     let encryptedData: { encryptedApiKey?: string; apiKeyIv?: string; apiKeyAuthTag?: string } = {};
 
     if (apiKey && hasEncryptionKey()) {
-      const encrypted = encryptCredentials(JSON.stringify({ apiKey }));
+      const encrypted = encryptToken(JSON.stringify({ apiKey }));
       encryptedData = {
-        encryptedApiKey: encrypted.encrypted,
+        encryptedApiKey: encrypted.ciphertext,
         apiKeyIv: encrypted.iv,
         apiKeyAuthTag: encrypted.authTag,
       };

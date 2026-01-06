@@ -1,7 +1,8 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, insertAutomationSettingsSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { sendEntrySignal, sendExitSignal, createAutomationLogEntry, type EntrySignal, type ExitSignal } from "./algopilotx";
 import { getStrategyList, classifyQuote, StrategyId, PullbackStage, runAllPluginScans, STRATEGY_PRESETS, getAllStrategyIds, StrategyIdType } from "./strategies";
 import { classifyMarketRegime, getRegimeAdjustment } from "./engine/regime";
 import { aggregateConfluence, rankByConfluence, filterByMinMatches, ConfluenceResult } from "./engine/confluence";
@@ -1179,6 +1180,176 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete backtest" });
+    }
+  });
+
+  app.get("/api/automation/settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const settings = await storage.getAutomationSettings(userId);
+      if (!settings) {
+        return res.json({
+          isEnabled: false,
+          webhookUrl: null,
+          hasApiKey: false,
+          autoEntryEnabled: true,
+          autoExitEnabled: true,
+          minScore: 70,
+          maxPositions: 5,
+          defaultPositionSize: 1000,
+        });
+      }
+      res.json({
+        isEnabled: settings.isEnabled,
+        webhookUrl: settings.webhookUrl,
+        hasApiKey: !!settings.encryptedApiKey,
+        autoEntryEnabled: settings.autoEntryEnabled,
+        autoExitEnabled: settings.autoExitEnabled,
+        minScore: settings.minScore,
+        maxPositions: settings.maxPositions,
+        defaultPositionSize: settings.defaultPositionSize,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get automation settings" });
+    }
+  });
+
+  app.post("/api/automation/settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { apiKey, ...settingsData } = req.body;
+      
+      const settings = await storage.setAutomationSettingsWithApiKey(
+        userId,
+        {
+          ...settingsData,
+          userId,
+        },
+        apiKey
+      );
+      
+      res.json({
+        isEnabled: settings.isEnabled,
+        webhookUrl: settings.webhookUrl,
+        hasApiKey: !!settings.encryptedApiKey,
+        autoEntryEnabled: settings.autoEntryEnabled,
+        autoExitEnabled: settings.autoExitEnabled,
+        minScore: settings.minScore,
+        maxPositions: settings.maxPositions,
+        defaultPositionSize: settings.defaultPositionSize,
+      });
+    } catch (error) {
+      console.error("Failed to save automation settings:", error);
+      res.status(500).json({ error: "Failed to save automation settings" });
+    }
+  });
+
+  app.get("/api/automation/logs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await storage.getAutomationLogs(userId, limit);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get automation logs" });
+    }
+  });
+
+  app.post("/api/automation/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const settingsWithKey = await storage.getAutomationSettingsWithApiKey(userId);
+      if (!settingsWithKey) {
+        return res.status(400).json({ error: "Automation not configured" });
+      }
+      
+      if (!settingsWithKey.webhookUrl) {
+        return res.status(400).json({ error: "Webhook URL not configured" });
+      }
+      
+      const testSignal: EntrySignal = {
+        symbol: "TEST",
+        lastPrice: 100.00,
+        targetPrice: 110.00,
+        stopLoss: 95.00,
+      };
+      
+      const result = await sendEntrySignal(
+        { ...settingsWithKey, isEnabled: true, autoEntryEnabled: true },
+        testSignal,
+        settingsWithKey.apiKey
+      );
+      
+      const logEntry = createAutomationLogEntry(
+        userId,
+        "entry",
+        "TEST",
+        result.message,
+        result
+      );
+      await storage.createAutomationLog(logEntry);
+      
+      res.json({
+        success: result.success,
+        message: result.message,
+        error: result.error,
+      });
+    } catch (error) {
+      console.error("Automation test failed:", error);
+      res.status(500).json({ error: "Failed to send test signal" });
+    }
+  });
+
+  app.post("/api/automation/send-signal", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { type, symbol, lastPrice, targetPrice, stopLoss, reason } = req.body;
+      
+      const settingsWithKey = await storage.getAutomationSettingsWithApiKey(userId);
+      if (!settingsWithKey || !settingsWithKey.isEnabled) {
+        return res.status(400).json({ error: "Automation not enabled" });
+      }
+      
+      let result;
+      if (type === "entry") {
+        const signal: EntrySignal = { symbol, lastPrice, targetPrice, stopLoss };
+        result = await sendEntrySignal(settingsWithKey, signal, settingsWithKey.apiKey);
+      } else if (type === "exit") {
+        const signal: ExitSignal = { symbol, reason, targetPrice };
+        result = await sendExitSignal(settingsWithKey, signal, settingsWithKey.apiKey);
+      } else {
+        return res.status(400).json({ error: "Invalid signal type" });
+      }
+      
+      const logEntry = createAutomationLogEntry(userId, type, symbol, result.message, result);
+      await storage.createAutomationLog(logEntry);
+      
+      res.json({
+        success: result.success,
+        message: result.message,
+        error: result.error,
+      });
+    } catch (error) {
+      console.error("Failed to send signal:", error);
+      res.status(500).json({ error: "Failed to send signal" });
     }
   });
 
