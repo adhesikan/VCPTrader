@@ -30,6 +30,12 @@ import type {
   InsertAutomationSettings,
   AutomationLog,
   InsertAutomationLog,
+  AutomationProfile,
+  InsertAutomationProfile,
+  UserAutomationSettings,
+  InsertUserAutomationSettings,
+  AutomationEvent,
+  InsertAutomationEvent,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -102,6 +108,26 @@ export interface IStorage {
   setAutomationSettingsWithApiKey(userId: string, settings: Partial<InsertAutomationSettings>, apiKey?: string): Promise<AutomationSettings>;
   getAutomationLogs(userId: string, limit?: number): Promise<AutomationLog[]>;
   createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
+
+  getAutomationProfiles(userId: string): Promise<AutomationProfile[]>;
+  getAutomationProfile(id: string): Promise<AutomationProfile | null>;
+  getAutomationProfileWithApiKey(id: string): Promise<(AutomationProfile & { apiKey?: string }) | null>;
+  createAutomationProfile(profile: InsertAutomationProfile, apiKey?: string): Promise<AutomationProfile>;
+  updateAutomationProfile(id: string, profile: Partial<InsertAutomationProfile>, apiKey?: string): Promise<AutomationProfile | null>;
+  deleteAutomationProfile(id: string): Promise<void>;
+  updateProfileTestResult(id: string, status: number, response: string): Promise<void>;
+
+  getUserAutomationSettings(userId: string): Promise<UserAutomationSettings | null>;
+  setUserAutomationSettings(userId: string, settings: Partial<InsertUserAutomationSettings>): Promise<UserAutomationSettings>;
+
+  getAutomationEvents(userId: string, limit?: number): Promise<AutomationEvent[]>;
+  getAutomationEventsByProfile(profileId: string, limit?: number): Promise<AutomationEvent[]>;
+  getPendingAutomationEvents(userId: string): Promise<AutomationEvent[]>;
+  getAutomationEventByIdempotencyKey(key: string): Promise<AutomationEvent | null>;
+  createAutomationEvent(event: InsertAutomationEvent): Promise<AutomationEvent>;
+  updateAutomationEvent(id: string, data: Partial<AutomationEvent>): Promise<AutomationEvent | null>;
+  countTodayAutomationEventsByProfile(profileId: string): Promise<number>;
+  getLastSentEventForSymbol(profileId: string, symbol: string): Promise<AutomationEvent | null>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1012,6 +1038,215 @@ export class MemStorage implements IStorage {
     };
     this.automationLogs.set(newLog.id, newLog);
     return newLog;
+  }
+
+  private automationProfilesMap = new Map<string, AutomationProfile>();
+  private userAutomationSettingsMap = new Map<string, UserAutomationSettings>();
+  private automationEventsMap = new Map<string, AutomationEvent>();
+
+  async getAutomationProfiles(userId: string): Promise<AutomationProfile[]> {
+    return Array.from(this.automationProfilesMap.values())
+      .filter(p => p.userId === userId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+
+  async getAutomationProfile(id: string): Promise<AutomationProfile | null> {
+    return this.automationProfilesMap.get(id) || null;
+  }
+
+  async getAutomationProfileWithApiKey(id: string): Promise<(AutomationProfile & { apiKey?: string }) | null> {
+    const profile = this.automationProfilesMap.get(id);
+    if (!profile) return null;
+
+    if (profile.encryptedApiKey && profile.apiKeyIv && profile.apiKeyAuthTag && hasEncryptionKey()) {
+      try {
+        const decrypted = decryptToken(profile.encryptedApiKey, profile.apiKeyIv, profile.apiKeyAuthTag);
+        const parsed = JSON.parse(decrypted);
+        return { ...profile, apiKey: parsed.apiKey };
+      } catch (e) {
+        console.error("Failed to decrypt profile API key:", e);
+      }
+    }
+    return profile;
+  }
+
+  async createAutomationProfile(profile: InsertAutomationProfile, apiKey?: string): Promise<AutomationProfile> {
+    let encryptedData: { encryptedApiKey?: string; apiKeyIv?: string; apiKeyAuthTag?: string } = {};
+
+    if (apiKey && hasEncryptionKey()) {
+      const encrypted = encryptToken(JSON.stringify({ apiKey }));
+      encryptedData = {
+        encryptedApiKey: encrypted.ciphertext,
+        apiKeyIv: encrypted.iv,
+        apiKeyAuthTag: encrypted.authTag,
+      };
+    }
+
+    const now = new Date();
+    const newProfile: AutomationProfile = {
+      id: randomUUID(),
+      userId: profile.userId,
+      name: profile.name,
+      webhookUrl: profile.webhookUrl,
+      encryptedApiKey: encryptedData.encryptedApiKey ?? null,
+      apiKeyIv: encryptedData.apiKeyIv ?? null,
+      apiKeyAuthTag: encryptedData.apiKeyAuthTag ?? null,
+      isEnabled: profile.isEnabled ?? true,
+      mode: profile.mode ?? "NOTIFY_ONLY",
+      guardrails: profile.guardrails ?? null,
+      lastTestStatus: null,
+      lastTestAt: null,
+      lastTestResponse: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.automationProfilesMap.set(newProfile.id, newProfile);
+    return newProfile;
+  }
+
+  async updateAutomationProfile(id: string, profile: Partial<InsertAutomationProfile>, apiKey?: string): Promise<AutomationProfile | null> {
+    const existing = this.automationProfilesMap.get(id);
+    if (!existing) return null;
+
+    let encryptedData: { encryptedApiKey?: string; apiKeyIv?: string; apiKeyAuthTag?: string } = {};
+
+    if (apiKey !== undefined && hasEncryptionKey()) {
+      if (apiKey) {
+        const encrypted = encryptToken(JSON.stringify({ apiKey }));
+        encryptedData = {
+          encryptedApiKey: encrypted.ciphertext,
+          apiKeyIv: encrypted.iv,
+          apiKeyAuthTag: encrypted.authTag,
+        };
+      } else {
+        encryptedData = {
+          encryptedApiKey: undefined,
+          apiKeyIv: undefined,
+          apiKeyAuthTag: undefined,
+        };
+      }
+    }
+
+    const updated: AutomationProfile = {
+      ...existing,
+      ...profile,
+      ...encryptedData,
+      updatedAt: new Date(),
+    };
+    this.automationProfilesMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteAutomationProfile(id: string): Promise<void> {
+    this.automationProfilesMap.delete(id);
+  }
+
+  async updateProfileTestResult(id: string, status: number, response: string): Promise<void> {
+    const profile = this.automationProfilesMap.get(id);
+    if (profile) {
+      profile.lastTestStatus = status;
+      profile.lastTestAt = new Date();
+      profile.lastTestResponse = response.substring(0, 500);
+      this.automationProfilesMap.set(id, profile);
+    }
+  }
+
+  async getUserAutomationSettings(userId: string): Promise<UserAutomationSettings | null> {
+    return this.userAutomationSettingsMap.get(userId) || null;
+  }
+
+  async setUserAutomationSettings(userId: string, settings: Partial<InsertUserAutomationSettings>): Promise<UserAutomationSettings> {
+    const existing = this.userAutomationSettingsMap.get(userId);
+    const now = new Date();
+
+    if (existing) {
+      const updated: UserAutomationSettings = {
+        ...existing,
+        ...settings,
+        updatedAt: now,
+      };
+      this.userAutomationSettingsMap.set(userId, updated);
+      return updated;
+    }
+
+    const newSettings: UserAutomationSettings = {
+      userId,
+      globalDefaultProfileId: settings.globalDefaultProfileId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.userAutomationSettingsMap.set(userId, newSettings);
+    return newSettings;
+  }
+
+  async getAutomationEvents(userId: string, limit: number = 50): Promise<AutomationEvent[]> {
+    return Array.from(this.automationEventsMap.values())
+      .filter(e => e.userId === userId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, limit);
+  }
+
+  async getAutomationEventsByProfile(profileId: string, limit: number = 50): Promise<AutomationEvent[]> {
+    return Array.from(this.automationEventsMap.values())
+      .filter(e => e.profileId === profileId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, limit);
+  }
+
+  async getPendingAutomationEvents(userId: string): Promise<AutomationEvent[]> {
+    return Array.from(this.automationEventsMap.values())
+      .filter(e => e.userId === userId && e.action === "QUEUED")
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+
+  async getAutomationEventByIdempotencyKey(key: string): Promise<AutomationEvent | null> {
+    return Array.from(this.automationEventsMap.values()).find(e => e.idempotencyKey === key) || null;
+  }
+
+  async createAutomationEvent(event: InsertAutomationEvent): Promise<AutomationEvent> {
+    const newEvent: AutomationEvent = {
+      ...event,
+      id: randomUUID(),
+      reason: event.reason ?? null,
+      payload: event.payload ?? null,
+      responseStatus: event.responseStatus ?? null,
+      responseBody: event.responseBody ?? null,
+      createdAt: new Date(),
+    };
+    this.automationEventsMap.set(newEvent.id, newEvent);
+    return newEvent;
+  }
+
+  async updateAutomationEvent(id: string, data: Partial<AutomationEvent>): Promise<AutomationEvent | null> {
+    const existing = this.automationEventsMap.get(id);
+    if (!existing) return null;
+
+    const updated: AutomationEvent = {
+      ...existing,
+      ...data,
+    };
+    this.automationEventsMap.set(id, updated);
+    return updated;
+  }
+
+  async countTodayAutomationEventsByProfile(profileId: string): Promise<number> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Array.from(this.automationEventsMap.values())
+      .filter(e => 
+        e.profileId === profileId && 
+        e.action === "SENT" && 
+        e.createdAt && new Date(e.createdAt) >= today
+      ).length;
+  }
+
+  async getLastSentEventForSymbol(profileId: string, symbol: string): Promise<AutomationEvent | null> {
+    const events = Array.from(this.automationEventsMap.values())
+      .filter(e => e.profileId === profileId && e.symbol === symbol && e.action === "SENT")
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    
+    return events[0] || null;
   }
 }
 
