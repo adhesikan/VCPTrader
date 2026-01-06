@@ -235,9 +235,10 @@ export async function processAlertRules(
             const signalContext: AutomationSignalContext = {
               userId: rule.userId,
               symbol: rule.symbol,
-              strategy: "VCP",
+              strategy: rule.strategy || "VCP",
               alertRuleId: rule.id,
               alertRuleProfileId: rule.automationProfileId || undefined,
+              watchlistId: rule.watchlistId || undefined,
               lastPrice: result.price,
               targetPrice: Number(targetPrice.toFixed(2)),
               stopLoss: Number(classification.stopLoss.toFixed(2)),
