@@ -360,3 +360,39 @@ export const marketRegimeHistory = pgTable("market_regime_history", {
 export const insertMarketRegimeHistorySchema = createInsertSchema(marketRegimeHistory).omit({ id: true, recordedAt: true });
 export type InsertMarketRegimeHistory = z.infer<typeof insertMarketRegimeHistorySchema>;
 export type MarketRegimeHistory = typeof marketRegimeHistory.$inferSelect;
+
+export const automationSettings = pgTable("automation_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  isEnabled: boolean("is_enabled").default(false),
+  webhookUrl: text("webhook_url"),
+  encryptedApiKey: text("encrypted_api_key"),
+  apiKeyIv: text("api_key_iv"),
+  apiKeyAuthTag: text("api_key_auth_tag"),
+  autoEntryEnabled: boolean("auto_entry_enabled").default(true),
+  autoExitEnabled: boolean("auto_exit_enabled").default(true),
+  minScore: integer("min_score").default(70),
+  maxPositions: integer("max_positions").default(5),
+  defaultPositionSize: real("default_position_size").default(1000),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAutomationSettingsSchema = createInsertSchema(automationSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAutomationSettings = z.infer<typeof insertAutomationSettingsSchema>;
+export type AutomationSettings = typeof automationSettings.$inferSelect;
+
+export const automationLogs = pgTable("automation_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  signalType: text("signal_type").notNull(),
+  symbol: text("symbol").notNull(),
+  message: text("message").notNull(),
+  webhookResponse: jsonb("webhook_response"),
+  success: boolean("success").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAutomationLogSchema = createInsertSchema(automationLogs).omit({ id: true, createdAt: true });
+export type InsertAutomationLog = z.infer<typeof insertAutomationLogSchema>;
+export type AutomationLog = typeof automationLogs.$inferSelect;

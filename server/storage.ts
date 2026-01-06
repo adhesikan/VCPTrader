@@ -26,6 +26,10 @@ import type {
   PatternStageType,
   BacktestResult,
   InsertBacktestResult,
+  AutomationSettings,
+  InsertAutomationSettings,
+  AutomationLog,
+  InsertAutomationLog,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -91,6 +95,13 @@ export interface IStorage {
   updateAlertEvent(id: string, data: Partial<AlertEvent>): Promise<AlertEvent | undefined>;
   markAlertEventRead(id: string): Promise<AlertEvent | undefined>;
   markAllAlertEventsRead(userId: string): Promise<void>;
+
+  getAutomationSettings(userId: string): Promise<AutomationSettings | null>;
+  getAutomationSettingsWithApiKey(userId: string): Promise<(AutomationSettings & { apiKey?: string }) | null>;
+  setAutomationSettings(userId: string, settings: Partial<InsertAutomationSettings>): Promise<AutomationSettings>;
+  setAutomationSettingsWithApiKey(userId: string, settings: Partial<InsertAutomationSettings>, apiKey?: string): Promise<AutomationSettings>;
+  getAutomationLogs(userId: string, limit?: number): Promise<AutomationLog[]>;
+  createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -895,6 +906,112 @@ export class MemStorage implements IStorage {
         this.alertEvents.set(id, { ...event, isRead: true });
       }
     });
+  }
+
+  private automationSettings = new Map<string, AutomationSettings>();
+  private automationLogs = new Map<string, AutomationLog>();
+
+  async getAutomationSettings(userId: string): Promise<AutomationSettings | null> {
+    return this.automationSettings.get(userId) || null;
+  }
+
+  async getAutomationSettingsWithApiKey(userId: string): Promise<(AutomationSettings & { apiKey?: string }) | null> {
+    const settings = this.automationSettings.get(userId);
+    if (!settings) return null;
+
+    if (settings.encryptedApiKey && settings.apiKeyIv && settings.apiKeyAuthTag && hasEncryptionKey()) {
+      try {
+        const decrypted = decryptCredentials(
+          settings.encryptedApiKey,
+          settings.apiKeyIv,
+          settings.apiKeyAuthTag
+        );
+        const parsed = JSON.parse(decrypted);
+        return { ...settings, apiKey: parsed.apiKey };
+      } catch (error) {
+        console.error("[Storage] Failed to decrypt API key:", error);
+      }
+    }
+    return settings;
+  }
+
+  async setAutomationSettings(userId: string, settings: Partial<InsertAutomationSettings>): Promise<AutomationSettings> {
+    if (settings.encryptedApiKey && !settings.apiKeyIv) {
+      throw new Error("Invalid automation settings: API key appears to be unencrypted. Use setAutomationSettingsWithApiKey() to store API key securely.");
+    }
+
+    const existing = this.automationSettings.get(userId);
+    const now = new Date();
+
+    if (existing) {
+      const updated: AutomationSettings = {
+        ...existing,
+        ...settings,
+        updatedAt: now,
+      };
+      this.automationSettings.set(userId, updated);
+      return updated;
+    }
+
+    const newSettings: AutomationSettings = {
+      id: randomUUID(),
+      userId,
+      isEnabled: settings.isEnabled ?? false,
+      webhookUrl: settings.webhookUrl ?? null,
+      encryptedApiKey: settings.encryptedApiKey ?? null,
+      apiKeyIv: settings.apiKeyIv ?? null,
+      apiKeyAuthTag: settings.apiKeyAuthTag ?? null,
+      autoEntryEnabled: settings.autoEntryEnabled ?? true,
+      autoExitEnabled: settings.autoExitEnabled ?? true,
+      minScore: settings.minScore ?? 70,
+      maxPositions: settings.maxPositions ?? 5,
+      defaultPositionSize: settings.defaultPositionSize ?? 1000,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.automationSettings.set(userId, newSettings);
+    return newSettings;
+  }
+
+  async setAutomationSettingsWithApiKey(
+    userId: string,
+    settings: Partial<InsertAutomationSettings>,
+    apiKey?: string
+  ): Promise<AutomationSettings> {
+    let encryptedData: { encryptedApiKey?: string; apiKeyIv?: string; apiKeyAuthTag?: string } = {};
+
+    if (apiKey && hasEncryptionKey()) {
+      const encrypted = encryptCredentials(JSON.stringify({ apiKey }));
+      encryptedData = {
+        encryptedApiKey: encrypted.encrypted,
+        apiKeyIv: encrypted.iv,
+        apiKeyAuthTag: encrypted.authTag,
+      };
+    }
+
+    return this.setAutomationSettings(userId, {
+      ...settings,
+      ...encryptedData,
+    });
+  }
+
+  async getAutomationLogs(userId: string, limit: number = 50): Promise<AutomationLog[]> {
+    const logs = Array.from(this.automationLogs.values())
+      .filter(log => log.userId === userId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    return logs.slice(0, limit);
+  }
+
+  async createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog> {
+    const newLog: AutomationLog = {
+      ...log,
+      id: randomUUID(),
+      webhookResponse: log.webhookResponse ?? null,
+      success: log.success ?? false,
+      createdAt: new Date(),
+    };
+    this.automationLogs.set(newLog.id, newLog);
+    return newLog;
   }
 }
 
