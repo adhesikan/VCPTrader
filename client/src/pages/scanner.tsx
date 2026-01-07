@@ -337,9 +337,9 @@ export default function Scanner() {
     <div className="p-6 space-y-6" data-testid="scanner-page">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Pattern Scanner</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Opportunity Engine</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Scan for trading pattern setups across multiple strategies
+            Scan for trading opportunities across multiple strategies
           </p>
         </div>
 

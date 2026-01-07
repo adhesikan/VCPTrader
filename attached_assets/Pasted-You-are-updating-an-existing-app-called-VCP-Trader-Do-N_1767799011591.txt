@@ -1,0 +1,163 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Redesign the “Pattern Scanner” page UI to be significantly more organized and easier to use by grouping controls into clear decision layers, adding presets, and reducing cognitive load—without removing any existing functionality.
+
+DO NOT
+- Do NOT change backend scan logic.
+- Do NOT remove existing filters.
+- Do NOT break existing query params or saved user settings (if any).
+- Do NOT change strategy IDs. Only improve UI/UX and how filters are grouped/presented.
+
+NEW UX MODEL (DECISION LAYERS)
+Users should interact in this order:
+1) Strategy & Mode
+2) Universe
+3) Liquidity Filters
+4) Signal Quality
+5) Run Scan + Results
+
+PAGE LAYOUT (DESKTOP)
+A) Top Action Bar (always visible, compact)
+Left:
+- Page title “Pattern Scanner”
+- Subtitle: “Scan for pattern setups across multiple strategies”
+
+Center/Right controls (in this order):
+1) Strategy Engine selector dropdown:
+   - Momentum Engine / Trend Engine / Volatility Engine / (All Strategies)
+   - If “Single Strategy” mode is enabled, show strategy dropdown next to it
+2) Mode toggle:
+   - Single Strategy
+   - Fusion Engine (multi-strategy confluence)
+3) Timeframe dropdown (keep existing)
+4) Preset dropdown (new) default “Balanced”
+5) Buttons:
+   - Reset
+   - Run Scan (primary)
+   - Refresh (secondary if it exists)
+
+B) Filters Panel (collapsible accordion with 3 sections)
+Replace the current flat filter grid with an accordion or tabbed filter card:
+
+SECTION 1: Universe
+- Universe dropdown (My Watchlist, S&P 500, Nasdaq 100, All US Stocks, etc. keep existing options)
+- Sector dropdown (All Sectors, etc.)
+- Optional: “Exchange” if you have it
+
+SECTION 2: Liquidity
+Group these fields together:
+- Min Price
+- Max Price
+- Min Volume (shares)
+- Min $ Volume (dollar volume)
+- Toggles:
+  - Exclude ETFs
+  - Exclude OTC
+
+SECTION 3: Signal Quality
+Group these fields together:
+- Min RVOL
+- Min Score (if scoring exists) else hide
+- Min Confluence (only show when Fusion Engine is selected)
+- Optional: “Trend filter strictness” (if you already have such options)
+
+C) Make the filter panel collapsed by default on returning users if a scan was previously run (persist collapsed/expanded in localStorage).
+
+PRESETS (NEW FEATURE)
+Add a “Scan Presets” dropdown in the top bar with:
+- Conservative
+- Balanced (default)
+- Aggressive
+- Scalp
+- Swing
+- High Momentum
+
+Each preset should auto-set the filter values (but users can still override).
+Use sensible defaults (edit if you have better existing benchmarks):
+
+Conservative:
+- Min Price: 10
+- Min Volume: 1,000,000
+- Min $ Volume: 20,000,000
+- Min RVOL: 1.5
+- Exclude ETFs: ON
+- Exclude OTC: ON
+
+Balanced:
+- Min Price: 5
+- Min Volume: 500,000
+- Min $ Volume: 10,000,000
+- Min RVOL: 1.2
+- Exclude ETFs: ON
+- Exclude OTC: ON
+
+Aggressive:
+- Min Price: 2
+- Min Volume: 200,000
+- Min $ Volume: 3,000,000
+- Min RVOL: 1.0
+- Exclude ETFs: ON
+- Exclude OTC: ON
+
+Scalp:
+- Timeframe: 1m or 5m (choose existing supported)
+- Min RVOL: 1.8
+- Min Volume: 1,000,000
+- Min $ Volume: 20,000,000
+
+Swing:
+- Timeframe: 1h or 1d
+- Min RVOL: 1.0
+- Min Volume: 300,000
+- Min $ Volume: 5,000,000
+
+High Momentum:
+- Min RVOL: 2.0
+- Min Volume: 800,000
+- Min $ Volume: 15,000,000
+- Strategy Engine defaults to Momentum Engine
+
+Implement presets as:
+- A pure function: applyPreset(presetId, currentState) -> newState
+- Track “Preset: Custom” automatically if user changes any preset-controlled field.
+
+SMART DEFAULTS (CONTEXT-AWARE)
+When user changes Strategy Engine:
+- Momentum Engine: bump Min RVOL + liquidity slightly (suggested)
+- Trend Engine: keep balanced defaults
+- Volatility Engine: allow lower RVOL but require higher liquidity
+When user toggles Fusion Engine:
+- Show “Min Confluence” control
+- Default Min Confluence = 2
+- Show helper text: “Require 2+ strategies to align.”
+
+MICRO-UX IMPROVEMENTS
+1) Add helper text under each section title:
+- Universe: “Choose what to scan.”
+- Liquidity: “Filter for tradable stocks.”
+- Signal Quality: “Control signal strength and selectivity.”
+2) Add a small inline “What changed?” summary after running a scan:
+- Example: “Filtered out 1,245 symbols by liquidity; 83 matched conditions.”
+If you don’t have counts, add a placeholder summary based on what you can measure.
+3) Keep “Reset” but make it reset to the selected preset defaults (or Balanced if preset is Custom).
+
+MOBILE UX
+- Top bar becomes two rows:
+  Row 1: Strategy, Mode
+  Row 2: Timeframe, Preset, Run Scan
+- Filters are in a slide-over drawer or accordion (collapsed by default)
+
+IMPLEMENTATION NOTES
+- Use existing component library/styling (Tailwind, shadcn, etc.) and match the dark theme.
+- Do not introduce heavy new dependencies.
+- Ensure accessibility: labels, focus states, keyboard navigation.
+
+DELIVERABLE
+Update the Pattern Scanner page to:
+- Use a clean top action bar
+- Use a 3-section collapsible filter panel (Universe/Liquidity/Signal Quality)
+- Add scan presets with sensible defaults and “Custom” detection
+- Show confluence controls only for Fusion mode
+- Improve mobile layout with collapsible filters
+- Preserve all current scanning functionality and parameters
