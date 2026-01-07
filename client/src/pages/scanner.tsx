@@ -439,7 +439,7 @@ export default function Scanner() {
                       <li><strong>Run the scan:</strong> Click the button and review the results. Click any row to see the chart.</li>
                     </ol>
                     <div className="flex items-center gap-2 pt-2">
-                      <Link href="/strategies">
+                      <Link href="/strategy-guide">
                         <Button variant="outline" size="sm" className="gap-1" data-testid="link-strategy-guide">
                           <Info className="h-4 w-4" />
                           Strategy Guide
