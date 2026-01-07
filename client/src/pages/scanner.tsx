@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -68,11 +69,11 @@ const SCAN_PRESETS = [
 ];
 
 const PRESET_FILTERS: Record<string, Partial<ScannerFilters>> = {
-  balanced: { minPrice: 5, maxPrice: 500, minVolume: 500000, minRvol: 1.2 },
-  conservative: { minPrice: 10, maxPrice: 500, minVolume: 1000000, minRvol: 1.5 },
-  aggressive: { minPrice: 2, maxPrice: 500, minVolume: 200000, minRvol: 1.0 },
-  scalp: { minPrice: 5, maxPrice: 200, minVolume: 1000000, minRvol: 1.8 },
-  swing: { minPrice: 10, maxPrice: 500, minVolume: 300000, minRvol: 1.0 },
+  balanced: { minPrice: 5, maxPrice: 500, minVolume: 500000, minRvol: 1.2, excludeEtfs: true, excludeOtc: true },
+  conservative: { minPrice: 10, maxPrice: 500, minVolume: 1000000, minRvol: 1.5, excludeEtfs: true, excludeOtc: true },
+  aggressive: { minPrice: 2, maxPrice: 500, minVolume: 200000, minRvol: 1.0, excludeEtfs: true, excludeOtc: true },
+  scalp: { minPrice: 5, maxPrice: 200, minVolume: 1000000, minRvol: 1.8, excludeEtfs: true, excludeOtc: true },
+  swing: { minPrice: 10, maxPrice: 500, minVolume: 300000, minRvol: 1.0, excludeEtfs: true, excludeOtc: true },
 };
 
 const UNIVERSE_OPTIONS = [
@@ -280,9 +281,12 @@ export default function Scanner() {
            r.name?.toLowerCase().includes(query);
   });
 
-  const triggeredCount = filteredResults?.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length || 0;
-  const readyCount = filteredResults?.filter(r => r.stage === "READY").length || 0;
-  const formingCount = filteredResults?.filter(r => r.stage === "FORMING").length || 0;
+  const triggeredCount = filteredResults?.filter(r => {
+    const stage = r.stage?.toUpperCase();
+    return stage === "BREAKOUT" || stage === "TRIGGERED";
+  }).length || 0;
+  const readyCount = filteredResults?.filter(r => r.stage?.toUpperCase() === "READY").length || 0;
+  const formingCount = filteredResults?.filter(r => r.stage?.toUpperCase() === "FORMING").length || 0;
 
   const getRegimeColor = (regime?: string) => {
     switch (regime) {
@@ -514,55 +518,89 @@ export default function Scanner() {
 
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 pb-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="minPrice" className="text-xs text-muted-foreground">Min Price</Label>
-                    <Input
-                      id="minPrice"
-                      type="number"
-                      placeholder="$5"
-                      value={filters.minPrice || ""}
-                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
-                      className="font-mono h-8"
-                      data-testid="input-min-price"
-                    />
+                <div className="space-y-4 pt-3 pb-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="minPrice" className="text-xs text-muted-foreground">Min Price</Label>
+                      <Input
+                        id="minPrice"
+                        type="number"
+                        placeholder="$5"
+                        value={filters.minPrice ?? ""}
+                        onChange={(e) => setFilters(prev => ({ 
+                          ...prev, 
+                          minPrice: e.target.value ? Number(e.target.value) : PRESET_FILTERS[selectedPreset]?.minPrice 
+                        }))}
+                        className="font-mono h-8"
+                        data-testid="input-min-price"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="maxPrice" className="text-xs text-muted-foreground">Max Price</Label>
+                      <Input
+                        id="maxPrice"
+                        type="number"
+                        placeholder="$500"
+                        value={filters.maxPrice ?? ""}
+                        onChange={(e) => setFilters(prev => ({ 
+                          ...prev, 
+                          maxPrice: e.target.value ? Number(e.target.value) : PRESET_FILTERS[selectedPreset]?.maxPrice 
+                        }))}
+                        className="font-mono h-8"
+                        data-testid="input-max-price"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="minVolume" className="text-xs text-muted-foreground">Min Volume</Label>
+                      <Input
+                        id="minVolume"
+                        type="number"
+                        placeholder="500K"
+                        value={filters.minVolume ?? ""}
+                        onChange={(e) => setFilters(prev => ({ 
+                          ...prev, 
+                          minVolume: e.target.value ? Number(e.target.value) : PRESET_FILTERS[selectedPreset]?.minVolume 
+                        }))}
+                        className="font-mono h-8"
+                        data-testid="input-min-volume"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="minRvol" className="text-xs text-muted-foreground">Min RVOL</Label>
+                      <Input
+                        id="minRvol"
+                        type="number"
+                        step="0.1"
+                        placeholder="1.0x"
+                        value={filters.minRvol ?? ""}
+                        onChange={(e) => setFilters(prev => ({ 
+                          ...prev, 
+                          minRvol: e.target.value ? Number(e.target.value) : PRESET_FILTERS[selectedPreset]?.minRvol 
+                        }))}
+                        className="font-mono h-8"
+                        data-testid="input-min-rvol"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="maxPrice" className="text-xs text-muted-foreground">Max Price</Label>
-                    <Input
-                      id="maxPrice"
-                      type="number"
-                      placeholder="$500"
-                      value={filters.maxPrice || ""}
-                      onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
-                      className="font-mono h-8"
-                      data-testid="input-max-price"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="minVolume" className="text-xs text-muted-foreground">Min Volume</Label>
-                    <Input
-                      id="minVolume"
-                      type="number"
-                      placeholder="500K"
-                      value={filters.minVolume || ""}
-                      onChange={(e) => setFilters(prev => ({ ...prev, minVolume: e.target.value ? Number(e.target.value) : undefined }))}
-                      className="font-mono h-8"
-                      data-testid="input-min-volume"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="minRvol" className="text-xs text-muted-foreground">Min RVOL</Label>
-                    <Input
-                      id="minRvol"
-                      type="number"
-                      step="0.1"
-                      placeholder="1.0x"
-                      value={filters.minRvol || ""}
-                      onChange={(e) => setFilters(prev => ({ ...prev, minRvol: e.target.value ? Number(e.target.value) : undefined }))}
-                      className="font-mono h-8"
-                      data-testid="input-min-rvol"
-                    />
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="excludeEtfs"
+                        checked={filters.excludeEtfs ?? true}
+                        onCheckedChange={(checked) => setFilters(prev => ({ ...prev, excludeEtfs: checked }))}
+                        data-testid="switch-exclude-etfs"
+                      />
+                      <Label htmlFor="excludeEtfs" className="text-sm cursor-pointer">Exclude ETFs</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="excludeOtc"
+                        checked={filters.excludeOtc ?? true}
+                        onCheckedChange={(checked) => setFilters(prev => ({ ...prev, excludeOtc: checked }))}
+                        data-testid="switch-exclude-otc"
+                      />
+                      <Label htmlFor="excludeOtc" className="text-sm cursor-pointer">Exclude OTC</Label>
+                    </div>
                   </div>
                 </div>
               </CollapsibleContent>
