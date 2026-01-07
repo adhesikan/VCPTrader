@@ -114,7 +114,16 @@ export default function Scanner() {
   const [selectedUniverse, setSelectedUniverse] = useState<string>("sp500");
   const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
   const [showGuide, setShowGuide] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filters, setFilters] = useState<ScannerFilters>({
+    minPrice: 5,
+    maxPrice: 500,
+    minVolume: 500000,
+    minRvol: 1.2,
+    excludeEtfs: true,
+    excludeOtc: true,
+  });
   
   const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
@@ -163,10 +172,17 @@ export default function Scanner() {
     return undefined;
   };
 
+  const applyPreset = (presetId: string) => {
+    const presetFilters = PRESET_FILTERS[presetId];
+    if (presetFilters) {
+      setFilters(prev => ({ ...prev, ...presetFilters }));
+    }
+    setSelectedPreset(presetId);
+  };
+
   const runScanMutation = useMutation({
     mutationFn: async () => {
       const symbols = getSymbolsForTarget();
-      const filters = PRESET_FILTERS[selectedPreset] || PRESET_FILTERS.balanced;
       
       const response = await apiRequest("POST", "/api/scan/live", { 
         symbols, 
@@ -203,7 +219,6 @@ export default function Scanner() {
   const confluenceMutation = useMutation({
     mutationFn: async () => {
       const symbols = getSymbolsForTarget();
-      const filters = PRESET_FILTERS[selectedPreset] || PRESET_FILTERS.balanced;
       
       const response = await apiRequest("POST", "/api/scan/confluence", {
         strategies: selectedStrategies,
@@ -264,6 +279,10 @@ export default function Scanner() {
     return r.ticker.toLowerCase().includes(query) || 
            r.name?.toLowerCase().includes(query);
   });
+
+  const triggeredCount = filteredResults?.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length || 0;
+  const readyCount = filteredResults?.filter(r => r.stage === "READY").length || 0;
+  const formingCount = filteredResults?.filter(r => r.stage === "FORMING").length || 0;
 
   const getRegimeColor = (regime?: string) => {
     switch (regime) {
@@ -463,8 +482,21 @@ export default function Scanner() {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Step 4: Filter Preset</Label>
-            <Select value={selectedPreset} onValueChange={setSelectedPreset}>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Step 4: Filter Preset</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-xs gap-1"
+                data-testid="button-advanced-filters"
+              >
+                <Zap className="h-3 w-3" />
+                Advanced
+                <ChevronDown className={cn("h-3 w-3 transition-transform", showAdvanced && "rotate-180")} />
+              </Button>
+            </div>
+            <Select value={selectedPreset} onValueChange={applyPreset}>
               <SelectTrigger className="w-full max-w-md" data-testid="select-preset">
                 <SelectValue placeholder="Select preset" />
               </SelectTrigger>
@@ -479,6 +511,62 @@ export default function Scanner() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <CollapsibleContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 pb-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="minPrice" className="text-xs text-muted-foreground">Min Price</Label>
+                    <Input
+                      id="minPrice"
+                      type="number"
+                      placeholder="$5"
+                      value={filters.minPrice || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="font-mono h-8"
+                      data-testid="input-min-price"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="maxPrice" className="text-xs text-muted-foreground">Max Price</Label>
+                    <Input
+                      id="maxPrice"
+                      type="number"
+                      placeholder="$500"
+                      value={filters.maxPrice || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="font-mono h-8"
+                      data-testid="input-max-price"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="minVolume" className="text-xs text-muted-foreground">Min Volume</Label>
+                    <Input
+                      id="minVolume"
+                      type="number"
+                      placeholder="500K"
+                      value={filters.minVolume || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minVolume: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="font-mono h-8"
+                      data-testid="input-min-volume"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="minRvol" className="text-xs text-muted-foreground">Min RVOL</Label>
+                    <Input
+                      id="minRvol"
+                      type="number"
+                      step="0.1"
+                      placeholder="1.0x"
+                      value={filters.minRvol || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minRvol: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="font-mono h-8"
+                      data-testid="input-min-rvol"
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           <div className="flex items-center gap-4 pt-2">
@@ -566,11 +654,24 @@ export default function Scanner() {
       )}
 
       {engineMode === "single" && filteredResults && filteredResults.length > 0 && (
-        <ScannerTable
-          results={filteredResults}
-          onRowClick={handleRowClick}
-          isLoading={isLoading}
-        />
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge variant="default" className="gap-1">
+              Breakout <span className="font-mono">{triggeredCount}</span>
+            </Badge>
+            <Badge variant="secondary" className="gap-1">
+              Ready <span className="font-mono">{readyCount}</span>
+            </Badge>
+            <Badge variant="outline" className="gap-1">
+              Forming <span className="font-mono">{formingCount}</span>
+            </Badge>
+          </div>
+          <ScannerTable
+            results={filteredResults}
+            onRowClick={handleRowClick}
+            isLoading={isLoading}
+          />
+        </>
       )}
 
       {engineMode === "fusion" && confluenceResults && confluenceResults.length > 0 && (
