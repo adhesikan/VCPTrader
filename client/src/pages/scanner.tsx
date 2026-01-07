@@ -4,8 +4,9 @@ import { Link, useLocation } from "wouter";
 import { 
   Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
   TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
-  AlertTriangle, Clock, CheckCircle2, Flame
+  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -516,27 +517,61 @@ export default function Scanner() {
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
-                          <div>
-                            <span className="block text-muted-foreground/70">Resistance</span>
-                            <span className="font-medium text-foreground">${result.resistance?.toFixed(2) || "N/A"}</span>
-                          </div>
-                          <div>
-                            <span className="block text-muted-foreground/70">Stop</span>
-                            <span className="font-medium text-foreground">${result.stopLoss?.toFixed(2) || "N/A"}</span>
-                          </div>
-                          <div>
-                            <span className="block text-muted-foreground/70">Vol</span>
-                            <span className="font-medium text-foreground">{result.volume ? (result.volume / 1000000).toFixed(1) + "M" : "N/A"}</span>
-                          </div>
-                          <div>
-                            <span className="block text-muted-foreground/70">RVOL</span>
-                            <span className={cn(
-                              "font-medium",
-                              (result.rvol || 0) >= 1.5 ? "text-green-600 dark:text-green-400" : "text-foreground"
-                            )}>
-                              {result.rvol?.toFixed(1) || "N/A"}x
-                            </span>
-                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <span className="block text-muted-foreground/70 flex items-center gap-1">
+                                  <Target className="h-3 w-3 text-chart-2" />
+                                  Resistance
+                                </span>
+                                <span className="font-medium text-chart-2">${result.resistance?.toFixed(2) || "N/A"}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">
+                              Price level where the stock has struggled to break above. A breakout happens when price pushes through this ceiling.
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <span className="block text-muted-foreground/70 flex items-center gap-1">
+                                  <TrendingDown className="h-3 w-3 text-destructive" />
+                                  Stop
+                                </span>
+                                <span className="font-medium text-destructive">${result.stopLoss?.toFixed(2) || "N/A"}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">
+                              Safety price level to exit a trade and limit losses. Placed below recent support to protect your capital.
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <span className="block text-muted-foreground/70">Vol</span>
+                                <span className="font-medium text-foreground">{result.volume ? (result.volume / 1000000).toFixed(1) + "M" : "N/A"}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">
+                              Number of shares traded. Higher volume confirms price moves and indicates stronger conviction.
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <span className="block text-muted-foreground/70">RVOL</span>
+                                <span className={cn(
+                                  "font-medium",
+                                  (result.rvol || 0) >= 1.5 ? "text-chart-2" : "text-foreground"
+                                )}>
+                                  {result.rvol?.toFixed(1) || "N/A"}x
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">
+                              Relative Volume compares current volume to the 20-day average. Above 1.5x often signals strong interest.
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </CardContent>
                     </Card>
@@ -578,10 +613,10 @@ export default function Scanner() {
                         )}>
                           {(result.changePercent || 0) >= 0 ? "+" : ""}{result.changePercent?.toFixed(2)}%
                         </span>
-                        <span className="hidden md:block w-16 text-right text-muted-foreground">
+                        <span className="hidden md:block w-16 text-right text-chart-2">
                           R: ${result.resistance?.toFixed(0) || "N/A"}
                         </span>
-                        <span className="hidden md:block w-16 text-right text-muted-foreground">
+                        <span className="hidden md:block w-16 text-right text-destructive">
                           S: ${result.stopLoss?.toFixed(0) || "N/A"}
                         </span>
                         <span className={cn(

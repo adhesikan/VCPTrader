@@ -360,8 +360,8 @@ export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("card");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<SortField>("ticker");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortField, setSortField] = useState<SortField>("type");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const { isConnected } = useBrokerStatus();
 
   const { data: scanResults, isLoading } = useQuery<any[]>({
