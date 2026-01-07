@@ -658,6 +658,7 @@ export default function Scanner() {
             filters={filters}
             onChange={setFilters}
             onReset={() => setFilters(defaultFilters)}
+            showConfluence={true}
           />
           <Card>
             <CardHeader className="pb-3">

@@ -289,6 +289,7 @@ export const scannerFilters = z.object({
   universe: z.enum(["all", "sp500", "nasdaq100", "dow30", "watchlist"]).optional(),
   sector: z.string().optional(),
   strategies: z.array(z.string()).optional(),
+  minConfluence: z.number().min(2).max(10).optional(),
 });
 
 export type ScannerFilters = z.infer<typeof scannerFilters>;
