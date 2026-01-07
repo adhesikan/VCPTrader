@@ -367,12 +367,26 @@ export async function registerRoutes(
         });
       }
 
-      const symbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
+      const requestedSymbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
       const strategy = req.body.strategy || StrategyType.VCP;
-      const quotes = await fetchQuotesFromBroker(connection, symbols);
+      const startTime = Date.now();
+      
+      const quotes = await fetchQuotesFromBroker(connection, requestedSymbols);
       const results = quotesToScanResults(quotes, strategy);
       
-      res.json(results);
+      const scanTime = Date.now() - startTime;
+      
+      res.json({
+        results,
+        metadata: {
+          isLive: true,
+          provider: connection.provider,
+          symbolsRequested: requestedSymbols.length,
+          symbolsReturned: quotes.length,
+          scanTimeMs: scanTime,
+          timestamp: new Date().toISOString(),
+        }
+      });
     } catch (error: any) {
       console.error("Live scan error:", error);
       res.status(500).json({ error: error.message || "Failed to run live scan" });

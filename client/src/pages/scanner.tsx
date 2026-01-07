@@ -130,6 +130,13 @@ export default function Scanner() {
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [confluenceResults, setConfluenceResults] = useState<ConfluenceResult[] | null>(null);
   const [marketRegime, setMarketRegime] = useState<MarketRegime | null>(null);
+  const [scanMetadata, setScanMetadata] = useState<{
+    isLive: boolean;
+    provider: string;
+    symbolsRequested: number;
+    symbolsReturned: number;
+    scanTimeMs: number;
+  } | null>(null);
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -193,9 +200,18 @@ export default function Scanner() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (Array.isArray(data)) {
+      if (data.results && Array.isArray(data.results)) {
+        setLiveResults(data.results);
+        setLastScanTime(new Date());
+        setScanMetadata(data.metadata || null);
+        toast({
+          title: "Scan Complete",
+          description: `Found ${data.results.length} opportunities from ${data.metadata?.provider || "broker"}`,
+        });
+      } else if (Array.isArray(data)) {
         setLiveResults(data);
         setLastScanTime(new Date());
+        setScanMetadata(null);
         toast({
           title: "Scan Complete",
           description: `Found ${data.length} opportunities`,
@@ -652,9 +668,20 @@ export default function Scanner() {
 
       {lastScanTime && (
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <span>Last scan: {format(lastScanTime, "h:mm a")}</span>
             <span>({filteredResults?.length || 0} results)</span>
+            {scanMetadata && (
+              <>
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <Activity className="h-3 w-3" />
+                  {scanMetadata.provider.toUpperCase()}
+                </Badge>
+                <span className="text-xs">
+                  {scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s
+                </span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="relative max-w-xs">
