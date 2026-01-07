@@ -1,9 +1,69 @@
-import { BookOpen, TrendingUp, Target, Shield, AlertTriangle, CheckCircle2, ArrowUpRight, Zap, Activity, Layers } from "lucide-react";
+import { BookOpen, TrendingUp, Target, Shield, AlertTriangle, CheckCircle2, Zap, Activity, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { STRATEGY_CONFIGS, STRATEGY_CATEGORIES, type StrategyConfig } from "@shared/strategies";
+import { STRATEGY_CONFIGS, FUSION_ENGINE_CONFIG, type StrategyConfig } from "@shared/strategies";
+
+function StrategyCard({ strategy }: { strategy: StrategyConfig }) {
+  return (
+    <Card data-testid={`card-strategy-${strategy.guideSlug}`}>
+      <CardHeader>
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Target className="h-4 w-4" />
+          {strategy.displayName}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">{strategy.shortDescription}</p>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="space-y-2">
+          <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">What It Looks For</p>
+          <p className="text-muted-foreground">{strategy.whatItLooksFor}</p>
+        </div>
+
+        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <p className="font-medium">Core Conditions:</p>
+          <ul className="space-y-1 text-muted-foreground">
+            {strategy.coreConditions.map((condition, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                <span>{condition}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="space-y-2">
+          <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Trigger Alerts</p>
+          <ul className="space-y-1 text-muted-foreground">
+            {strategy.triggerAlerts.map((trigger, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <span>{trigger}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="space-y-2">
+          <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Risk / Exit Reference</p>
+          <ul className="space-y-1 text-muted-foreground text-xs">
+            {strategy.riskExitReference.map((ref, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                <span>{ref}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const momentumStrategies = STRATEGY_CONFIGS.filter(s => s.category === "Momentum Engine");
+const trendStrategies = STRATEGY_CONFIGS.filter(s => s.category === "Trend Engine");
+const volatilityStrategies = STRATEGY_CONFIGS.filter(s => s.category === "Volatility Engine");
 
 export default function StrategyGuide() {
   return (
@@ -14,7 +74,7 @@ export default function StrategyGuide() {
           <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Strategy Guide</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Learn about our supported trading strategies and breakout conditions
+          Learn about our supported trading strategies organized by category
         </p>
       </div>
 
@@ -39,699 +99,246 @@ export default function StrategyGuide() {
         </TabsList>
 
         <TabsContent value="momentum" className="space-y-6 mt-6">
+          <Card data-testid="card-momentum-intro">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Momentum Engine
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                Momentum Engine strategies focus on <strong>breakout setups</strong> where volatility 
+                expansion is expected. These strategies look for consolidation patterns, volume surges, 
+                and directional momentum to identify potential entry points.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {momentumStrategies.map(s => (
+                  <Badge key={s.id} variant="secondary">{s.displayName}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="card-vcp-overview">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Momentum Engine Strategies
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  A <strong>volatility contraction pattern</strong> is a technical market structure where price ranges 
-                  tighten as a stock consolidates near resistance. This behavior can reflect decreasing selling pressure 
-                  while buyers remain active, and may precede a breakout when demand overwhelms supply.
-                </p>
-                <p>
-                  VCP Trader identifies these contraction phases using objective price, volume, and moving-average data 
-                  to help traders surface potential breakout conditions.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Key Characteristics:</p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Multiple contractions (T1, T2, T3...) with each smaller than the last</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Volume typically decreases during consolidation</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Price stays above key moving averages (EMA 21, EMA 50)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Clear resistance level forms (pivot point)</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-entry">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  VCP Entry Strategy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The ideal entry point is when price breaks above the resistance level 
-                  (pivot point) with <strong>increased volume</strong>.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">1</Badge>
-                    <div>
-                      <p className="font-medium">Identify the Pattern</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Look for stocks showing 2-4 contractions with decreasing range
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">2</Badge>
-                    <div>
-                      <p className="font-medium">Mark the Pivot</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Identify the resistance level from the highest point of the base
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">3</Badge>
-                    <div>
-                      <p className="font-medium">Wait for Breakout</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Enter when price breaks above pivot with volume 50%+ above average
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">4</Badge>
-                    <div>
-                      <p className="font-medium">Set Stop Loss</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Place stop below the last contraction low (typically 5-8% risk)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-stages">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  VCP Pattern Stages
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  VCP Trader automatically classifies patterns into stages to help you 
-                  identify the best opportunities. VCP strategies use BREAKOUT as the actionable stage.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
-                    <Badge variant="outline">FORMING</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Early stage - volatility is starting to contract but pattern needs more time. 
-                        Add to watchlist and monitor.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
-                    <Badge variant="secondary">READY</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Pattern is mature with tight range near resistance. Watch closely 
-                        for breakout trigger.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
-                    <Badge variant="default">BREAKOUT</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Price has broken above resistance with volume confirmation. 
-                        Potential entry signal. <span className="text-foreground font-medium">VCP strategies only.</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-checklist">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">VCP Checklist</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Pattern Quality</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        2-4 contractions visible
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Each contraction smaller than previous
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Volume declining during consolidation
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Price above EMA 50 and EMA 200
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Entry Confirmation</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Price breaks above pivot point
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Volume 50%+ above average
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Risk/reward ratio at least 2:1
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {momentumStrategies.map(strategy => (
+              <StrategyCard key={strategy.id} strategy={strategy} />
+            ))}
           </div>
-        </TabsContent>
 
-        <TabsContent value="vcp-multiday" className="space-y-6 mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="card-vcp-multiday-overview">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  What is Multi-timeframe VCP?
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The <strong>Multi-timeframe VCP</strong> strategy analyzes historical daily or weekly candles to detect
-                  true volatility contraction patterns. Unlike the Intraday VCP which uses quote-level data, this strategy
-                  identifies multiple contracting bases (T1, T2, T3) that develop over days or weeks.
-                </p>
-                <p>
-                  This is the classic Mark Minervini-style VCP that swing traders look for - patterns that show progressively
-                  tighter price ranges as the stock consolidates before a potential breakout.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Key Characteristics:</p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Historical candle analysis over 30+ days</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Detects multiple contracting bases (T1 larger than T2, T2 larger than T3)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Verifies uptrend via EMA 9 above EMA 21</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Requires broker connection for historical data access</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-multiday-entry">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Multi-day VCP Entry Strategy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  Entry is triggered when price breaks above the <strong>pivot point</strong> (the high of the last contraction)
-                  with volume confirmation of at least 1.5x average.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">1</Badge>
-                    <div>
-                      <p className="font-medium">Pattern Detection</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Scanner identifies 2+ contracting bases with each smaller than the previous
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">2</Badge>
-                    <div>
-                      <p className="font-medium">Pivot Identification</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        The highest point of the final contraction becomes the pivot/breakout level
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">3</Badge>
-                    <div>
-                      <p className="font-medium">Breakout Confirmation</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Enter when price closes above pivot with 1.5x+ volume and 1%+ gain
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">4</Badge>
-                    <div>
-                      <p className="font-medium">Stop Placement</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Stop below the last contraction low (typically 5-10% risk)
-                      </p>
-                    </div>
+          <Card data-testid="card-momentum-stages">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Momentum Pattern Stages
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                VCP Trader classifies momentum patterns into stages to help identify the best opportunities.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
+                  <Badge variant="outline">FORMING</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Early stage - pattern is developing but needs more time. Add to watchlist and monitor.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-multiday-stages">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  Multi-day VCP Pattern Stages
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The scanner classifies multi-day VCP patterns based on contraction quality and proximity to breakout.
-                  Like Intraday VCP, this strategy uses BREAKOUT as the actionable stage.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
-                    <Badge variant="outline">FORMING</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Early consolidation detected. May have 1 base but needs more time for volatility contraction
-                        to develop properly.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
-                    <Badge variant="secondary">READY</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Multiple contracting bases confirmed (T1 larger than T2). Price near pivot and in uptrend.
-                        High-probability setup forming.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
-                    <Badge variant="default">BREAKOUT</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Price has broken above the pivot with volume surge. Pattern has fully matured and triggered.
-                        <span className="text-foreground font-medium"> VCP strategies only.</span>
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
+                  <Badge variant="secondary">READY</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Pattern is mature with tight range near resistance. Watch closely for breakout trigger.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vcp-multiday-comparison">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Intraday vs Multi-day VCP</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Intraday VCP</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Uses real-time quote data
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Detects same-day momentum
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Faster signals, shorter holds
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Works without historical data
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Multi-timeframe VCP</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Analyzes 30+ days of candles
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        True volatility contraction detection
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Swing trade timeframe (days to weeks)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Requires broker connection for data
-                      </li>
-                    </ul>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
+                  <Badge variant="default">BREAKOUT</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Price has broken above resistance with volume confirmation. Potential entry signal.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="trend" className="space-y-6 mt-6">
+          <Card data-testid="card-trend-intro">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Trend Engine
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                Trend Engine strategies focus on <strong>pullback entries</strong> within established 
+                uptrends. These strategies identify when trending stocks pull back to support levels, 
+                offering potentially lower-risk entry points before the trend resumes.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {trendStrategies.map(s => (
+                  <Badge key={s.id} variant="secondary">{s.displayName}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="card-pullback-overview">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <ArrowUpRight className="h-4 w-4" />
-                  What is Classic Pullback?
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The <strong>Classic Pullback</strong> strategy identifies stocks in strong uptrends that have 
-                  temporarily pulled back to support levels. These pullbacks offer potential lower-risk entry 
-                  points into trending stocks before they resume their upward trajectory.
-                </p>
-                <p>
-                  This strategy uses exponential moving averages (EMA 9 and EMA 21) as dynamic support levels 
-                  and waits for a volume-confirmed bounce to signal a potential resumption of the trend.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Key Characteristics:</p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Strong uptrend with EMA 9 above EMA 21</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Price pulls back to or near EMA 9 or EMA 21 support</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Pullback is shallow (typically under 10% from recent high)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Volume spike on bounce confirms buyer interest</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-pullback-entry">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Pullback Entry Strategy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The ideal entry is when price bounces off EMA support with 
-                  <strong> increased volume</strong>, indicating buyers are stepping in.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">1</Badge>
-                    <div>
-                      <p className="font-medium">Confirm Uptrend</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        EMA 9 must be above EMA 21, both rising. Price above both EMAs.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">2</Badge>
-                    <div>
-                      <p className="font-medium">Identify Pullback</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Watch for price to pull back toward EMA 9 or EMA 21 on lower volume
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">3</Badge>
-                    <div>
-                      <p className="font-medium">Wait for Trigger</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Enter when price closes above the pullback high with volume 1.5x+ average
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border">
-                    <Badge variant="default" className="mt-0.5">4</Badge>
-                    <div>
-                      <p className="font-medium">Set Stop Loss</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">
-                        Place stop below pullback low or EMA 21 (typically 3-5% risk)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-pullback-stages">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  Pullback Pattern Stages
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The scanner classifies pullback patterns into stages based on 
-                  where they are in the setup process. Classic Pullback uses TRIGGERED as the actionable stage.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
-                    <Badge variant="outline">FORMING</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Stock is in an uptrend and starting to pull back. Too early for entry - 
-                        wait for the pullback to develop.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
-                    <Badge variant="secondary">READY</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Pullback has reached EMA support zone. Watch for a bullish 
-                        candle with volume to trigger entry.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
-                    <Badge variant="default">TRIGGERED</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Price has bounced with volume confirmation. 
-                        Potential entry signal - the trend may be resuming. <span className="text-foreground font-medium">Classic Pullback only.</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-pullback-checklist">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Pullback Checklist</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Trend Confirmation</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        EMA 9 above EMA 21
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Price made recent higher high
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Prior impulse move of 3%+ from EMA
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Overall market in uptrend preferred
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Entry Confirmation</p>
-                    <ul className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Pullback touched or neared EMA 9/21
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Bullish candle on bounce day
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        Volume 1.5x+ above 20-day average
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {trendStrategies.map(strategy => (
+              <StrategyCard key={strategy.id} strategy={strategy} />
+            ))}
           </div>
+
+          <Card data-testid="card-trend-stages">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Trend Pattern Stages
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                Trend-following strategies use the TRIGGERED stage to indicate a potential entry.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
+                  <Badge variant="outline">FORMING</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Stock is in an uptrend and starting to pull back. Too early for entry.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
+                  <Badge variant="secondary">READY</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Pullback has reached support zone. Watch for bounce confirmation.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
+                  <Badge variant="default">TRIGGERED</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Price has bounced with volume confirmation. Potential entry signal.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="volatility" className="space-y-6 mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="card-volatility-overview">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Pressure Break Strategy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The <strong>Pressure Break</strong> (Volatility Squeeze) strategy identifies extreme 
-                  volatility compression setups designed to catch expansion moves. When Bollinger Bands 
-                  squeeze inside Keltner Channels, it signals a potential explosive breakout.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Key Characteristics:</p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Bollinger Bands narrowing to multi-period low</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Keltner Channel inside Bollinger Bands (squeeze signal)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Decreasing ATR indicating compression</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Price coiling near a key level</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
+          <Card data-testid="card-volatility-intro">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Volatility Engine
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                Volatility Engine strategies focus on <strong>compression and expansion</strong> patterns. 
+                These strategies identify when volatility contracts to extreme levels, often preceding 
+                significant price moves when the compression releases.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {volatilityStrategies.map(s => (
+                  <Badge key={s.id} variant="secondary">{s.displayName}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card data-testid="card-volatility-stages">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  Volatility Squeeze Stages
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
-                    <Badge variant="outline">FORMING</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Squeeze on - Bollinger Bands inside Keltner Channels. 
-                        Volatility compressing.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
-                    <Badge variant="secondary">READY</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Squeeze about to fire, near breakout level. 
-                        Watch for directional signal.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
-                    <Badge variant="default">TRIGGERED</Badge>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-xs">
-                        Squeeze fired - breakout with volume expansion. 
-                        Potential entry signal.
-                      </p>
-                    </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {volatilityStrategies.map(strategy => (
+              <StrategyCard key={strategy.id} strategy={strategy} />
+            ))}
+          </div>
+
+          <Card data-testid="card-volatility-stages">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Volatility Squeeze Stages
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
+                  <Badge variant="outline">FORMING</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Squeeze on - Bollinger Bands inside Keltner Channels. Volatility compressing.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
+                  <Badge variant="secondary">READY</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Squeeze about to fire, near breakout level. Watch for directional signal.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
+                  <Badge variant="default">TRIGGERED</Badge>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground text-xs">
+                      Squeeze fired - breakout with volume expansion. Potential entry signal.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="fusion" className="space-y-6 mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card data-testid="card-fusion-overview">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Layers className="h-4 w-4" />
-                  Fusion Engine Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p>
-                  The <strong>Fusion Engine</strong> identifies confluence opportunities where 
-                  two or more strategies trigger simultaneously on the same symbol. Higher 
-                  confluence scores indicate stronger setups with multiple confirming signals.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">How It Works:</p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Scans all active strategies simultaneously</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Ranks symbols by number of matching strategies</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Applies market regime adjustments to scores</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                      <span>Higher confluence = higher confidence setup</span>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
+          <Card data-testid="card-fusion-intro">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                {FUSION_ENGINE_CONFIG.displayName}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <p>
+                {FUSION_ENGINE_CONFIG.description}
+              </p>
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <p className="font-medium">How It Works:</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                    <span>Scans all active strategies simultaneously</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                    <span>Ranks symbols by number of matching strategies</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                    <span>Applies market regime adjustments to scores</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                    <span>Higher confluence = higher confidence setup</span>
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
 
+          <div className="grid gap-6 lg:grid-cols-2">
             <Card data-testid="card-fusion-scoring">
               <CardHeader>
                 <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -770,6 +377,52 @@ export default function StrategyGuide() {
                       <p className="text-muted-foreground text-xs mt-0.5">
                         Trending market boosts scores; Risk-Off market reduces them
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-fusion-strategies">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Included Strategies
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p className="text-muted-foreground">
+                  The Fusion Engine combines signals from all available strategies:
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="font-medium text-xs mb-2 flex items-center gap-1">
+                      <Zap className="h-3 w-3" /> Momentum Engine
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {momentumStrategies.map(s => (
+                        <Badge key={s.id} variant="outline" className="text-xs">{s.displayName}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-xs mb-2 flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" /> Trend Engine
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {trendStrategies.map(s => (
+                        <Badge key={s.id} variant="outline" className="text-xs">{s.displayName}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-xs mb-2 flex items-center gap-1">
+                      <Activity className="h-3 w-3" /> Volatility Engine
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {volatilityStrategies.map(s => (
+                        <Badge key={s.id} variant="outline" className="text-xs">{s.displayName}</Badge>
+                      ))}
                     </div>
                   </div>
                 </div>
