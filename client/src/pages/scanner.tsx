@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { 
   Search, Loader2, RefreshCw, List, Info, HelpCircle, ChevronDown, ChevronRight, 
-  TrendingUp, Layers, Activity, Zap, Target, BookOpen, X
+  TrendingUp, Layers, Activity, Zap, Target, BookOpen, X, LayoutGrid, LayoutList,
+  AlertTriangle, Clock, CheckCircle2, Flame
 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -105,6 +106,7 @@ export default function Scanner() {
   const [showGuide, setShowGuide] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [featuredViewMode, setFeaturedViewMode] = useState<"cards" | "list">("cards");
   const [filters, setFilters] = useState<ScannerFilters>({
     minPrice: 5,
     maxPrice: 500,
@@ -438,7 +440,30 @@ export default function Scanner() {
                       <li><strong>Pick a preset:</strong> Balanced works for most traders. Conservative filters for safer trades. Aggressive shows more opportunities.</li>
                       <li><strong>Run the scan:</strong> Click the button and review the results. Click any row to see the chart.</li>
                     </ol>
-                    <div className="flex items-center gap-2 pt-2">
+                    
+                    <div className="mt-4 pt-3 border-t border-border/50">
+                      <p className="font-medium mb-2">Understanding Pattern Stages</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 shrink-0">FORMING</Badge>
+                          <span>Pattern is developing. Price is consolidating with decreasing volatility. Add to watchlist for monitoring.</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">READY</Badge>
+                          <span>Pattern is mature and approaching breakout zone. Set alerts and prepare your entry plan.</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">BREAKOUT</Badge>
+                          <span>Price breaking above resistance with volume confirmation. This is your potential entry signal.</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">TRIGGERED</Badge>
+                          <span>Breakout confirmed with follow-through. Pattern has activated - monitor for continuation or exit.</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 pt-3">
                       <Link href="/strategy-guide">
                         <Button variant="outline" size="sm" className="gap-1" data-testid="link-strategy-guide">
                           <Info className="h-4 w-4" />
@@ -453,6 +478,169 @@ export default function Scanner() {
           </CollapsibleContent>
         </Collapsible>
       </div>
+
+      {/* Featured Opportunities - Breakout & Triggered Symbols */}
+      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-500" />
+                <CardTitle className="text-lg">Active Opportunities</CardTitle>
+                <Badge variant="secondary" className="text-xs">
+                  {liveResults.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length} signals
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={featuredViewMode === "cards" ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setFeaturedViewMode("cards")}
+                  data-testid="button-view-cards"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={featuredViewMode === "list" ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => setFeaturedViewMode("list")}
+                  data-testid="button-view-list"
+                >
+                  <LayoutList className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-2">
+            {featuredViewMode === "cards" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {liveResults
+                  .filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED")
+                  .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
+                  .map((result) => (
+                    <Card 
+                      key={result.id} 
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => navigate(`/chart/${result.ticker}`)}
+                      data-testid={`card-opportunity-${result.ticker}`}
+                    >
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-base truncate">{result.ticker}</span>
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "shrink-0 text-xs",
+                                result.stage === "BREAKOUT" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                                result.stage === "TRIGGERED" && "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                              )}
+                            >
+                              {result.stage}
+                            </Badge>
+                          </div>
+                          {result.patternScore && (
+                            <Badge variant="secondary" className="shrink-0 text-xs">
+                              {result.patternScore}%
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{result.name || result.ticker}</p>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">${result.price?.toFixed(2)}</span>
+                          <span className={cn(
+                            "text-xs",
+                            (result.changePercent || 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                          )}>
+                            {(result.changePercent || 0) >= 0 ? "+" : ""}{result.changePercent?.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
+                          <div>
+                            <span className="block text-muted-foreground/70">Resistance</span>
+                            <span className="font-medium text-foreground">${result.resistance?.toFixed(2) || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-muted-foreground/70">Stop</span>
+                            <span className="font-medium text-foreground">${result.stopLoss?.toFixed(2) || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-muted-foreground/70">Vol</span>
+                            <span className="font-medium text-foreground">{result.volume ? (result.volume / 1000000).toFixed(1) + "M" : "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-muted-foreground/70">RVOL</span>
+                            <span className={cn(
+                              "font-medium",
+                              (result.rvol || 0) >= 1.5 ? "text-green-600 dark:text-green-400" : "text-foreground"
+                            )}>
+                              {result.rvol?.toFixed(1) || "N/A"}x
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {liveResults
+                  .filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED")
+                  .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
+                  .map((result) => (
+                    <div
+                      key={result.id}
+                      className="flex items-center justify-between gap-4 p-2 rounded-md hover-elevate cursor-pointer"
+                      onClick={() => navigate(`/chart/${result.ticker}`)}
+                      data-testid={`row-opportunity-${result.ticker}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "shrink-0 text-xs w-20 justify-center",
+                            result.stage === "BREAKOUT" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                            result.stage === "TRIGGERED" && "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                          )}
+                        >
+                          {result.stage}
+                        </Badge>
+                        <div className="min-w-0">
+                          <span className="font-semibold">{result.ticker}</span>
+                          <span className="text-muted-foreground text-sm ml-2 hidden sm:inline">{result.name}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm shrink-0">
+                        <span className="font-medium w-16 text-right">${result.price?.toFixed(2)}</span>
+                        <span className={cn(
+                          "w-16 text-right",
+                          (result.changePercent || 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                        )}>
+                          {(result.changePercent || 0) >= 0 ? "+" : ""}{result.changePercent?.toFixed(2)}%
+                        </span>
+                        <span className="hidden md:block w-16 text-right text-muted-foreground">
+                          R: ${result.resistance?.toFixed(0) || "N/A"}
+                        </span>
+                        <span className="hidden md:block w-16 text-right text-muted-foreground">
+                          S: ${result.stopLoss?.toFixed(0) || "N/A"}
+                        </span>
+                        <span className={cn(
+                          "hidden lg:block w-12 text-right",
+                          (result.rvol || 0) >= 1.5 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                        )}>
+                          {result.rvol?.toFixed(1)}x
+                        </span>
+                        {result.patternScore && (
+                          <Badge variant="secondary" className="w-12 justify-center">{result.patternScore}%</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-6 space-y-6">
