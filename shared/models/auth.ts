@@ -69,3 +69,31 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+// User settings table for persistent preferences
+export const userSettings = pgTable("user_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  showTooltips: varchar("show_tooltips").default("true"),
+  pushNotificationsEnabled: varchar("push_notifications_enabled").default("false"),
+  breakoutAlertsEnabled: varchar("breakout_alerts_enabled").default("true"),
+  stopAlertsEnabled: varchar("stop_alerts_enabled").default("true"),
+  emaAlertsEnabled: varchar("ema_alerts_enabled").default("true"),
+  approachingAlertsEnabled: varchar("approaching_alerts_enabled").default("true"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({ id: true, updatedAt: true });
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;
+
+export const userSettingsUpdateSchema = z.object({
+  showTooltips: z.boolean().optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+  breakoutAlertsEnabled: z.boolean().optional(),
+  stopAlertsEnabled: z.boolean().optional(),
+  emaAlertsEnabled: z.boolean().optional(),
+  approachingAlertsEnabled: z.boolean().optional(),
+});
+
+export type UserSettingsUpdate = z.infer<typeof userSettingsUpdateSchema>;
