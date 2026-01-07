@@ -653,16 +653,18 @@ export async function registerRoutes(
 
   app.get("/api/watchlists", isAuthenticated, async (req, res) => {
     try {
-      const watchlists = await storage.getWatchlists();
+      const userId = req.session.userId!;
+      const watchlists = await storage.getWatchlists(userId);
       res.json(watchlists);
     } catch (error) {
       res.status(500).json({ error: "Failed to get watchlists" });
     }
   });
 
-  app.get("/api/watchlists/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/watchlists/:id", isAuthenticated, async (req, res) => {
     try {
-      const watchlist = await storage.getWatchlist(req.params.id);
+      const userId = req.session.userId!;
+      const watchlist = await storage.getWatchlist(req.params.id, userId);
       if (!watchlist) {
         return res.status(404).json({ error: "Watchlist not found" });
       }
@@ -672,8 +674,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/watchlists/:id/results", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/watchlists/:id/results", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId!;
+      const watchlist = await storage.getWatchlist(req.params.id, userId);
+      if (!watchlist) {
+        return res.status(404).json({ error: "Watchlist not found" });
+      }
       const results = await storage.getWatchlistResults(req.params.id);
       res.json(results);
     } catch (error) {
@@ -681,9 +688,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/watchlists", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/watchlists", isAuthenticated, async (req, res) => {
     try {
-      const watchlistData = insertWatchlistSchema.parse(req.body);
+      const userId = req.session.userId!;
+      const watchlistData = insertWatchlistSchema.parse({ ...req.body, userId });
       const watchlist = await storage.createWatchlist(watchlistData);
       res.json(watchlist);
     } catch (error) {
@@ -695,22 +703,24 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/watchlists/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/watchlists/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteWatchlist(req.params.id);
+      const userId = req.session.userId!;
+      await storage.deleteWatchlist(req.params.id, userId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete watchlist" });
     }
   });
 
-  app.post("/api/watchlists/:id/symbols", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/watchlists/:id/symbols", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const { symbol } = req.body;
       if (!symbol) {
         return res.status(400).json({ error: "Symbol is required" });
       }
-      const watchlist = await storage.addSymbolToWatchlist(req.params.id, symbol);
+      const watchlist = await storage.addSymbolToWatchlist(req.params.id, userId, symbol);
       if (!watchlist) {
         return res.status(404).json({ error: "Watchlist not found" });
       }
@@ -720,10 +730,12 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/watchlists/:id/symbols/:symbol", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/watchlists/:id/symbols/:symbol", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const watchlist = await storage.removeSymbolFromWatchlist(
         req.params.id,
+        userId,
         req.params.symbol
       );
       if (!watchlist) {

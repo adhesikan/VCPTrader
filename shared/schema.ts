@@ -202,6 +202,7 @@ export type AlertEvent = typeof alertEvents.$inferSelect;
 
 export const watchlists = pgTable("watchlists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   symbols: text("symbols").array(),
   createdAt: timestamp("created_at").defaultNow(),

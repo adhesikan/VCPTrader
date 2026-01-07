@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { brokerConnections, watchlists as watchlistsTable } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import type {
   User,
   InsertUser,
@@ -62,13 +62,13 @@ export interface IStorage {
   deleteAllAlerts(): Promise<void>;
   markAllAlertsRead(): Promise<void>;
 
-  getWatchlists(): Promise<Watchlist[]>;
-  getWatchlist(id: string): Promise<Watchlist | undefined>;
+  getWatchlists(userId: string): Promise<Watchlist[]>;
+  getWatchlist(id: string, userId: string): Promise<Watchlist | undefined>;
   createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist>;
-  updateWatchlist(id: string, data: Partial<Watchlist>): Promise<Watchlist | undefined>;
-  deleteWatchlist(id: string): Promise<void>;
-  addSymbolToWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
-  removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined>;
+  updateWatchlist(id: string, userId: string, data: Partial<Watchlist>): Promise<Watchlist | undefined>;
+  deleteWatchlist(id: string, userId: string): Promise<void>;
+  addSymbolToWatchlist(watchlistId: string, userId: string, symbol: string): Promise<Watchlist | undefined>;
+  removeSymbolFromWatchlist(watchlistId: string, userId: string, symbol: string): Promise<Watchlist | undefined>;
 
   getBrokerConnection(userId: string): Promise<BrokerConnection | null>;
   getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null>;
@@ -542,52 +542,60 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getWatchlists(): Promise<Watchlist[]> {
-    return Array.from(this.watchlists.values());
+  async getWatchlists(userId: string): Promise<Watchlist[]> {
+    return db
+      .select()
+      .from(watchlistsTable)
+      .where(eq(watchlistsTable.userId, userId));
   }
 
-  async getWatchlist(id: string): Promise<Watchlist | undefined> {
-    return this.watchlists.get(id);
+  async getWatchlist(id: string, userId: string): Promise<Watchlist | undefined> {
+    const [watchlist] = await db
+      .select()
+      .from(watchlistsTable)
+      .where(and(eq(watchlistsTable.id, id), eq(watchlistsTable.userId, userId)))
+      .limit(1);
+    return watchlist;
   }
 
   async createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist> {
-    const id = randomUUID();
-    const newWatchlist: Watchlist = { ...watchlist, id, createdAt: new Date() };
-    this.watchlists.set(id, newWatchlist);
-    return newWatchlist;
+    const [created] = await db
+      .insert(watchlistsTable)
+      .values(watchlist)
+      .returning();
+    return created;
   }
 
-  async updateWatchlist(id: string, data: Partial<Watchlist>): Promise<Watchlist | undefined> {
-    const watchlist = this.watchlists.get(id);
-    if (!watchlist) return undefined;
-    const updated = { ...watchlist, ...data };
-    this.watchlists.set(id, updated);
+  async updateWatchlist(id: string, userId: string, data: Partial<Watchlist>): Promise<Watchlist | undefined> {
+    const [updated] = await db
+      .update(watchlistsTable)
+      .set(data)
+      .where(and(eq(watchlistsTable.id, id), eq(watchlistsTable.userId, userId)))
+      .returning();
     return updated;
   }
 
-  async deleteWatchlist(id: string): Promise<void> {
-    this.watchlists.delete(id);
+  async deleteWatchlist(id: string, userId: string): Promise<void> {
+    await db
+      .delete(watchlistsTable)
+      .where(and(eq(watchlistsTable.id, id), eq(watchlistsTable.userId, userId)));
   }
 
-  async addSymbolToWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined> {
-    const watchlist = this.watchlists.get(watchlistId);
+  async addSymbolToWatchlist(watchlistId: string, userId: string, symbol: string): Promise<Watchlist | undefined> {
+    const watchlist = await this.getWatchlist(watchlistId, userId);
     if (!watchlist) return undefined;
     const symbols = watchlist.symbols || [];
     if (!symbols.includes(symbol)) {
       symbols.push(symbol);
     }
-    const updated = { ...watchlist, symbols };
-    this.watchlists.set(watchlistId, updated);
-    return updated;
+    return this.updateWatchlist(watchlistId, userId, { symbols });
   }
 
-  async removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | undefined> {
-    const watchlist = this.watchlists.get(watchlistId);
+  async removeSymbolFromWatchlist(watchlistId: string, userId: string, symbol: string): Promise<Watchlist | undefined> {
+    const watchlist = await this.getWatchlist(watchlistId, userId);
     if (!watchlist) return undefined;
     const symbols = (watchlist.symbols || []).filter(s => s !== symbol);
-    const updated = { ...watchlist, symbols };
-    this.watchlists.set(watchlistId, updated);
-    return updated;
+    return this.updateWatchlist(watchlistId, userId, { symbols });
   }
 
   async getBrokerConnection(userId: string): Promise<BrokerConnection | null> {
