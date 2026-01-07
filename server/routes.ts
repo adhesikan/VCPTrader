@@ -370,10 +370,30 @@ export async function registerRoutes(
       const requestedSymbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
       const strategy = req.body.strategy || StrategyType.VCP;
       const startTime = Date.now();
+      const BATCH_SIZE = 200;
       
-      const quotes = await fetchQuotesFromBroker(connection, requestedSymbols);
-      const results = quotesToScanResults(quotes, strategy);
+      let allQuotes: any[] = [];
+      const totalSymbols = requestedSymbols.length;
       
+      if (totalSymbols > BATCH_SIZE) {
+        for (let i = 0; i < totalSymbols; i += BATCH_SIZE) {
+          const batch = requestedSymbols.slice(i, i + BATCH_SIZE);
+          try {
+            const batchQuotes = await fetchQuotesFromBroker(connection, batch);
+            allQuotes = allQuotes.concat(batchQuotes);
+          } catch (batchError: any) {
+            console.error(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError.message);
+          }
+          
+          if (i + BATCH_SIZE < totalSymbols) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      } else {
+        allQuotes = await fetchQuotesFromBroker(connection, requestedSymbols);
+      }
+      
+      const results = quotesToScanResults(allQuotes, strategy);
       const scanTime = Date.now() - startTime;
       
       res.json({
@@ -381,8 +401,9 @@ export async function registerRoutes(
         metadata: {
           isLive: true,
           provider: connection.provider,
-          symbolsRequested: requestedSymbols.length,
-          symbolsReturned: quotes.length,
+          symbolsRequested: totalSymbols,
+          symbolsReturned: allQuotes.length,
+          batchCount: Math.ceil(totalSymbols / BATCH_SIZE),
           scanTimeMs: scanTime,
           timestamp: new Date().toISOString(),
         }

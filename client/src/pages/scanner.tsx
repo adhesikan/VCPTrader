@@ -136,6 +136,7 @@ export default function Scanner() {
     symbolsRequested: number;
     symbolsReturned: number;
     scanTimeMs: number;
+    batchCount?: number;
   } | null>(null);
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
@@ -485,18 +486,34 @@ export default function Scanner() {
               )}
 
               {targetType === "universe" && (
-                <Select value={selectedUniverse} onValueChange={setSelectedUniverse}>
-                  <SelectTrigger data-testid="select-universe">
-                    <SelectValue placeholder="Select market" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UNIVERSE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label} ({opt.count} stocks)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  <Select value={selectedUniverse} onValueChange={setSelectedUniverse}>
+                    <SelectTrigger data-testid="select-universe">
+                      <SelectValue placeholder="Select market" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNIVERSE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} ({opt.count} stocks)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedUniverse === "all" && (
+                    <div className="mt-2 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/30">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-yellow-700 dark:text-yellow-400">Large scan warning</p>
+                          <p className="text-muted-foreground mt-1">
+                            Scanning 5000+ stocks requires many API calls and may take several minutes. 
+                            Consider using price/volume filters to reduce the number of stocks, or select a smaller index like S&P 500 or Nasdaq 100.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -678,7 +695,9 @@ export default function Scanner() {
                   {scanMetadata.provider.toUpperCase()}
                 </Badge>
                 <span className="text-xs">
-                  {scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s
+                  {scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols
+                  {scanMetadata.batchCount && scanMetadata.batchCount > 1 && ` (${scanMetadata.batchCount} batches)`}
+                  {" "}in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s
                 </span>
               </>
             )}
