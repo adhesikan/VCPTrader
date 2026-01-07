@@ -524,3 +524,32 @@ export const insertOpportunityDefaultsSchema = createInsertSchema(opportunityDef
 });
 export type InsertOpportunityDefaults = z.infer<typeof insertOpportunityDefaultsSchema>;
 export type OpportunityDefaults = typeof opportunityDefaults.$inferSelect;
+
+export const userSettings = pgTable("user_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  showTooltips: varchar("show_tooltips").notNull().default("true"),
+  pushNotificationsEnabled: varchar("push_notifications_enabled").notNull().default("false"),
+  breakoutAlertsEnabled: varchar("breakout_alerts_enabled").notNull().default("true"),
+  stopAlertsEnabled: varchar("stop_alerts_enabled").notNull().default("true"),
+  emaAlertsEnabled: varchar("ema_alerts_enabled").notNull().default("true"),
+  approachingAlertsEnabled: varchar("approaching_alerts_enabled").notNull().default("true"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({ 
+  id: true,
+  updatedAt: true 
+});
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+
+export const userSettingsUpdateSchema = z.object({
+  showTooltips: z.boolean().optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+  breakoutAlertsEnabled: z.boolean().optional(),
+  stopAlertsEnabled: z.boolean().optional(),
+  emaAlertsEnabled: z.boolean().optional(),
+  approachingAlertsEnabled: z.boolean().optional(),
+});
+export type UserSettingsUpdate = z.infer<typeof userSettingsUpdateSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;

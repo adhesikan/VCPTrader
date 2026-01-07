@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List, Info, Eye } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List, Info, Eye, Save, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -29,6 +39,15 @@ import { useToast } from "@/hooks/use-toast";
 import type { BrokerConnection, BrokerProviderType, OpportunityDefaults } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
 import { useTooltipVisibility } from "@/hooks/use-tooltips";
+
+interface UserSettingsResponse {
+  showTooltips: boolean;
+  pushNotificationsEnabled: boolean;
+  breakoutAlertsEnabled: boolean;
+  stopAlertsEnabled: boolean;
+  emaAlertsEnabled: boolean;
+  approachingAlertsEnabled: boolean;
+}
 
 const brokerProviders = [
   { 
@@ -91,12 +110,104 @@ const brokerProviders = [
 
 export default function Settings() {
   const { toast } = useToast();
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const [, navigate] = useLocation();
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const { tooltipsEnabled, setTooltipsEnabled } = useTooltipVisibility();
+  
+  const [localSettings, setLocalSettings] = useState<UserSettingsResponse>({
+    showTooltips: true,
+    pushNotificationsEnabled: false,
+    breakoutAlertsEnabled: true,
+    stopAlertsEnabled: true,
+    emaAlertsEnabled: true,
+    approachingAlertsEnabled: true,
+  });
+  const [originalSettings, setOriginalSettings] = useState<UserSettingsResponse | null>(null);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  
+  const { data: userSettings, isLoading: isLoadingSettings } = useQuery<UserSettingsResponse>({
+    queryKey: ["/api/user/settings"],
+  });
+  
+  useEffect(() => {
+    if (userSettings) {
+      setLocalSettings(userSettings);
+      setOriginalSettings(userSettings);
+    }
+  }, [userSettings]);
+  
+  const hasUnsavedChanges = originalSettings !== null && (
+    localSettings.showTooltips !== originalSettings.showTooltips ||
+    localSettings.pushNotificationsEnabled !== originalSettings.pushNotificationsEnabled ||
+    localSettings.breakoutAlertsEnabled !== originalSettings.breakoutAlertsEnabled ||
+    localSettings.stopAlertsEnabled !== originalSettings.stopAlertsEnabled ||
+    localSettings.emaAlertsEnabled !== originalSettings.emaAlertsEnabled ||
+    localSettings.approachingAlertsEnabled !== originalSettings.approachingAlertsEnabled
+  );
+  
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+  
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (settings: Partial<UserSettingsResponse>) => {
+      const response = await apiRequest("PUT", "/api/user/settings", settings);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setOriginalSettings(data);
+      setLocalSettings(data);
+      setTooltipsEnabled(data.showTooltips);
+      queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+      toast({
+        title: "Settings Saved",
+        description: "Your preferences have been updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Save",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleSaveSettings = () => {
+    saveSettingsMutation.mutate(localSettings);
+  };
+  
+  const handleDiscardChanges = () => {
+    if (originalSettings) {
+      setLocalSettings(originalSettings);
+    }
+    setShowUnsavedDialog(false);
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
+    }
+  };
+  
+  const handleSaveAndContinue = async () => {
+    await saveSettingsMutation.mutateAsync(localSettings);
+    setShowUnsavedDialog(false);
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
+    }
+  };
 
   const { data: brokerStatus } = useQuery<BrokerConnection | null>({
     queryKey: ["/api/broker/status"],
@@ -206,7 +317,7 @@ export default function Settings() {
       return false;
     },
     onSuccess: (enabled) => {
-      setPushEnabled(enabled);
+      setLocalSettings(prev => ({ ...prev, pushNotificationsEnabled: enabled }));
       if (enabled) {
         toast({
           title: "Push Notifications Enabled",
@@ -441,11 +552,24 @@ export default function Settings() {
 
         <TabsContent value="notifications">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-medium">Push Notifications</CardTitle>
-              <CardDescription>
-                Receive instant alerts on your device
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-medium">Push Notifications</CardTitle>
+                <CardDescription>
+                  Receive instant alerts on your device
+                </CardDescription>
+              </div>
+              {hasUnsavedChanges && (
+                <Button 
+                  onClick={handleSaveSettings}
+                  disabled={saveSettingsMutation.isPending}
+                  className="gap-2"
+                  data-testid="button-save-settings"
+                >
+                  <Save className="h-4 w-4" />
+                  {saveSettingsMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
@@ -456,12 +580,12 @@ export default function Settings() {
                   </p>
                 </div>
                 <Switch
-                  checked={pushEnabled}
+                  checked={localSettings.pushNotificationsEnabled}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       enablePushMutation.mutate();
                     } else {
-                      setPushEnabled(false);
+                      setLocalSettings(prev => ({ ...prev, pushNotificationsEnabled: false }));
                     }
                   }}
                   data-testid="switch-push-notifications"
@@ -473,22 +597,42 @@ export default function Settings() {
                 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="breakout-alerts">Breakout Alerts</Label>
-                  <Switch id="breakout-alerts" defaultChecked data-testid="switch-breakout-alerts" />
+                  <Switch 
+                    id="breakout-alerts" 
+                    checked={localSettings.breakoutAlertsEnabled}
+                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, breakoutAlertsEnabled: checked }))}
+                    data-testid="switch-breakout-alerts" 
+                  />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="stop-alerts">Stop Loss Alerts</Label>
-                  <Switch id="stop-alerts" defaultChecked data-testid="switch-stop-alerts" />
+                  <Switch 
+                    id="stop-alerts" 
+                    checked={localSettings.stopAlertsEnabled}
+                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, stopAlertsEnabled: checked }))}
+                    data-testid="switch-stop-alerts" 
+                  />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="ema-alerts">EMA Exit Alerts</Label>
-                  <Switch id="ema-alerts" defaultChecked data-testid="switch-ema-alerts" />
+                  <Switch 
+                    id="ema-alerts" 
+                    checked={localSettings.emaAlertsEnabled}
+                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, emaAlertsEnabled: checked }))}
+                    data-testid="switch-ema-alerts" 
+                  />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="approaching-alerts">Approaching Breakout</Label>
-                  <Switch id="approaching-alerts" defaultChecked data-testid="switch-approaching-alerts" />
+                  <Switch 
+                    id="approaching-alerts" 
+                    checked={localSettings.approachingAlertsEnabled}
+                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, approachingAlertsEnabled: checked }))}
+                    data-testid="switch-approaching-alerts" 
+                  />
                 </div>
               </div>
             </CardContent>
@@ -497,11 +641,24 @@ export default function Settings() {
 
         <TabsContent value="display">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-medium">Display Preferences</CardTitle>
-              <CardDescription>
-                Customize how information is displayed across the platform
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-medium">Display Preferences</CardTitle>
+                <CardDescription>
+                  Customize how information is displayed across the platform
+                </CardDescription>
+              </div>
+              {hasUnsavedChanges && (
+                <Button 
+                  onClick={handleSaveSettings}
+                  disabled={saveSettingsMutation.isPending}
+                  className="gap-2"
+                  data-testid="button-save-settings-display"
+                >
+                  <Save className="h-4 w-4" />
+                  {saveSettingsMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
@@ -515,8 +672,8 @@ export default function Settings() {
                   </div>
                 </div>
                 <Switch
-                  checked={tooltipsEnabled}
-                  onCheckedChange={setTooltipsEnabled}
+                  checked={localSettings.showTooltips}
+                  onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, showTooltips: checked }))}
                   data-testid="switch-tooltips"
                 />
               </div>
@@ -536,6 +693,28 @@ export default function Settings() {
           <AutomationSettings />
         </TabsContent>
       </Tabs>
+      
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="h-5 w-5 text-yellow-500" />
+              Unsaved Changes
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Would you like to save them before leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDiscardChanges} data-testid="button-discard-changes">
+              Discard
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveAndContinue} data-testid="button-save-and-continue">
+              Save Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

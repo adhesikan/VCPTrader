@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
 
 interface TooltipContextType {
   tooltipsEnabled: boolean;
@@ -17,6 +17,29 @@ export function TooltipVisibilityProvider({ children }: { children: ReactNode })
     }
     return true;
   });
+  
+  const hasFetched = useRef(false);
+  
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    
+    const fetchUserSettings = async () => {
+      try {
+        const response = await fetch("/api/user/settings", { credentials: "include" });
+        if (response.ok) {
+          const settings = await response.json();
+          if (typeof settings.showTooltips === "boolean") {
+            setTooltipsEnabledState(settings.showTooltips);
+            localStorage.setItem(STORAGE_KEY, String(settings.showTooltips));
+          }
+        }
+      } catch {
+      }
+    };
+    
+    fetchUserSettings();
+  }, []);
 
   const setTooltipsEnabled = (enabled: boolean) => {
     setTooltipsEnabledState(enabled);
