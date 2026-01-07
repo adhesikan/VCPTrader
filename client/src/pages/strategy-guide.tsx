@@ -1,8 +1,9 @@
-import { BookOpen, TrendingUp, Target, Shield, AlertTriangle, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { BookOpen, TrendingUp, Target, Shield, AlertTriangle, CheckCircle2, ArrowUpRight, Zap, Activity, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { STRATEGY_CONFIGS, STRATEGY_CATEGORIES, type StrategyConfig } from "@shared/strategies";
 
 export default function StrategyGuide() {
   return (
@@ -17,20 +18,33 @@ export default function StrategyGuide() {
         </p>
       </div>
 
-      <Tabs defaultValue="vcp" className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
-          <TabsTrigger value="vcp" data-testid="tab-vcp">Intraday VCP</TabsTrigger>
-          <TabsTrigger value="vcp-multiday" data-testid="tab-vcp-multiday">Multi-day VCP</TabsTrigger>
-          <TabsTrigger value="pullback" data-testid="tab-pullback">Classic Pullback</TabsTrigger>
+      <Tabs defaultValue="momentum" className="w-full">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsTrigger value="momentum" data-testid="tab-momentum" className="gap-1">
+            <Zap className="h-3 w-3" />
+            Momentum
+          </TabsTrigger>
+          <TabsTrigger value="trend" data-testid="tab-trend" className="gap-1">
+            <TrendingUp className="h-3 w-3" />
+            Trend
+          </TabsTrigger>
+          <TabsTrigger value="volatility" data-testid="tab-volatility" className="gap-1">
+            <Activity className="h-3 w-3" />
+            Volatility
+          </TabsTrigger>
+          <TabsTrigger value="fusion" data-testid="tab-fusion" className="gap-1">
+            <Layers className="h-3 w-3" />
+            Fusion
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="vcp" className="space-y-6 mt-6">
+        <TabsContent value="momentum" className="space-y-6 mt-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card data-testid="card-vcp-overview">
               <CardHeader>
                 <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  What is VCP?
+                  <Zap className="h-4 w-4" />
+                  Momentum Engine Strategies
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
@@ -408,7 +422,7 @@ export default function StrategyGuide() {
           </div>
         </TabsContent>
 
-        <TabsContent value="pullback" className="space-y-6 mt-6">
+        <TabsContent value="trend" className="space-y-6 mt-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card data-testid="card-pullback-overview">
               <CardHeader>
@@ -591,6 +605,172 @@ export default function StrategyGuide() {
                         Volume 1.5x+ above 20-day average
                       </li>
                     </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="volatility" className="space-y-6 mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card data-testid="card-volatility-overview">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Pressure Break Strategy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  The <strong>Pressure Break</strong> (Volatility Squeeze) strategy identifies extreme 
+                  volatility compression setups designed to catch expansion moves. When Bollinger Bands 
+                  squeeze inside Keltner Channels, it signals a potential explosive breakout.
+                </p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <p className="font-medium">Key Characteristics:</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Bollinger Bands narrowing to multi-period low</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Keltner Channel inside Bollinger Bands (squeeze signal)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Decreasing ATR indicating compression</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Price coiling near a key level</span>
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-volatility-stages">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Volatility Squeeze Stages
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-muted-foreground/30">
+                    <Badge variant="outline">FORMING</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Squeeze on - Bollinger Bands inside Keltner Channels. 
+                        Volatility compressing.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30">
+                    <Badge variant="secondary">READY</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Squeeze about to fire, near breakout level. 
+                        Watch for directional signal.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-chart-2/30">
+                    <Badge variant="default">TRIGGERED</Badge>
+                    <div className="flex-1">
+                      <p className="text-muted-foreground text-xs">
+                        Squeeze fired - breakout with volume expansion. 
+                        Potential entry signal.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="fusion" className="space-y-6 mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card data-testid="card-fusion-overview">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Fusion Engine Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  The <strong>Fusion Engine</strong> identifies confluence opportunities where 
+                  two or more strategies trigger simultaneously on the same symbol. Higher 
+                  confluence scores indicate stronger setups with multiple confirming signals.
+                </p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <p className="font-medium">How It Works:</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Scans all active strategies simultaneously</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Ranks symbols by number of matching strategies</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Applies market regime adjustments to scores</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
+                      <span>Higher confluence = higher confidence setup</span>
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-fusion-scoring">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Confluence Scoring
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p>
+                  Each strategy that triggers on a symbol adds to its confluence score. 
+                  The score is then adjusted based on the current market regime.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">1</Badge>
+                    <div>
+                      <p className="font-medium">Base Score (0-100)</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Average of individual strategy scores
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">2</Badge>
+                    <div>
+                      <p className="font-medium">Confluence Bonus</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        +10 points per additional matching strategy
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border">
+                    <Badge variant="default" className="mt-0.5">3</Badge>
+                    <div>
+                      <p className="font-medium">Regime Adjustment</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Trending market boosts scores; Risk-Off market reduces them
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>

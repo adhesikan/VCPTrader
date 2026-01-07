@@ -306,12 +306,12 @@ export default function Scanner() {
             <SelectContent>
               {strategies?.map((strategy) => (
                 <SelectItem key={strategy.id} value={strategy.id}>
-                  {strategy.name.replace(" (Volatility Contraction Pattern)", "")}
+                  {strategy.displayName || strategy.name}
                 </SelectItem>
               )) || (
                 <>
-                  <SelectItem value="VCP">VCP</SelectItem>
-                  <SelectItem value="CLASSIC_PULLBACK">Classic Pullback</SelectItem>
+                  <SelectItem value="VCP">Momentum Breakout</SelectItem>
+                  <SelectItem value="CLASSIC_PULLBACK">Precision Pullback</SelectItem>
                 </>
               )}
             </SelectContent>

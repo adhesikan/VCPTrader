@@ -64,7 +64,11 @@ export type StrategyTypeValue = typeof StrategyType[keyof typeof StrategyType];
 export interface StrategyInfo {
   id: StrategyTypeValue;
   name: string;
+  displayName: string;
+  shortDescription: string;
   description: string;
+  category: string;
+  legacyName?: string;
   stages: string[];
 }
 

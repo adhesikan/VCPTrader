@@ -4,8 +4,7 @@ import type { AlertRule, AlertEvent, InsertAlertEvent, BrokerConnection, Pattern
 import { PatternStage, RuleConditionType } from "@shared/schema";
 import { sendEntrySignalToProfile, createAutomationLogEntry, type EntrySignal } from "./algopilotx";
 import { resolveAutomationProfileForSignal, createAutomationEvent, type AutomationSignalContext } from "./automation-resolver";
-
-const ALERT_DISCLAIMER = "This alert is for educational purposes only and not investment advice.";
+import { ALERT_DISCLAIMER, getStrategyDisplayName } from "@shared/strategies";
 
 export interface VCPClassification {
   stage: PatternStageType;
