@@ -1,0 +1,108 @@
+You are a senior full-stack engineer working inside an existing VCP Trader web app (React frontend + Node/Express backend + Postgres). The app has an “Opportunity Engine” page with scan controls:
+- Mode (Single Strategy / Fusion Engine)
+- Strategy dropdown (e.g., Momentum Breakout, Intraday VCP, Multi-day VCP, Classic Pullback)
+- What to scan (Watchlist / Single Stock / Market Index)
+- Watchlist dropdown
+- Filter preset dropdown
+- Run Scan button
+Results render below.
+
+GOAL
+Add a “Default Scan Strategy” setting that each user can select once, save, and have it auto-selected every time they return to the Opportunity Engine (and optionally auto-run the scan).
+
+REQUIREMENTS
+1) Persist per-user defaults in the database.
+2) On Opportunity Engine load:
+   - Fetch user defaults.
+   - Preselect the saved defaults in the UI controls.
+   - If no defaults exist, use sensible app defaults (e.g., Mode=Single Strategy, Strategy=Momentum Breakout, WhatToScan=Watchlist, Watchlist=Default Watchlist, FilterPreset=Balanced).
+3) Add a small UI component near the top of the Opportunity Engine controls:
+   - Label: “Default Scan”
+   - Button: “Save as Default”
+   - Button state: disabled until required fields are selected
+   - On click: save current selections as defaults for the logged-in user
+   - Show toast/snackbar: “Default scan saved”
+4) Add a Settings page section:
+   - “Opportunity Engine Defaults”
+   - Show current defaults
+   - Buttons: “Update Defaults” (saves current chosen values) and “Reset to App Defaults”
+5) Security:
+   - Must require authentication
+   - Only allow reading/writing defaults for the current user
+6) Code quality:
+   - Use typed validation (zod or equivalent) on API inputs
+   - Handle loading states and errors gracefully
+
+DATABASE (Postgres)
+Create a table (or extend existing user profile/settings table if present):
+- user_id (PK, FK users.id)
+- default_mode (text)            // 'single' | 'fusion'
+- default_strategy_id (text)     // strategy key/id
+- default_scan_scope (text)      // 'watchlist' | 'single_stock' | 'market_index'
+- default_watchlist_id (text, nullable)
+- default_symbol (text, nullable)
+- default_market_index (text, nullable) // e.g. 'SPY', 'QQQ'
+- default_filter_preset (text)   // e.g. 'balanced'
+- auto_run_on_load (boolean default false)
+- updated_at (timestamp)
+
+If you already have a user_settings table, add these columns there instead.
+
+BACKEND API
+Implement these endpoints:
+
+GET  /api/user/opportunity-defaults
+- Returns saved defaults or null
+
+PUT  /api/user/opportunity-defaults
+- Body: { mode, strategyId, scanScope, watchlistId?, symbol?, marketIndex?, filterPreset, autoRunOnLoad? }
+- Validates with zod
+- Upserts into DB for current user
+
+DELETE /api/user/opportunity-defaults
+- Resets to null/defaults (delete row or set columns to null)
+
+FRONTEND
+Opportunity Engine page:
+- On mount, call GET /api/user/opportunity-defaults
+- If found, set the control state to defaults
+- Add “Save as Default” button that calls PUT with current selections
+- Optional toggle: “Auto-run on load” (saves autoRunOnLoad)
+- If autoRunOnLoad is true, trigger Run Scan automatically after state hydration (ensure it runs only once and only after defaults are applied)
+
+Settings page:
+- Display defaults (human readable labels)
+- Allow editing via the same dropdowns (can reuse the Opportunity Engine controls component in a “Defaults Editor” mode)
+- Reset button calls DELETE
+
+UX DETAILS
+- Save button should be near the Run Scan button, but visually secondary
+- When defaults are applied, show a subtle text: “Using your saved default scan”
+- If saved watchlistId no longer exists, fallback to Default Watchlist and show a toast “Saved watchlist not found — using Default Watchlist”
+- If saved strategyId no longer exists, fallback to Momentum Breakout and show a toast
+
+IMPLEMENTATION STEPS
+1) Inspect the repo:
+   - Find auth middleware and user identification method (JWT/session)
+   - Find Opportunity Engine page/component (search for “Opportunity Engine”, “Run Scan”, strategy dropdown labels)
+   - Find DB layer/migrations pattern
+2) Add migration for the defaults storage (new table or new columns).
+3) Implement backend routes with auth + zod validation + upsert.
+4) Implement frontend API client functions.
+5) Wire Opportunity Engine to load/apply defaults and save defaults.
+6) Add Settings section with reset.
+7) Test end-to-end:
+   - Fresh user: sees app defaults
+   - Save defaults: persists and restores on reload
+   - Auto-run: runs scan once on load
+   - Reset: returns to app defaults
+   - Unauthorized: endpoints blocked
+
+DELIVERABLES
+- List changed files
+- Migration SQL or ORM migration
+- Endpoint code
+- Frontend component code changes
+- Any config/env notes
+
+Now begin by scanning the repo to locate the Opportunity Engine controls component and existing auth + DB patterns, then implement the above.
