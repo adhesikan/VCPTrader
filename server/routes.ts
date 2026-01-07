@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, insertAutomationSettingsSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, insertAutomationSettingsSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType, userSettingsUpdateSchema } from "@shared/schema";
 import { sendEntrySignal, sendExitSignal, createAutomationLogEntry, type EntrySignal, type ExitSignal } from "./algopilotx";
 import { getStrategyList, classifyQuote, StrategyId, PullbackStage, runAllPluginScans, STRATEGY_PRESETS, getAllStrategyIds, StrategyIdType } from "./strategies";
 import { classifyMarketRegime, getRegimeAdjustment } from "./engine/regime";
@@ -1711,6 +1711,66 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to delete opportunity defaults:", error);
       res.status(500).json({ error: "Failed to delete opportunity defaults" });
+    }
+  });
+
+  app.get("/api/user/settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const settings = await storage.getUserSettings(userId);
+      if (!settings) {
+        return res.json({
+          showTooltips: true,
+          pushNotificationsEnabled: false,
+          breakoutAlertsEnabled: true,
+          stopAlertsEnabled: true,
+          emaAlertsEnabled: true,
+          approachingAlertsEnabled: true,
+        });
+      }
+      
+      res.json({
+        showTooltips: settings.showTooltips === "true",
+        pushNotificationsEnabled: settings.pushNotificationsEnabled === "true",
+        breakoutAlertsEnabled: settings.breakoutAlertsEnabled === "true",
+        stopAlertsEnabled: settings.stopAlertsEnabled === "true",
+        emaAlertsEnabled: settings.emaAlertsEnabled === "true",
+        approachingAlertsEnabled: settings.approachingAlertsEnabled === "true",
+      });
+    } catch (error) {
+      console.error("Failed to get user settings:", error);
+      res.status(500).json({ error: "Failed to get user settings" });
+    }
+  });
+
+  app.put("/api/user/settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const parsed = userSettingsUpdateSchema.parse(req.body);
+      const settings = await storage.setUserSettings(userId, parsed);
+      
+      res.json({
+        showTooltips: settings.showTooltips === "true",
+        pushNotificationsEnabled: settings.pushNotificationsEnabled === "true",
+        breakoutAlertsEnabled: settings.breakoutAlertsEnabled === "true",
+        stopAlertsEnabled: settings.stopAlertsEnabled === "true",
+        emaAlertsEnabled: settings.emaAlertsEnabled === "true",
+        approachingAlertsEnabled: settings.approachingAlertsEnabled === "true",
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Failed to save user settings:", error);
+      res.status(500).json({ error: "Failed to save user settings" });
     }
   });
 

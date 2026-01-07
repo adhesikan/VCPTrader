@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -38,6 +38,8 @@ import type {
   InsertAutomationEvent,
   OpportunityDefaults,
   InsertOpportunityDefaults,
+  UserSettings,
+  UserSettingsUpdate,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -134,6 +136,9 @@ export interface IStorage {
   getOpportunityDefaults(userId: string): Promise<OpportunityDefaults | null>;
   setOpportunityDefaults(userId: string, defaults: Partial<InsertOpportunityDefaults>): Promise<OpportunityDefaults>;
   deleteOpportunityDefaults(userId: string): Promise<void>;
+
+  getUserSettings(userId: string): Promise<UserSettings | null>;
+  setUserSettings(userId: string, settings: UserSettingsUpdate): Promise<UserSettings>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1299,6 +1304,42 @@ export class MemStorage implements IStorage {
     await db
       .delete(opportunityDefaultsTable)
       .where(eq(opportunityDefaultsTable.userId, userId));
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | null> {
+    const [settings] = await db
+      .select()
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1);
+    return settings || null;
+  }
+
+  async setUserSettings(userId: string, settings: UserSettingsUpdate): Promise<UserSettings> {
+    const existing = await this.getUserSettings(userId);
+    
+    const dbSettings: Record<string, string | undefined> = {};
+    if (settings.showTooltips !== undefined) dbSettings.showTooltips = String(settings.showTooltips);
+    if (settings.pushNotificationsEnabled !== undefined) dbSettings.pushNotificationsEnabled = String(settings.pushNotificationsEnabled);
+    if (settings.breakoutAlertsEnabled !== undefined) dbSettings.breakoutAlertsEnabled = String(settings.breakoutAlertsEnabled);
+    if (settings.stopAlertsEnabled !== undefined) dbSettings.stopAlertsEnabled = String(settings.stopAlertsEnabled);
+    if (settings.emaAlertsEnabled !== undefined) dbSettings.emaAlertsEnabled = String(settings.emaAlertsEnabled);
+    if (settings.approachingAlertsEnabled !== undefined) dbSettings.approachingAlertsEnabled = String(settings.approachingAlertsEnabled);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(userSettingsTable)
+        .set({ ...dbSettings, updatedAt: new Date() })
+        .where(eq(userSettingsTable.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(userSettingsTable)
+        .values({ userId, ...dbSettings })
+        .returning();
+      return created;
+    }
   }
 }
 
