@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, Loader2, RefreshCw, List, DollarSign, Info, Plug, Settings, Clock, X, LayoutGrid, Target, AlertTriangle, ChevronRight, TrendingUp, Layers, Activity } from "lucide-react";
+import { 
+  Search, Loader2, RefreshCw, List, Info, HelpCircle, ChevronDown, ChevronRight, 
+  TrendingUp, Layers, Activity, Zap, Target, BookOpen, X
+} from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScannerTable } from "@/components/scanner-table";
-import { ScannerFiltersPanel, defaultFilters } from "@/components/scanner-filters";
 import { StrategySelector } from "@/components/strategy-selector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -24,14 +28,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo } from "@shared/schema";
-import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
+import { STRATEGY_CONFIGS, getStrategyDisplayName, FUSION_ENGINE_CONFIG } from "@shared/strategies";
+import { useBrokerStatus } from "@/hooks/use-broker-status";
+import { cn } from "@/lib/utils";
+
+type EngineMode = "single" | "fusion";
+type TargetType = "watchlist" | "symbol" | "universe";
 
 interface MarketRegime {
   regime: "TRENDING" | "CHOPPY" | "RISK_OFF";
@@ -56,18 +59,28 @@ interface ConfluenceResult {
   explanation: string;
 }
 
-import { useBrokerStatus } from "@/hooks/use-broker-status";
-
-const PRICE_PRESETS = [
-  { id: "all", label: "All Prices", min: 0, max: Infinity },
-  { id: "under10", label: "Under $10", min: 0, max: 10 },
-  { id: "10to50", label: "$10 - $50", min: 10, max: 50 },
-  { id: "50to100", label: "$50 - $100", min: 50, max: 100 },
-  { id: "100to500", label: "$100 - $500", min: 100, max: 500 },
-  { id: "over500", label: "Over $500", min: 500, max: Infinity },
+const SCAN_PRESETS = [
+  { id: "balanced", name: "Balanced", description: "Default settings for most traders" },
+  { id: "conservative", name: "Conservative", description: "Higher liquidity, lower risk" },
+  { id: "aggressive", name: "Aggressive", description: "More opportunities, higher risk" },
+  { id: "scalp", name: "Scalp", description: "Quick trades, high volume" },
+  { id: "swing", name: "Swing", description: "Multi-day holds" },
 ];
 
-const TOP_TECH_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"];
+const PRESET_FILTERS: Record<string, Partial<ScannerFilters>> = {
+  balanced: { minPrice: 5, maxPrice: 500, minVolume: 500000, minRvol: 1.2 },
+  conservative: { minPrice: 10, maxPrice: 500, minVolume: 1000000, minRvol: 1.5 },
+  aggressive: { minPrice: 2, maxPrice: 500, minVolume: 200000, minRvol: 1.0 },
+  scalp: { minPrice: 5, maxPrice: 200, minVolume: 1000000, minRvol: 1.8 },
+  swing: { minPrice: 10, maxPrice: 500, minVolume: 300000, minRvol: 1.0 },
+};
+
+const UNIVERSE_OPTIONS = [
+  { value: "sp500", label: "S&P 500", count: 500 },
+  { value: "nasdaq100", label: "Nasdaq 100", count: 100 },
+  { value: "dow30", label: "Dow 30", count: 30 },
+  { value: "all", label: "All US Stocks", count: "5000+" },
+];
 
 const DOW_30_SYMBOLS = [
   "AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "DOW",
@@ -87,147 +100,37 @@ const SP500_TOP = [
   "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
 ];
 
-const STRATEGY_STAGES: Record<string, { stage: string; description: string }[]> = {
-  VCP: [
-    { stage: "FORMING", description: "Pattern is in early stages - volatility is beginning to contract but not yet ready for entry." },
-    { stage: "READY", description: "Pattern is mature - price is consolidating near resistance with tight range. Watch for breakout." },
-    { stage: "BREAKOUT", description: "Price has broken above resistance with increased volume - potential entry signal." },
-  ],
-  VCP_MULTIDAY: [
-    { stage: "FORMING", description: "Multi-day VCP pattern developing - volatility contracting over multiple sessions." },
-    { stage: "READY", description: "Pattern mature - consolidating near resistance. Watch for daily breakout." },
-    { stage: "BREAKOUT", description: "Daily breakout above resistance with volume - potential swing entry." },
-  ],
-  CLASSIC_PULLBACK: [
-    { stage: "FORMING", description: "Looking for uptrending stock above EMA9/EMA21. Waiting for impulse move and pullback." },
-    { stage: "READY", description: "Valid pullback detected - price has pulled back to support. Watching for volume breakout." },
-    { stage: "TRIGGERED", description: "Breakout confirmed with increased volume - entry signal triggered." },
-  ],
-  VWAP_RECLAIM: [
-    { stage: "FORMING", description: "Price below VWAP, watching for potential reclaim." },
-    { stage: "READY", description: "Price reclaimed VWAP, waiting for volume confirmation." },
-    { stage: "TRIGGERED", description: "VWAP reclaim confirmed with volume expansion." },
-  ],
-  ORB5: [
-    { stage: "FORMING", description: "Building 5-minute opening range, price within range." },
-    { stage: "READY", description: "Price broke 5m opening range, awaiting volume confirmation." },
-    { stage: "TRIGGERED", description: "5-minute ORB confirmed with volume." },
-  ],
-  ORB15: [
-    { stage: "FORMING", description: "Building 15-minute opening range, price within range." },
-    { stage: "READY", description: "Price broke 15m opening range, awaiting volume confirmation." },
-    { stage: "TRIGGERED", description: "15-minute ORB confirmed with volume." },
-  ],
-  HIGH_RVOL: [
-    { stage: "FORMING", description: "Tight consolidation detected with building volume." },
-    { stage: "READY", description: "High RVOL detected (>2x), near breakout level." },
-    { stage: "TRIGGERED", description: "Breakout confirmed with RVOL >2x average." },
-  ],
-  GAP_AND_GO: [
-    { stage: "FORMING", description: "Gap up detected, holding above VWAP." },
-    { stage: "READY", description: "Holding above VWAP, near opening range breakout." },
-    { stage: "TRIGGERED", description: "Gap & Go confirmed: OR breakout with volume." },
-  ],
-  TREND_CONTINUATION: [
-    { stage: "FORMING", description: "In uptrend, pulling back to EMA9/EMA21 zone." },
-    { stage: "READY", description: "Pullback complete, near breakout level." },
-    { stage: "TRIGGERED", description: "Trend continuation confirmed with volume." },
-  ],
-  VOLATILITY_SQUEEZE: [
-    { stage: "FORMING", description: "Squeeze on - Bollinger Bands inside Keltner Channels." },
-    { stage: "READY", description: "Squeeze about to fire, near breakout level." },
-    { stage: "TRIGGERED", description: "Squeeze fired - breakout with volume expansion." },
-  ],
-};
-
 export default function Scanner() {
   const [, navigate] = useLocation();
-  const [filters, setFilters] = useState<ScannerFilters>(defaultFilters);
-  const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
-  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
-  const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all");
-  const [selectedStrategy, setSelectedStrategy] = useState<string>("VCP");
-  const [selectedStrategies, setSelectedStrategies] = useState<string[]>(STRATEGY_CONFIGS.map(s => s.id));
-  const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "card">("list");
-  const [activeTab, setActiveTab] = useState<"scan" | "confluence">("scan");
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
 
+  const [engineMode, setEngineMode] = useState<EngineMode>("single");
+  const [selectedStrategy, setSelectedStrategy] = useState<string>("VCP");
+  const [selectedStrategies, setSelectedStrategies] = useState<string[]>(STRATEGY_CONFIGS.map(s => s.id));
+  const [targetType, setTargetType] = useState<TargetType>("watchlist");
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
+  const [symbolInput, setSymbolInput] = useState<string>("");
+  const [selectedUniverse, setSelectedUniverse] = useState<string>("sp500");
+  const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
+  const [showGuide, setShowGuide] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  const [liveResults, setLiveResults] = useState<ScanResult[] | null>(null);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [confluenceResults, setConfluenceResults] = useState<ConfluenceResult[] | null>(null);
   const [marketRegime, setMarketRegime] = useState<MarketRegime | null>(null);
-
-  const confluenceMutation = useMutation({
-    mutationFn: async (params: {
-      strategies: string[];
-      minPrice?: number;
-      maxPrice?: number;
-      minVolume?: number;
-      minMatches?: number;
-    }) => {
-      const response = await apiRequest("POST", "/api/scan/confluence", params);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setConfluenceResults(data.results);
-      setMarketRegime(data.marketRegime);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Fusion Scan Failed",
-        description: error.message || "Failed to run multi-strategy scan",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const runFusionScan = () => {
-    if (!isConnected) {
-      toast({
-        title: "Not Connected",
-        description: "Please connect your brokerage in Settings first",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (selectedStrategies.length === 0) {
-      toast({
-        title: "No Strategies Selected",
-        description: "Please select at least one strategy to scan",
-        variant: "destructive",
-      });
-      return;
-    }
-    confluenceMutation.mutate({
-      strategies: selectedStrategies,
-      minPrice: filters.minPrice,
-      maxPrice: filters.maxPrice,
-      minVolume: filters.minVolume,
-      minMatches: 2,
-    });
-  };
-
-  const isConfluenceLoading = confluenceMutation.isPending;
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
   });
 
-  const currentStrategy = strategies?.find(s => s.id === selectedStrategy);
-  const currentStages = STRATEGY_STAGES[selectedStrategy] || STRATEGY_STAGES.VCP;
-
-  const handleRowClick = (result: ScanResult) => {
-    navigate(`/charts/${result.ticker}`);
-  };
+  const { data: watchlists } = useQuery<Watchlist[]>({
+    queryKey: ["/api/watchlists"],
+  });
 
   const { data: storedResults, isLoading, refetch, dataUpdatedAt } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
-  });
-
-  const { data: watchlists } = useQuery<Watchlist[]>({
-    queryKey: ["/api/watchlists"],
   });
 
   useEffect(() => {
@@ -236,47 +139,39 @@ export default function Scanner() {
     }
   }, [dataUpdatedAt, storedResults, liveResults]);
 
-  const rawResults = liveResults || storedResults;
-  const isLiveData = !!liveResults;
-  
-  const getSymbolsForPreset = (preset: string): string[] | null => {
-    switch (preset) {
-      case "toptech": return TOP_TECH_SYMBOLS;
-      case "dow30": return DOW_30_SYMBOLS;
-      case "nasdaq100": return NASDAQ_100_TOP;
-      case "sp500": return SP500_TOP;
-      default: return null;
-    }
+  const handleRowClick = (result: ScanResult) => {
+    navigate(`/charts/${result.ticker}`);
   };
-  
-  const pricePreset = PRICE_PRESETS.find(p => p.id === selectedPriceRange);
-  const presetSymbols = getSymbolsForPreset(selectedWatchlist);
-  const results = rawResults?.filter(r => {
-    if (isLiveData && presetSymbols && !presetSymbols.includes(r.ticker)) {
-      return false;
+
+  const getSymbolsForTarget = (): string[] | undefined => {
+    if (targetType === "symbol" && symbolInput.trim()) {
+      return symbolInput.toUpperCase().split(",").map(s => s.trim()).filter(Boolean);
     }
-    if (!pricePreset) return true;
-    const price = r.price || 0;
-    return price >= pricePreset.min && price < pricePreset.max;
-  });
+    if (targetType === "watchlist") {
+      if (selectedWatchlist === "default") return undefined;
+      const wl = watchlists?.find(w => w.id === selectedWatchlist);
+      return wl?.symbols || undefined;
+    }
+    if (targetType === "universe") {
+      switch (selectedUniverse) {
+        case "dow30": return DOW_30_SYMBOLS;
+        case "nasdaq100": return NASDAQ_100_TOP;
+        case "sp500": return SP500_TOP;
+        default: return undefined;
+      }
+    }
+    return undefined;
+  };
 
   const runScanMutation = useMutation({
     mutationFn: async () => {
-      let symbols: string[] | undefined;
-      
-      const presetSymbolsList = getSymbolsForPreset(selectedWatchlist);
-      if (presetSymbolsList) {
-        symbols = presetSymbolsList;
-      } else if (selectedWatchlist !== "default" && watchlists) {
-        const watchlist = watchlists.find(w => w.id === selectedWatchlist);
-        if (watchlist?.symbols && watchlist.symbols.length > 0) {
-          symbols = watchlist.symbols;
-        }
-      }
+      const symbols = getSymbolsForTarget();
+      const filters = PRESET_FILTERS[selectedPreset] || PRESET_FILTERS.balanced;
       
       const response = await apiRequest("POST", "/api/scan/live", { 
         symbols, 
-        strategy: selectedStrategy 
+        strategy: selectedStrategy,
+        ...filters,
       });
       return response.json();
     },
@@ -285,8 +180,8 @@ export default function Scanner() {
         setLiveResults(data);
         setLastScanTime(new Date());
         toast({
-          title: "Live Scan Complete",
-          description: `Fetched ${data.length} stocks from your broker`,
+          title: "Scan Complete",
+          description: `Found ${data.length} opportunities`,
         });
       } else {
         toast({
@@ -305,15 +200,70 @@ export default function Scanner() {
     },
   });
 
-  const handleResetFilters = () => {
-    setFilters(defaultFilters);
+  const confluenceMutation = useMutation({
+    mutationFn: async () => {
+      const symbols = getSymbolsForTarget();
+      const filters = PRESET_FILTERS[selectedPreset] || PRESET_FILTERS.balanced;
+      
+      const response = await apiRequest("POST", "/api/scan/confluence", {
+        strategies: selectedStrategies,
+        symbols,
+        minMatches: 2,
+        ...filters,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setConfluenceResults(data.results);
+      setMarketRegime(data.marketRegime);
+      toast({
+        title: "Fusion Scan Complete",
+        description: `Found ${data.results?.length || 0} confluence opportunities`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Fusion Scan Failed",
+        description: error.message || "Failed to run multi-strategy scan",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRunScan = () => {
+    if (!isConnected) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect your brokerage in Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (engineMode === "single") {
+      runScanMutation.mutate();
+    } else {
+      if (selectedStrategies.length < 2) {
+        toast({
+          title: "Select More Strategies",
+          description: "Fusion Engine requires at least 2 strategies",
+          variant: "destructive",
+        });
+        return;
+      }
+      confluenceMutation.mutate();
+    }
   };
 
-  const triggeredCount = results?.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length || 0;
-  const readyCount = results?.filter(r => r.stage === "READY").length || 0;
-  const formingCount = results?.filter(r => r.stage === "FORMING").length || 0;
-
-  const triggerLabel = selectedStrategy === "VCP" ? "Breakout" : "Triggered";
+  const isScanning = runScanMutation.isPending || confluenceMutation.isPending;
+  const rawResults = liveResults || storedResults;
+  
+  const filteredResults = rawResults?.filter(r => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return r.ticker.toLowerCase().includes(query) || 
+           r.name?.toLowerCase().includes(query);
+  });
 
   const getRegimeColor = (regime?: string) => {
     switch (regime) {
@@ -324,203 +274,270 @@ export default function Scanner() {
     }
   };
 
-  const getRegimeLabel = (regime?: string) => {
-    switch (regime) {
-      case "TRENDING": return "Trending";
-      case "CHOPPY": return "Choppy";
-      case "RISK_OFF": return "Risk-Off";
-      default: return "Unknown";
-    }
-  };
+  const currentStrategyConfig = STRATEGY_CONFIGS.find(s => s.id === selectedStrategy);
 
   return (
     <div className="p-6 space-y-6" data-testid="scanner-page">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Opportunity Engine</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Scan for trading opportunities across multiple strategies
-          </p>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+              <Target className="h-6 w-6" />
+              Opportunity Engine
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Find trading setups that match your strategy
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowGuide(!showGuide)}
+            className="gap-2"
+            data-testid="button-toggle-guide"
+          >
+            <HelpCircle className="h-4 w-4" />
+            How to use
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showGuide && "rotate-180")} />
+          </Button>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-            <SelectTrigger className="w-[200px]" data-testid="select-strategy">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Select strategy" />
-            </SelectTrigger>
-            <SelectContent>
-              {strategies?.map((strategy) => (
-                <SelectItem key={strategy.id} value={strategy.id}>
-                  {strategy.displayName || strategy.name}
-                </SelectItem>
-              )) || (
-                <>
-                  <SelectItem value="VCP">Momentum Breakout</SelectItem>
-                  <SelectItem value="CLASSIC_PULLBACK">Precision Pullback</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-          <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
-            <SelectTrigger className="w-[180px]" data-testid="select-watchlist">
-              <List className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Select watchlist" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default (16 stocks)</SelectItem>
-              <SelectItem value="toptech">Top Tech 5</SelectItem>
-              <SelectItem value="dow30">Dow 30</SelectItem>
-              <SelectItem value="nasdaq100">NASDAQ 100 Top 30</SelectItem>
-              <SelectItem value="sp500">S&P 500 Top 30</SelectItem>
-              {watchlists && watchlists.map((wl) => (
-                <SelectItem key={wl.id} value={wl.id}>
-                  {wl.name} ({wl.symbols?.length || 0})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
-            <SelectTrigger className="w-[150px]" data-testid="select-price-range">
-              <DollarSign className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Price range" />
-            </SelectTrigger>
-            <SelectContent>
-              {PRICE_PRESETS.map((preset) => (
-                <SelectItem key={preset.id} value={preset.id}>
-                  {preset.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-            data-testid="button-refresh"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button
-            onClick={() => runScanMutation.mutate()}
-            disabled={runScanMutation.isPending || !isConnected}
-            className="gap-2"
-            data-testid="button-run-scan"
-          >
-            {runScanMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-            {runScanMutation.isPending ? "Scanning..." : "Run Scan"}
-          </Button>
-        </div>
+        <Collapsible open={showGuide} onOpenChange={setShowGuide}>
+          <CollapsibleContent>
+            <Card className="mt-4 bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <BookOpen className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="space-y-3">
+                    <p className="font-medium">Quick Start Guide</p>
+                    <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                      <li><strong>Choose your mode:</strong> Single Strategy scans for one pattern. Fusion Engine finds stocks matching multiple patterns.</li>
+                      <li><strong>Select what to scan:</strong> Pick a watchlist, enter a stock symbol, or scan an entire market index.</li>
+                      <li><strong>Pick a preset:</strong> Balanced works for most traders. Conservative filters for safer trades. Aggressive shows more opportunities.</li>
+                      <li><strong>Run the scan:</strong> Click the button and review the results. Click any row to see the chart.</li>
+                    </ol>
+                    <div className="flex items-center gap-2 pt-2">
+                      <Link href="/strategies">
+                        <Button variant="outline" size="sm" className="gap-1" data-testid="link-strategy-guide">
+                          <Info className="h-4 w-4" />
+                          Strategy Guide
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "scan" | "confluence")} className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList>
-            <TabsTrigger value="scan" className="gap-2" data-testid="tab-scan">
-              <Search className="h-4 w-4" />
-              Single Strategy
-            </TabsTrigger>
-            <TabsTrigger value="confluence" className="gap-2" data-testid="tab-confluence">
-              <Layers className="h-4 w-4" />
-              Fusion Engine
-            </TabsTrigger>
-          </TabsList>
-          
-          {activeTab === "confluence" && (
-            <div className="flex items-center gap-3 flex-wrap">
+      <Card>
+        <CardContent className="p-6 space-y-6">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Step 1: Choose Mode</Label>
+            <RadioGroup 
+              value={engineMode} 
+              onValueChange={(v) => setEngineMode(v as EngineMode)}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="single" id="mode-single" data-testid="radio-single" />
+                <Label htmlFor="mode-single" className="flex items-center gap-2 cursor-pointer">
+                  <TrendingUp className="h-4 w-4" />
+                  Single Strategy
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="fusion" id="mode-fusion" data-testid="radio-fusion" />
+                <Label htmlFor="mode-fusion" className="flex items-center gap-2 cursor-pointer">
+                  <Layers className="h-4 w-4" />
+                  Fusion Engine
+                </Label>
+              </div>
+            </RadioGroup>
+            <p className="text-xs text-muted-foreground">
+              {engineMode === "single" 
+                ? `Scan for ${currentStrategyConfig?.displayName || "patterns"} - ${currentStrategyConfig?.shortDescription || ""}`
+                : FUSION_ENGINE_CONFIG.shortDescription
+              }
+            </p>
+          </div>
+
+          {engineMode === "single" ? (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Step 2: Select Strategy</Label>
+              <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
+                <SelectTrigger className="w-full max-w-md" data-testid="select-strategy">
+                  <SelectValue placeholder="Select strategy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STRATEGY_CONFIGS.map((strategy) => (
+                    <SelectItem key={strategy.id} value={strategy.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{strategy.displayName}</span>
+                        <span className="text-xs text-muted-foreground">({strategy.category})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Step 2: Select Strategies</Label>
               <StrategySelector
                 selectedStrategies={selectedStrategies}
                 onChange={setSelectedStrategies}
                 mode="multi"
               />
-              <Button 
-                onClick={runFusionScan}
-                disabled={isConfluenceLoading || selectedStrategies.length === 0}
-                className="gap-2"
-                data-testid="button-run-fusion-scan"
-              >
-                {isConfluenceLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Layers className="h-4 w-4" />
-                )}
-                {isConfluenceLoading ? "Scanning..." : "Run Fusion Scan"}
-              </Button>
-              {marketRegime && (
-                <div className="flex items-center gap-2">
-                  <Activity className={`h-4 w-4 ${getRegimeColor(marketRegime.regime)}`} />
-                  <span className="text-sm font-medium">Market:</span>
-                  <Badge variant="outline" className={getRegimeColor(marketRegime.regime)}>
-                    {getRegimeLabel(marketRegime.regime)}
-                  </Badge>
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {selectedStrategies.length} strategies selected. Stocks matching 2+ strategies will be highlighted.
+              </p>
             </div>
           )}
-        </div>
 
-        <TabsContent value="scan" className="space-y-4 mt-0">
-          <ScannerFiltersPanel
-            filters={filters}
-            onChange={setFilters}
-            onReset={handleResetFilters}
-          />
-
-          <Collapsible open={showStageInfo} onOpenChange={setShowStageInfo}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant="default" className="gap-1">
-                {triggerLabel} <span className="font-mono">{triggeredCount}</span>
-              </Badge>
-              <Badge variant="secondary" className="gap-1">
-                Ready <span className="font-mono">{readyCount}</span>
-              </Badge>
-              <Badge variant="outline" className="gap-1">
-                Forming <span className="font-mono">{formingCount}</span>
-              </Badge>
-              <span className="text-sm text-muted-foreground ml-2">
-                Total: <span className="font-mono">{results?.length || 0}</span> results
-              </span>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1 ml-auto" data-testid="button-stage-info">
-                  <Info className="h-4 w-4" />
-                  {showStageInfo ? "Hide" : "What do these stages mean?"}
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-            <CollapsibleContent className="mt-4">
-              <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
-                <p className="text-sm font-medium">{currentStrategy?.name || "Pattern"} Stages</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {currentStages.map((info) => (
-                    <div key={info.stage} className="flex gap-3">
-                      <Badge 
-                        variant={info.stage === "BREAKOUT" || info.stage === "TRIGGERED" ? "default" : info.stage === "READY" ? "secondary" : "outline"}
-                        className="h-fit shrink-0"
-                      >
-                        {info.stage}
-                      </Badge>
-                      <p className="text-sm text-muted-foreground">{info.description}</p>
-                    </div>
-                  ))}
-                </div>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Step 3: What to Scan</Label>
+            <RadioGroup 
+              value={targetType} 
+              onValueChange={(v) => setTargetType(v as TargetType)}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="watchlist" id="target-watchlist" data-testid="radio-watchlist" />
+                <Label htmlFor="target-watchlist" className="cursor-pointer">Watchlist</Label>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="symbol" id="target-symbol" data-testid="radio-symbol" />
+                <Label htmlFor="target-symbol" className="cursor-pointer">Single Stock</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="universe" id="target-universe" data-testid="radio-universe" />
+                <Label htmlFor="target-universe" className="cursor-pointer">Market Index</Label>
+              </div>
+            </RadioGroup>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <div className="max-w-md">
+              {targetType === "watchlist" && (
+                <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+                  <SelectTrigger data-testid="select-watchlist">
+                    <SelectValue placeholder="Select watchlist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default Watchlist</SelectItem>
+                    {watchlists?.map((wl) => (
+                      <SelectItem key={wl.id} value={wl.id}>
+                        {wl.name} ({wl.symbols?.length || 0} stocks)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {targetType === "symbol" && (
+                <Input
+                  placeholder="Enter symbol (e.g., AAPL) or multiple (AAPL, MSFT)"
+                  value={symbolInput}
+                  onChange={(e) => setSymbolInput(e.target.value.toUpperCase())}
+                  className="font-mono"
+                  data-testid="input-symbol"
+                />
+              )}
+
+              {targetType === "universe" && (
+                <Select value={selectedUniverse} onValueChange={setSelectedUniverse}>
+                  <SelectTrigger data-testid="select-universe">
+                    <SelectValue placeholder="Select market" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIVERSE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label} ({opt.count} stocks)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Step 4: Filter Preset</Label>
+            <Select value={selectedPreset} onValueChange={setSelectedPreset}>
+              <SelectTrigger className="w-full max-w-md" data-testid="select-preset">
+                <SelectValue placeholder="Select preset" />
+              </SelectTrigger>
+              <SelectContent>
+                {SCAN_PRESETS.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{preset.name}</span>
+                      <span className="text-xs text-muted-foreground">- {preset.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-4 pt-2">
+            <Button
+              onClick={handleRunScan}
+              disabled={isScanning || !isConnected}
+              size="lg"
+              className="gap-2"
+              data-testid="button-run-scan"
+            >
+              {isScanning ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : engineMode === "single" ? (
+                <Search className="h-5 w-5" />
+              ) : (
+                <Layers className="h-5 w-5" />
+              )}
+              {isScanning 
+                ? "Scanning..." 
+                : engineMode === "single" 
+                  ? "Run Scan" 
+                  : "Run Fusion Scan"
+              }
+            </Button>
+
+            {!isConnected && (
+              <p className="text-sm text-muted-foreground">
+                <Link href="/settings" className="text-primary underline">Connect your broker</Link> to run scans
+              </p>
+            )}
+
+            {marketRegime && engineMode === "fusion" && (
+              <div className="flex items-center gap-2 ml-auto">
+                <Activity className={`h-4 w-4 ${getRegimeColor(marketRegime.regime)}`} />
+                <span className="text-sm">Market:</span>
+                <Badge variant="outline" className={getRegimeColor(marketRegime.regime)}>
+                  {marketRegime.regime === "TRENDING" ? "Trending" : 
+                   marketRegime.regime === "CHOPPY" ? "Choppy" : "Risk-Off"}
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {lastScanTime && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Last scan: {format(lastScanTime, "h:mm a")}</span>
+            <span>({filteredResults?.length || 0} results)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by ticker or name..."
+                placeholder="Filter results..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8"
+                className="pl-9 pr-8 h-9"
                 data-testid="input-search"
               />
               {searchQuery && (
@@ -535,221 +552,92 @@ export default function Scanner() {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-1 border rounded-md p-0.5">
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1"
-                data-testid="button-view-list"
-              >
-                <List className="h-4 w-4" />
-                List
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1"
-                data-testid="button-view-card"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Cards
-              </Button>
-            </div>
-            {lastScanTime && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {isLiveData ? "Live scan" : "Loaded"}: {format(lastScanTime, "MMM d, h:mm:ss a")}
-                </span>
-              </div>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
+        </div>
+      )}
 
-          {!isLoading && (!results || results.length === 0) && !isConnected ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-muted-foreground font-medium">No broker connected</p>
-                <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
-                  Connect your brokerage account to scan for VCP patterns
-                </p>
-                <Link href="/settings">
-                  <Button variant="outline" className="gap-2">
-                    <Settings className="h-4 w-4" />
-                    Connect Broker
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ) : viewMode === "list" ? (
-            <ScannerTable results={results || []} isLoading={isLoading} onRowClick={handleRowClick} searchQuery={searchQuery} />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {(results || [])
-                .filter(r => !searchQuery || r.ticker.toLowerCase().includes(searchQuery.toLowerCase()) || r.name?.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map((result) => (
-                  <Card 
-                    key={result.id}
-                    className="hover-elevate active-elevate-2 cursor-pointer transition-all"
-                    onClick={() => handleRowClick(result)}
-                    data-testid={`scan-card-${result.ticker}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold font-mono">{result.ticker}</span>
-                          <Badge 
-                            variant={result.stage === "BREAKOUT" ? "default" : result.stage === "READY" ? "secondary" : "outline"}
-                            className="text-xs"
-                          >
-                            {result.stage}
+      {engineMode === "single" && filteredResults && filteredResults.length > 0 && (
+        <ScannerTable
+          results={filteredResults}
+          onRowClick={handleRowClick}
+          isLoading={isLoading}
+        />
+      )}
+
+      {engineMode === "fusion" && confluenceResults && confluenceResults.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Confluence Results
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {confluenceResults.map((result) => (
+                <div
+                  key={result.symbol}
+                  className="flex items-center justify-between p-3 rounded-lg border hover-elevate cursor-pointer"
+                  onClick={() => navigate(`/charts/${result.symbol}`)}
+                  data-testid={`confluence-row-${result.symbol}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="font-medium">{result.symbol}</p>
+                      <p className="text-sm text-muted-foreground">{result.name}</p>
+                    </div>
+                    <Badge variant="outline">${result.price.toFixed(2)}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="flex items-center gap-1">
+                        {result.matchedStrategies.map((s) => (
+                          <Badge key={s} variant="secondary" className="text-xs">
+                            {getStrategyDisplayName(s)}
                           </Badge>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        ))}
                       </div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-2xl font-bold font-mono">${result.price?.toFixed(2)}</span>
-                        {result.changePercent != null && (
-                          <Badge
-                            variant={(result.changePercent ?? 0) >= 0 ? "default" : "destructive"}
-                            className="font-mono text-xs"
-                          >
-                            {(result.changePercent ?? 0) >= 0 ? "+" : ""}{(result.changePercent ?? 0).toFixed(2)}%
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                            <Target className="h-3 w-3 text-chart-2" />
-                            Resistance
-                          </p>
-                          <p className="font-mono font-medium text-chart-2">${result.resistance?.toFixed(2) || "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3 text-destructive" />
-                            Stop Loss
-                          </p>
-                          <p className="font-mono font-medium text-destructive">${result.stopLoss?.toFixed(2) || "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5">RVOL</p>
-                          <p className={`font-mono font-medium ${(result.rvol || 0) >= 1.5 ? "text-chart-2" : ""}`}>
-                            {result.rvol?.toFixed(2) || "-"}x
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5">Score</p>
-                          <p className="font-mono font-medium">{result.patternScore || "-"}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Score: {result.adjustedScore}/100
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-        </TabsContent>
+          </CardContent>
+        </Card>
+      )}
 
-        <TabsContent value="confluence" className="space-y-4 mt-0">
-          <ScannerFiltersPanel
-            filters={filters}
-            onChange={setFilters}
-            onReset={() => setFilters(defaultFilters)}
-            showConfluence={true}
-          />
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                Multi-Strategy Confluence
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Stocks matching multiple strategies get higher scores. Results are adjusted based on current market regime.
+      {((engineMode === "single" && (!filteredResults || filteredResults.length === 0)) ||
+        (engineMode === "fusion" && (!confluenceResults || confluenceResults.length === 0))) && 
+        !isScanning && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-3">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-muted p-4">
+                  <Search className="h-8 w-8 text-muted-foreground" />
+                </div>
+              </div>
+              <p className="text-lg font-medium">No results yet</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Configure your scan options above and click "Run Scan" to find trading opportunities.
               </p>
-            </CardHeader>
-            <CardContent>
-              {!isConnected ? (
-                <div className="text-center py-8">
-                  <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground font-medium">No broker connected</p>
-                  <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
-                    Connect your brokerage to scan for confluence patterns
-                  </p>
-                  <Link href="/settings">
-                    <Button variant="outline" className="gap-2">
-                      <Settings className="h-4 w-4" />
-                      Connect Broker
-                    </Button>
-                  </Link>
-                </div>
-              ) : isConfluenceLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : confluenceResults && confluenceResults.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {confluenceResults.map((item) => (
-                    <Card 
-                      key={item.symbol}
-                      className="hover-elevate active-elevate-2 cursor-pointer"
-                      onClick={() => navigate(`/charts/${item.symbol}`)}
-                      data-testid={`confluence-card-${item.symbol}`}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <span className="text-lg font-bold font-mono">{item.symbol}</span>
-                            <Badge variant="secondary" className="ml-2 text-xs">
-                              {item.primaryStage}
-                            </Badge>
-                          </div>
-                          <Badge 
-                            variant={item.adjustedScore >= 80 ? "default" : item.adjustedScore >= 60 ? "secondary" : "outline"}
-                            className="font-mono"
-                          >
-                            {item.adjustedScore}
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {item.matchedStrategies.map((strat) => (
-                            <Badge key={strat} variant="outline" className="text-xs">
-                              {getStrategyDisplayName(strat)}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Resistance</p>
-                            <p className="font-mono font-medium text-chart-2">
-                              ${item.keyLevels.resistance?.toFixed(2) || "-"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Stop Loss</p>
-                            <p className="font-mono font-medium text-destructive">
-                              ${item.keyLevels.stop?.toFixed(2) || "-"}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium">Ready to Scan</p>
-                  <p className="text-sm mt-1">Select strategies above and click "Run Fusion Scan" to find multi-strategy setups</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-        </TabsContent>
-      </Tabs>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
