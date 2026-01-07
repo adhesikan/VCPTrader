@@ -1,6 +1,5 @@
 import { Link, useLocation } from "wouter";
 import {
-  LayoutDashboard,
   Search,
   BarChart3,
   Bell,
@@ -29,9 +28,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { BrokerConnection, Alert } from "@shared/schema";
 
 const mainNavItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Opportunity Engine", url: "/", icon: Search },
   { title: "Breakout Alerts", url: "/signals", icon: Zap },
-  { title: "Opportunity Engine", url: "/scanner", icon: Search },
   { title: "Charts", url: "/charts", icon: BarChart3 },
   { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Watchlists", url: "/watchlists", icon: List },

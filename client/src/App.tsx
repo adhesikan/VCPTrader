@@ -28,7 +28,6 @@ import { LogOut, User, Loader2 } from "lucide-react";
 import { BrokerStatusProvider } from "@/hooks/use-broker-status";
 import { StatusBanner } from "@/components/status-banner";
 
-import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
 import Charts from "@/pages/charts";
 import Alerts from "@/pages/alerts";
@@ -48,10 +47,9 @@ import NotFound from "@/pages/not-found";
 function AppRouter() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/signals" component={Signals} />
+      <Route path="/" component={Scanner} />
       <Route path="/scanner" component={Scanner} />
+      <Route path="/signals" component={Signals} />
       <Route path="/charts" component={Charts} />
       <Route path="/charts/:ticker" component={Charts} />
       <Route path="/alerts" component={Alerts} />
