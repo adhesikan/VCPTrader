@@ -232,7 +232,7 @@ function HeroSection() {
           )}
         </div>
         <p className="mt-4 text-sm text-muted-foreground" data-testid="text-hero-disclaimer">
-          Educational & informational only — not investment advice.
+          Informational only — not investment advice.
         </p>
       </div>
     </section>
@@ -413,13 +413,13 @@ function VCPTraderProSection() {
       ],
     },
     {
-      title: "Educational Model Feed",
+      title: "Signal Feed",
       icon: BookOpen,
       features: [
         '"Today\'s Breakouts"',
         '"Forming Bases"',
         '"Ready Setups"',
-        "Model-generated educational alerts",
+        "Model-generated alerts",
       ],
     },
     {
@@ -540,7 +540,7 @@ function VCPTraderProSection() {
         </Card>
 
         <p className="text-center mt-8 text-xs text-muted-foreground max-w-2xl mx-auto" data-testid="text-compliance">
-          All data, alerts, and model outputs are provided for educational and informational purposes only. VCP Trader does not provide investment advice.
+          All data, alerts, and model outputs are provided for informational purposes only. VCP Trader does not provide investment advice.
         </p>
       </div>
     </section>
@@ -625,7 +625,7 @@ function FAQSection() {
   const faqs = [
     {
       question: "Is this investment advice?",
-      answer: "No. VCP Trader is an educational and informational platform for self-directed traders. We do not provide personalized investment recommendations or advice. All alerts and scan results are for educational purposes only.",
+      answer: "No. VCP Trader is an informational platform for self-directed traders. We do not provide personalized investment recommendations or advice. All alerts and scan results are for informational purposes only.",
     },
     {
       question: "What is a VCP setup?",
@@ -699,7 +699,7 @@ function LandingFooter() {
           </div>
         </div>
         <p className="text-center text-xs text-muted-foreground mt-8" data-testid="text-footer-disclaimer">
-          VCP Trader is an educational market-analysis and alerting platform. Not investment advice.
+          VCP Trader is a market-analysis and alerting platform. Not investment advice.
         </p>
       </div>
     </footer>

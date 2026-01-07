@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { 
-  Search, Loader2, RefreshCw, List, Info, HelpCircle, ChevronDown, ChevronRight, 
-  TrendingUp, Layers, Activity, Zap, Target, BookOpen, X, LayoutGrid, LayoutList,
+  Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
+  TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
   AlertTriangle, Clock, CheckCircle2, Flame
 } from "lucide-react";
 import { format } from "date-fns";
@@ -25,11 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName, FUSION_ENGINE_CONFIG } from "@shared/strategies";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
@@ -103,8 +99,7 @@ export default function Scanner() {
   const [symbolInput, setSymbolInput] = useState<string>("");
   const [selectedUniverse, setSelectedUniverse] = useState<string>("sp500");
   const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
-  const [showGuide, setShowGuide] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [featuredViewMode, setFeaturedViewMode] = useState<"cards" | "list">("cards");
   const [filters, setFilters] = useState<ScannerFilters>({
@@ -433,80 +428,15 @@ export default function Scanner() {
   return (
     <div className="p-6 space-y-6" data-testid="scanner-page">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Target className="h-6 w-6" />
-              Opportunity Engine
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Find trading setups that match your strategy
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowGuide(!showGuide)}
-            className="gap-2"
-            data-testid="button-toggle-guide"
-          >
-            <HelpCircle className="h-4 w-4" />
-            How to use
-            <ChevronDown className={cn("h-4 w-4 transition-transform", showGuide && "rotate-180")} />
-          </Button>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Target className="h-6 w-6" />
+            Opportunity Engine
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Find trading setups that match your strategy
+          </p>
         </div>
-
-        <Collapsible open={showGuide} onOpenChange={setShowGuide}>
-          <CollapsibleContent>
-            <Card className="mt-4 bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <BookOpen className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div className="space-y-3">
-                    <p className="font-medium">Quick Start Guide</p>
-                    <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                      <li><strong>Choose your mode:</strong> Single Strategy scans for one pattern. Fusion Engine finds stocks matching multiple patterns.</li>
-                      <li><strong>Select what to scan:</strong> Pick a watchlist, enter a stock symbol, or scan an entire market index.</li>
-                      <li><strong>Pick a preset:</strong> Balanced works for most traders. Conservative filters for safer trades. Aggressive shows more opportunities.</li>
-                      <li><strong>Run the scan:</strong> Click the button and review the results. Click any row to see the chart.</li>
-                    </ol>
-                    
-                    <div className="mt-4 pt-3 border-t border-border/50">
-                      <p className="font-medium mb-2">Understanding Pattern Stages</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 shrink-0">FORMING</Badge>
-                          <span>Pattern is developing. Price is consolidating with decreasing volatility. Add to watchlist for monitoring.</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">READY</Badge>
-                          <span>Pattern is mature and approaching breakout zone. Set alerts and prepare your entry plan.</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">BREAKOUT</Badge>
-                          <span>Price breaking above resistance with volume confirmation. This is your potential entry signal.</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">TRIGGERED</Badge>
-                          <span>Breakout confirmed with follow-through. Pattern has activated - monitor for continuation or exit.</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 pt-3">
-                      <Link href="/strategy-guide">
-                        <Button variant="outline" size="sm" className="gap-1" data-testid="link-strategy-guide">
-                          <Info className="h-4 w-4" />
-                          Strategy Guide
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </CollapsibleContent>
-        </Collapsible>
       </div>
 
       {/* Featured Opportunities - Breakout & Triggered Symbols */}

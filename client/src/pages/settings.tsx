@@ -770,7 +770,7 @@ function LegalSettings() {
                     <Shield className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium">Disclaimer</p>
-                      <p className="text-xs text-muted-foreground">Educational only</p>
+                      <p className="text-xs text-muted-foreground">Risk disclosure</p>
                     </div>
                     <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
                   </div>

@@ -41,7 +41,6 @@ import TermsPage from "@/pages/terms";
 import DisclaimerPage from "@/pages/disclaimer";
 import PrivacyPage from "@/pages/privacy";
 import OpenSourcePage from "@/pages/open-source";
-import StrategyGuide from "@/pages/strategy-guide";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -55,7 +54,6 @@ function AppRouter() {
       <Route path="/alerts" component={Alerts} />
       <Route path="/watchlists" component={Watchlists} />
       <Route path="/backtest" component={Backtest} />
-      <Route path="/strategy-guide" component={StrategyGuide} />
       <Route path="/settings" component={Settings} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/disclaimer" component={DisclaimerPage} />

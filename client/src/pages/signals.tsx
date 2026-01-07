@@ -413,7 +413,7 @@ export default function Signals() {
       <div>
         <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Educational VCP pattern alerts - click for detailed analysis
+          Pattern alerts - click for detailed analysis
         </p>
       </div>
 
@@ -586,12 +586,6 @@ export default function Signals() {
         ticker={selectedTicker || ""}
       />
 
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-        <p className="text-sm text-amber-600 dark:text-amber-400">
-          <strong>Disclaimer:</strong> These signals are for educational purposes only and should not be considered financial advice. 
-          Always do your own research and consult with a qualified financial advisor before making any trading decisions.
-        </p>
-      </div>
     </div>
   );
 }
