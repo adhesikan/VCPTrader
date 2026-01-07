@@ -656,7 +656,8 @@ export default function Scanner() {
         <TabsContent value="confluence" className="space-y-4 mt-0">
           <ScannerFiltersPanel
             filters={filters}
-            onFiltersChange={setFilters}
+            onChange={setFilters}
+            onReset={() => setFilters(defaultFilters)}
           />
           <Card>
             <CardHeader className="pb-3">
@@ -746,9 +747,6 @@ export default function Scanner() {
             </CardContent>
           </Card>
           
-          <p className="text-xs text-muted-foreground text-center">
-            This alert is informational only and not investment advice. Always do your own research before trading.
-          </p>
         </TabsContent>
       </Tabs>
     </div>

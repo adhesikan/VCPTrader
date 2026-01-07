@@ -63,7 +63,7 @@ function getStageBadgeVariant(stage: PatternStageType): "default" | "secondary" 
 }
 
 export function ScannerTable({ results, isLoading, onRowClick, searchQuery = "" }: ScannerTableProps) {
-  const [sortField, setSortField] = useState<SortField>("patternScore");
+  const [sortField, setSortField] = useState<SortField>("stage");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
