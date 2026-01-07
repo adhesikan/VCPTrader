@@ -29,10 +29,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo } from "@shared/schema";
+import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName, FUSION_ENGINE_CONFIG } from "@shared/strategies";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 import { cn } from "@/lib/utils";
+import { Save } from "lucide-react";
 
 type EngineMode = "single" | "fusion";
 type TargetType = "watchlist" | "symbol" | "universe";
@@ -125,12 +126,19 @@ export default function Scanner() {
     scanTimeMs: number;
     batchCount?: number;
   } | null>(null);
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+  const [autoRunOnLoad, setAutoRunOnLoad] = useState(false);
+  const [shouldAutoRun, setShouldAutoRun] = useState(false);
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
   });
 
-  const { data: watchlists } = useQuery<Watchlist[]>({
+  const { data: userDefaults, isLoading: defaultsLoading } = useQuery<OpportunityDefaults | null>({
+    queryKey: ["/api/user/opportunity-defaults"],
+  });
+
+  const { data: watchlists, isLoading: watchlistsLoading } = useQuery<Watchlist[]>({
     queryKey: ["/api/watchlists"],
   });
 
@@ -154,6 +162,86 @@ export default function Scanner() {
       setLastScanTime(new Date(dataUpdatedAt));
     }
   }, [dataUpdatedAt, storedResults, liveResults]);
+
+  useEffect(() => {
+    if (userDefaults && !defaultsApplied && !defaultsLoading && !watchlistsLoading) {
+      if (userDefaults.defaultMode) {
+        setEngineMode(userDefaults.defaultMode as EngineMode);
+      }
+      if (userDefaults.defaultStrategyId) {
+        setSelectedStrategy(userDefaults.defaultStrategyId);
+      }
+      if (userDefaults.defaultScanScope) {
+        setTargetType(userDefaults.defaultScanScope as TargetType);
+      }
+      if (userDefaults.defaultWatchlistId) {
+        const watchlistExists = watchlists?.some(w => w.id === userDefaults.defaultWatchlistId);
+        if (watchlistExists) {
+          setSelectedWatchlist(userDefaults.defaultWatchlistId);
+        } else if (userDefaults.defaultWatchlistId !== "default") {
+          toast({
+            title: "Saved watchlist not found",
+            description: "Using Default Watchlist instead",
+          });
+        }
+      }
+      if (userDefaults.defaultSymbol) {
+        setSymbolInput(userDefaults.defaultSymbol);
+      }
+      if (userDefaults.defaultMarketIndex) {
+        setSelectedUniverse(userDefaults.defaultMarketIndex);
+      }
+      if (userDefaults.defaultFilterPreset) {
+        applyPreset(userDefaults.defaultFilterPreset);
+      }
+      if (userDefaults.autoRunOnLoad) {
+        setAutoRunOnLoad(true);
+        setShouldAutoRun(true);
+      }
+      setDefaultsApplied(true);
+    }
+  }, [userDefaults, defaultsApplied, defaultsLoading, watchlistsLoading, watchlists]);
+
+  useEffect(() => {
+    if (shouldAutoRun && defaultsApplied && isConnected && !runScanMutation.isPending && !confluenceMutation.isPending) {
+      setShouldAutoRun(false);
+      if (engineMode === "fusion") {
+        confluenceMutation.mutate();
+      } else {
+        runScanMutation.mutate();
+      }
+    }
+  }, [shouldAutoRun, defaultsApplied, isConnected, engineMode]);
+
+  const saveDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("PUT", "/api/user/opportunity-defaults", {
+        defaultMode: engineMode,
+        defaultStrategyId: selectedStrategy,
+        defaultScanScope: targetType,
+        defaultWatchlistId: targetType === "watchlist" ? selectedWatchlist : null,
+        defaultSymbol: targetType === "symbol" ? symbolInput : null,
+        defaultMarketIndex: targetType === "universe" ? selectedUniverse : null,
+        defaultFilterPreset: selectedPreset,
+        autoRunOnLoad,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/opportunity-defaults"] });
+      toast({
+        title: "Default scan saved",
+        description: "Your settings will be applied when you return",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to save defaults",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleRowClick = (result: ScanResult) => {
     navigate(`/charts/${result.ticker}`);
@@ -656,6 +744,35 @@ export default function Scanner() {
                   : "Run Fusion Scan"
               }
             </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => saveDefaultsMutation.mutate()}
+              disabled={saveDefaultsMutation.isPending}
+              className="gap-2"
+              data-testid="button-save-defaults"
+            >
+              {saveDefaultsMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Save as Default
+            </Button>
+
+            <div className="flex items-center gap-2 ml-2">
+              <Switch
+                id="autoRunOnLoad"
+                checked={autoRunOnLoad}
+                onCheckedChange={setAutoRunOnLoad}
+                data-testid="switch-auto-run"
+              />
+              <Label htmlFor="autoRunOnLoad" className="text-sm cursor-pointer whitespace-nowrap">Auto-run on load</Label>
+            </div>
+
+            {userDefaults && defaultsApplied && (
+              <span className="text-xs text-muted-foreground ml-2">Using saved defaults</span>
+            )}
 
             {!isConnected && (
               <p className="text-sm text-muted-foreground">

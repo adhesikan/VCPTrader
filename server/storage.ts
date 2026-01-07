@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -36,6 +36,8 @@ import type {
   InsertUserAutomationSettings,
   AutomationEvent,
   InsertAutomationEvent,
+  OpportunityDefaults,
+  InsertOpportunityDefaults,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -128,6 +130,10 @@ export interface IStorage {
   updateAutomationEvent(id: string, data: Partial<AutomationEvent>): Promise<AutomationEvent | null>;
   countTodayAutomationEventsByProfile(profileId: string): Promise<number>;
   getLastSentEventForSymbol(profileId: string, symbol: string): Promise<AutomationEvent | null>;
+
+  getOpportunityDefaults(userId: string): Promise<OpportunityDefaults | null>;
+  setOpportunityDefaults(userId: string, defaults: Partial<InsertOpportunityDefaults>): Promise<OpportunityDefaults>;
+  deleteOpportunityDefaults(userId: string): Promise<void>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1259,6 +1265,40 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     
     return events[0] || null;
+  }
+
+  async getOpportunityDefaults(userId: string): Promise<OpportunityDefaults | null> {
+    const [defaults] = await db
+      .select()
+      .from(opportunityDefaultsTable)
+      .where(eq(opportunityDefaultsTable.userId, userId))
+      .limit(1);
+    return defaults || null;
+  }
+
+  async setOpportunityDefaults(userId: string, defaults: Partial<InsertOpportunityDefaults>): Promise<OpportunityDefaults> {
+    const existing = await this.getOpportunityDefaults(userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(opportunityDefaultsTable)
+        .set({ ...defaults, updatedAt: new Date() })
+        .where(eq(opportunityDefaultsTable.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(opportunityDefaultsTable)
+        .values({ userId, ...defaults })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteOpportunityDefaults(userId: string): Promise<void> {
+    await db
+      .delete(opportunityDefaultsTable)
+      .where(eq(opportunityDefaultsTable.userId, userId));
   }
 }
 

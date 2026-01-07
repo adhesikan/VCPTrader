@@ -1654,6 +1654,66 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/user/opportunity-defaults", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const defaults = await storage.getOpportunityDefaults(userId);
+      res.json(defaults);
+    } catch (error) {
+      console.error("Failed to get opportunity defaults:", error);
+      res.status(500).json({ error: "Failed to get opportunity defaults" });
+    }
+  });
+
+  const opportunityDefaultsSchema = z.object({
+    defaultMode: z.enum(["single", "fusion"]).optional(),
+    defaultStrategyId: z.string().optional(),
+    defaultScanScope: z.enum(["watchlist", "symbol", "universe"]).optional(),
+    defaultWatchlistId: z.string().nullable().optional(),
+    defaultSymbol: z.string().nullable().optional(),
+    defaultMarketIndex: z.string().nullable().optional(),
+    defaultFilterPreset: z.string().optional(),
+    autoRunOnLoad: z.boolean().optional(),
+  });
+
+  app.put("/api/user/opportunity-defaults", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const parsed = opportunityDefaultsSchema.parse(req.body);
+      const defaults = await storage.setOpportunityDefaults(userId, parsed);
+      res.json(defaults);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Failed to save opportunity defaults:", error);
+      res.status(500).json({ error: "Failed to save opportunity defaults" });
+    }
+  });
+
+  app.delete("/api/user/opportunity-defaults", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      await storage.deleteOpportunityDefaults(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete opportunity defaults:", error);
+      res.status(500).json({ error: "Failed to delete opportunity defaults" });
+    }
+  });
+
   app.get("/api/automation-events", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;

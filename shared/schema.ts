@@ -505,3 +505,22 @@ export const insertAutomationEventSchema = createInsertSchema(automationEvents).
 });
 export type InsertAutomationEvent = z.infer<typeof insertAutomationEventSchema>;
 export type AutomationEvent = typeof automationEvents.$inferSelect;
+
+export const opportunityDefaults = pgTable("opportunity_defaults", {
+  userId: varchar("user_id").primaryKey(),
+  defaultMode: text("default_mode").notNull().default("single"),
+  defaultStrategyId: text("default_strategy_id").notNull().default("VCP"),
+  defaultScanScope: text("default_scan_scope").notNull().default("watchlist"),
+  defaultWatchlistId: text("default_watchlist_id"),
+  defaultSymbol: text("default_symbol"),
+  defaultMarketIndex: text("default_market_index"),
+  defaultFilterPreset: text("default_filter_preset").notNull().default("balanced"),
+  autoRunOnLoad: boolean("auto_run_on_load").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOpportunityDefaultsSchema = createInsertSchema(opportunityDefaults).omit({ 
+  updatedAt: true 
+});
+export type InsertOpportunityDefaults = z.infer<typeof insertOpportunityDefaultsSchema>;
+export type OpportunityDefaults = typeof opportunityDefaults.$inferSelect;

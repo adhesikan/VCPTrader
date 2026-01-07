@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { BrokerConnection, BrokerProviderType } from "@shared/schema";
+import type { BrokerConnection, BrokerProviderType, OpportunityDefaults } from "@shared/schema";
+import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
 
 const brokerProviders = [
   { 
@@ -489,64 +490,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="scanner">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-medium">Default Scanner Settings</CardTitle>
-              <CardDescription>
-                Configure default filters for VCP scans
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="default-universe">Default Universe</Label>
-                  <Select defaultValue="all">
-                    <SelectTrigger id="default-universe" data-testid="select-default-universe">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All US Stocks</SelectItem>
-                      <SelectItem value="sp500">S&P 500</SelectItem>
-                      <SelectItem value="nasdaq100">Nasdaq 100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="scan-interval">Auto-scan Interval</Label>
-                  <Select defaultValue="5">
-                    <SelectTrigger id="scan-interval" data-testid="select-scan-interval">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Every 1 minute</SelectItem>
-                      <SelectItem value="5">Every 5 minutes</SelectItem>
-                      <SelectItem value="15">Every 15 minutes</SelectItem>
-                      <SelectItem value="30">Every 30 minutes</SelectItem>
-                      <SelectItem value="0">Manual only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="min-price">Min Price ($)</Label>
-                  <Input id="min-price" type="number" defaultValue="5" className="font-mono" data-testid="input-min-price" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max-price">Max Price ($)</Label>
-                  <Input id="max-price" type="number" defaultValue="500" className="font-mono" data-testid="input-max-price" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="min-volume">Min Volume</Label>
-                  <Input id="min-volume" type="number" defaultValue="500000" className="font-mono" data-testid="input-min-volume" />
-                </div>
-              </div>
-
-              <Button data-testid="button-save-settings">Save Settings</Button>
-            </CardContent>
-          </Card>
+          <OpportunityDefaultsSettings />
         </TabsContent>
 
         <TabsContent value="legal">
@@ -558,6 +502,163 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+const SCAN_PRESETS = [
+  { id: "balanced", name: "Balanced" },
+  { id: "conservative", name: "Conservative" },
+  { id: "aggressive", name: "Aggressive" },
+  { id: "scalp", name: "Scalp" },
+  { id: "swing", name: "Swing" },
+];
+
+function OpportunityDefaultsSettings() {
+  const { toast } = useToast();
+  
+  const { data: defaults, isLoading } = useQuery<OpportunityDefaults | null>({
+    queryKey: ["/api/user/opportunity-defaults"],
+  });
+
+  const resetDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/user/opportunity-defaults", {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/opportunity-defaults"] });
+      toast({
+        title: "Defaults reset",
+        description: "Your scan defaults have been reset to app defaults",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Reset failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getStrategyName = (strategyId: string) => {
+    const strategy = STRATEGY_CONFIGS.find(s => s.id === strategyId);
+    return strategy ? getStrategyDisplayName(strategy.id) : strategyId;
+  };
+
+  const getScopeName = (scope: string) => {
+    switch (scope) {
+      case "watchlist": return "Watchlist";
+      case "symbol": return "Single Stock";
+      case "universe": return "Market Index";
+      default: return scope;
+    }
+  };
+
+  const getPresetName = (presetId: string) => {
+    const preset = SCAN_PRESETS.find(p => p.id === presetId);
+    return preset?.name || presetId;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-muted-foreground">Loading scan defaults...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-medium">Opportunity Engine Defaults</CardTitle>
+        <CardDescription>
+          Your saved default scan settings. Set defaults from the Opportunity Engine page using "Save as Default".
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {defaults ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Mode</p>
+                <p className="font-medium" data-testid="text-default-mode">
+                  {defaults.defaultMode === "fusion" ? "Fusion Engine" : "Single Strategy"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Strategy</p>
+                <p className="font-medium" data-testid="text-default-strategy">
+                  {getStrategyName(defaults.defaultStrategyId)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Scan Target</p>
+                <p className="font-medium" data-testid="text-default-scope">
+                  {getScopeName(defaults.defaultScanScope)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Filter Preset</p>
+                <p className="font-medium" data-testid="text-default-preset">
+                  {getPresetName(defaults.defaultFilterPreset)}
+                </p>
+              </div>
+              {defaults.defaultWatchlistId && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Watchlist</p>
+                  <p className="font-medium" data-testid="text-default-watchlist">
+                    {defaults.defaultWatchlistId === "default" ? "Default Watchlist" : defaults.defaultWatchlistId}
+                  </p>
+                </div>
+              )}
+              {defaults.defaultSymbol && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Symbol</p>
+                  <p className="font-medium font-mono" data-testid="text-default-symbol">
+                    {defaults.defaultSymbol}
+                  </p>
+                </div>
+              )}
+              {defaults.defaultMarketIndex && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Market Index</p>
+                  <p className="font-medium" data-testid="text-default-index">
+                    {defaults.defaultMarketIndex}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Auto-run on Load</p>
+                <p className="font-medium" data-testid="text-default-autorun">
+                  {defaults.autoRunOnLoad ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                onClick={() => resetDefaultsMutation.mutate()}
+                disabled={resetDefaultsMutation.isPending}
+                data-testid="button-reset-defaults"
+              >
+                {resetDefaultsMutation.isPending ? "Resetting..." : "Reset to App Defaults"}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-6">
+            <p className="text-muted-foreground mb-4">No defaults saved yet</p>
+            <p className="text-sm text-muted-foreground">
+              Go to the Opportunity Engine and click "Save as Default" to save your preferred scan settings.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
