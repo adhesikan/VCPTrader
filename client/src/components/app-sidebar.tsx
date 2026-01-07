@@ -63,6 +63,10 @@ export function AppSidebar() {
         <Link href="/" data-testid="link-home">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="VCP Trader" className="h-8 w-auto" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm leading-tight">VCP Trader</span>
+              <span className="text-xs text-muted-foreground leading-tight">Multi-Strategy Trading Intelligence</span>
+            </div>
           </div>
         </Link>
       </SidebarHeader>
