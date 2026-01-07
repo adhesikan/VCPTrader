@@ -25,6 +25,21 @@ interface ScannerFiltersProps {
   onReset: () => void;
 }
 
+const SECTOR_OPTIONS = [
+  { value: "all", label: "All Sectors" },
+  { value: "Technology", label: "Technology" },
+  { value: "Healthcare", label: "Healthcare" },
+  { value: "Financial Services", label: "Financial" },
+  { value: "Consumer Cyclical", label: "Consumer Cyclical" },
+  { value: "Consumer Defensive", label: "Consumer Defensive" },
+  { value: "Industrials", label: "Industrials" },
+  { value: "Energy", label: "Energy" },
+  { value: "Basic Materials", label: "Basic Materials" },
+  { value: "Communication Services", label: "Communication" },
+  { value: "Real Estate", label: "Real Estate" },
+  { value: "Utilities", label: "Utilities" },
+];
+
 const defaultFilters: ScannerFilters = {
   minPrice: 5,
   maxPrice: 500,
@@ -34,6 +49,8 @@ const defaultFilters: ScannerFilters = {
   excludeEtfs: true,
   excludeOtc: true,
   universe: "all",
+  sector: undefined,
+  strategies: undefined,
 };
 
 export function ScannerFiltersPanel({ filters, onChange, onReset }: ScannerFiltersProps) {
@@ -91,7 +108,29 @@ export function ScannerFiltersPanel({ filters, onChange, onReset }: ScannerFilte
                     <SelectItem value="all">All US Stocks</SelectItem>
                     <SelectItem value="sp500">S&P 500</SelectItem>
                     <SelectItem value="nasdaq100">Nasdaq 100</SelectItem>
+                    <SelectItem value="dow30">Dow 30</SelectItem>
                     <SelectItem value="watchlist">My Watchlist</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sector" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Sector
+                </Label>
+                <Select
+                  value={filters.sector || "all"}
+                  onValueChange={(value) => updateFilter("sector", value === "all" ? undefined : value)}
+                >
+                  <SelectTrigger id="sector" data-testid="select-sector">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTOR_OPTIONS.map((sector) => (
+                      <SelectItem key={sector.value} value={sector.value}>
+                        {sector.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

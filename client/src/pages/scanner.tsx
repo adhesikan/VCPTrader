@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScannerTable } from "@/components/scanner-table";
 import { ScannerFiltersPanel, defaultFilters } from "@/components/scanner-filters";
+import { StrategySelector } from "@/components/strategy-selector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -30,6 +31,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo } from "@shared/schema";
+import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
 
 interface MarketRegime {
   regime: "TRENDING" | "CHOPPY" | "RISK_OFF";
@@ -145,6 +147,7 @@ export default function Scanner() {
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("default");
   const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("VCP");
+  const [selectedStrategies, setSelectedStrategies] = useState<string[]>(STRATEGY_CONFIGS.map(s => s.id));
   const [showStageInfo, setShowStageInfo] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
@@ -382,17 +385,26 @@ export default function Scanner() {
             </TabsTrigger>
             <TabsTrigger value="confluence" className="gap-2" data-testid="tab-confluence">
               <Layers className="h-4 w-4" />
-              Confluence
+              Fusion Engine
             </TabsTrigger>
           </TabsList>
           
-          {activeTab === "confluence" && marketRegime && (
-            <div className="flex items-center gap-2">
-              <Activity className={`h-4 w-4 ${getRegimeColor(marketRegime.regime)}`} />
-              <span className="text-sm font-medium">Market Regime:</span>
-              <Badge variant="outline" className={getRegimeColor(marketRegime.regime)}>
-                {getRegimeLabel(marketRegime.regime)}
-              </Badge>
+          {activeTab === "confluence" && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <StrategySelector
+                selectedStrategies={selectedStrategies}
+                onChange={setSelectedStrategies}
+                mode="multi"
+              />
+              {marketRegime && (
+                <div className="flex items-center gap-2">
+                  <Activity className={`h-4 w-4 ${getRegimeColor(marketRegime.regime)}`} />
+                  <span className="text-sm font-medium">Market:</span>
+                  <Badge variant="outline" className={getRegimeColor(marketRegime.regime)}>
+                    {getRegimeLabel(marketRegime.regime)}
+                  </Badge>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -642,7 +654,7 @@ export default function Scanner() {
                         <div className="flex flex-wrap gap-1 mb-3">
                           {item.matchedStrategies.map((strat) => (
                             <Badge key={strat} variant="outline" className="text-xs">
-                              {strat.replace(/_/g, " ")}
+                              {getStrategyDisplayName(strat)}
                             </Badge>
                           ))}
                         </div>
