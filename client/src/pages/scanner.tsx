@@ -131,6 +131,7 @@ export default function Scanner() {
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [autoRunOnLoad, setAutoRunOnLoad] = useState(false);
   const [shouldAutoRun, setShouldAutoRun] = useState(false);
+  const [initialScanDone, setInitialScanDone] = useState(false);
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -214,6 +215,35 @@ export default function Scanner() {
       }
     }
   }, [shouldAutoRun, defaultsApplied, isConnected, engineMode]);
+
+  // Auto-run scan on page load (with or without saved defaults)
+  useEffect(() => {
+    const shouldRun = !initialScanDone && 
+                      isConnected && 
+                      !defaultsLoading && 
+                      !watchlistsLoading &&
+                      !runScanMutation.isPending && 
+                      !confluenceMutation.isPending;
+    
+    if (shouldRun) {
+      // If user has saved defaults with autoRunOnLoad, that effect will handle it
+      // Otherwise, run with current/default settings after a short delay
+      const hasAutoRunDefaults = userDefaults?.autoRunOnLoad;
+      if (!hasAutoRunDefaults) {
+        setInitialScanDone(true);
+        // Small delay to ensure UI is ready
+        setTimeout(() => {
+          if (engineMode === "fusion") {
+            confluenceMutation.mutate();
+          } else {
+            runScanMutation.mutate();
+          }
+        }, 500);
+      } else {
+        setInitialScanDone(true);
+      }
+    }
+  }, [initialScanDone, isConnected, defaultsLoading, watchlistsLoading, userDefaults, engineMode]);
 
   const saveDefaultsMutation = useMutation({
     mutationFn: async () => {
@@ -521,7 +551,7 @@ export default function Scanner() {
                     <Card 
                       key={result.id} 
                       className="hover-elevate cursor-pointer"
-                      onClick={() => navigate(`/chart/${result.ticker}`)}
+                      onClick={() => navigate(`/charts/${result.ticker}`)}
                       data-testid={`card-opportunity-${result.ticker}`}
                     >
                       <CardContent className="p-3 space-y-2">
@@ -591,7 +621,7 @@ export default function Scanner() {
                     <div
                       key={result.id}
                       className="flex items-center justify-between gap-4 p-2 rounded-md hover-elevate cursor-pointer"
-                      onClick={() => navigate(`/chart/${result.ticker}`)}
+                      onClick={() => navigate(`/charts/${result.ticker}`)}
                       data-testid={`row-opportunity-${result.ticker}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
