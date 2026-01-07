@@ -156,17 +156,60 @@ export default function Scanner() {
   const { toast } = useToast();
   const { isConnected } = useBrokerStatus();
 
-  const { data: confluenceData, isLoading: isConfluenceLoading } = useQuery<{
-    results: ConfluenceResult[];
-    marketRegime?: MarketRegime;
-  }>({
-    queryKey: ["/api/scan/confluence"],
-    enabled: activeTab === "confluence" && isConnected,
-    staleTime: 30000,
+  const [confluenceResults, setConfluenceResults] = useState<ConfluenceResult[] | null>(null);
+  const [marketRegime, setMarketRegime] = useState<MarketRegime | null>(null);
+
+  const confluenceMutation = useMutation({
+    mutationFn: async (params: {
+      strategies: string[];
+      minPrice?: number;
+      maxPrice?: number;
+      minVolume?: number;
+      minMatches?: number;
+    }) => {
+      const response = await apiRequest("POST", "/api/scan/confluence", params);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setConfluenceResults(data.results);
+      setMarketRegime(data.marketRegime);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Fusion Scan Failed",
+        description: error.message || "Failed to run multi-strategy scan",
+        variant: "destructive",
+      });
+    },
   });
 
-  const confluenceResults = confluenceData?.results;
-  const marketRegime = confluenceData?.marketRegime;
+  const runFusionScan = () => {
+    if (!isConnected) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect your brokerage in Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (selectedStrategies.length === 0) {
+      toast({
+        title: "No Strategies Selected",
+        description: "Please select at least one strategy to scan",
+        variant: "destructive",
+      });
+      return;
+    }
+    confluenceMutation.mutate({
+      strategies: selectedStrategies,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      minVolume: filters.minVolume,
+      minMatches: 2,
+    });
+  };
+
+  const isConfluenceLoading = confluenceMutation.isPending;
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -396,6 +439,19 @@ export default function Scanner() {
                 onChange={setSelectedStrategies}
                 mode="multi"
               />
+              <Button 
+                onClick={runFusionScan}
+                disabled={isConfluenceLoading || selectedStrategies.length === 0}
+                className="gap-2"
+                data-testid="button-run-fusion-scan"
+              >
+                {isConfluenceLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Layers className="h-4 w-4" />
+                )}
+                {isConfluenceLoading ? "Scanning..." : "Run Fusion Scan"}
+              </Button>
               {marketRegime && (
                 <div className="flex items-center gap-2">
                   <Activity className={`h-4 w-4 ${getRegimeColor(marketRegime.regime)}`} />
@@ -598,6 +654,10 @@ export default function Scanner() {
         </TabsContent>
 
         <TabsContent value="confluence" className="space-y-4 mt-0">
+          <ScannerFiltersPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -679,8 +739,8 @@ export default function Scanner() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No confluence patterns found</p>
-                  <p className="text-sm mt-1">Try running a scan or check back during market hours</p>
+                  <p className="font-medium">Ready to Scan</p>
+                  <p className="text-sm mt-1">Select strategies above and click "Run Fusion Scan" to find multi-strategy setups</p>
                 </div>
               )}
             </CardContent>

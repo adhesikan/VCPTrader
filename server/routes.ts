@@ -207,7 +207,15 @@ export async function registerRoutes(
         });
       }
 
-      const { symbols = DEFAULT_SCAN_SYMBOLS, minMatches = 2, timeframe = "1d" } = req.body;
+      const { 
+        symbols = DEFAULT_SCAN_SYMBOLS, 
+        minMatches = 2, 
+        timeframe = "1d",
+        strategies,
+        minPrice,
+        maxPrice,
+        minVolume
+      } = req.body;
       
       let marketRegime;
       try {
@@ -230,6 +238,10 @@ export async function registerRoutes(
       
       for (const quote of quotes) {
         try {
+          if (minPrice && quote.last < minPrice) continue;
+          if (maxPrice && quote.last > maxPrice) continue;
+          if (minVolume && quote.volume < minVolume) continue;
+          
           const history = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
           const candles: CandleData[] = history.map(c => ({
             open: c.open,
@@ -246,7 +258,7 @@ export async function registerRoutes(
             quote.symbol,
             candles,
             timeframe,
-            undefined,
+            strategies,
             quote
           );
           
