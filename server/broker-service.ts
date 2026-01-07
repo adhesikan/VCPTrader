@@ -289,6 +289,18 @@ function calculateVCPStage(quote: QuoteData): "FORMING" | "READY" | "BREAKOUT" {
   return PatternStage.FORMING;
 }
 
+function calculateVCPMultidayStage(quote: QuoteData): string {
+  const priceFromHigh = ((quote.high - quote.last) / quote.high) * 100;
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (quote.changePercent > 3 && rvol >= 1.8 && priceFromHigh < 3) {
+    return PatternStage.BREAKOUT;
+  } else if (priceFromHigh < 8 && priceFromHigh > 2 && rvol < 1.2) {
+    return PatternStage.READY;
+  }
+  return PatternStage.FORMING;
+}
+
 function calculateClassicPullbackStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
@@ -300,14 +312,104 @@ function calculateClassicPullbackStage(quote: QuoteData): string {
   return PullbackStage.FORMING;
 }
 
+function calculateVWAPReclaimStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (quote.changePercent > 0.5 && quote.changePercent < 3 && rvol >= 1.3) {
+    return PullbackStage.TRIGGERED;
+  } else if (quote.changePercent >= -1 && quote.changePercent <= 0.5) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateORBStage(quote: QuoteData, minutes: number): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  const threshold = minutes === 5 ? 1.5 : 2.0;
+  
+  if (quote.changePercent > threshold && rvol >= 1.5) {
+    return PullbackStage.TRIGGERED;
+  } else if (quote.changePercent > 0 && quote.changePercent <= threshold) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateHighRVOLStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (rvol >= 3.0 && quote.changePercent > 2) {
+    return PullbackStage.TRIGGERED;
+  } else if (rvol >= 2.0 && quote.changePercent > 0) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateGapAndGoStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (quote.changePercent > 5 && rvol >= 2.0) {
+    return PullbackStage.TRIGGERED;
+  } else if (quote.changePercent > 3 && rvol >= 1.5) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateTrendContinuationStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  
+  if (quote.changePercent > 1.5 && rvol >= 1.2 && quote.change > 0) {
+    return PullbackStage.TRIGGERED;
+  } else if (quote.changePercent >= 0 && quote.changePercent <= 1.5) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateVolatilitySqueezeStage(quote: QuoteData): string {
+  const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
+  const priceFromHigh = ((quote.high - quote.last) / quote.high) * 100;
+  
+  if (quote.changePercent > 2.5 && rvol >= 2.0) {
+    return PullbackStage.TRIGGERED;
+  } else if (priceFromHigh < 3 && Math.abs(quote.changePercent) < 1) {
+    return PullbackStage.READY;
+  }
+  return PullbackStage.FORMING;
+}
+
+function calculateStageForStrategy(quote: QuoteData, strategy: string): string {
+  switch (strategy) {
+    case StrategyType.VCP:
+      return calculateVCPStage(quote);
+    case StrategyType.VCP_MULTIDAY:
+      return calculateVCPMultidayStage(quote);
+    case StrategyType.CLASSIC_PULLBACK:
+      return calculateClassicPullbackStage(quote);
+    case StrategyType.VWAP_RECLAIM:
+      return calculateVWAPReclaimStage(quote);
+    case StrategyType.ORB5:
+      return calculateORBStage(quote, 5);
+    case StrategyType.ORB15:
+      return calculateORBStage(quote, 15);
+    case StrategyType.HIGH_RVOL:
+      return calculateHighRVOLStage(quote);
+    case StrategyType.GAP_AND_GO:
+      return calculateGapAndGoStage(quote);
+    case StrategyType.TREND_CONTINUATION:
+      return calculateTrendContinuationStage(quote);
+    case StrategyType.VOLATILITY_SQUEEZE:
+      return calculateVolatilitySqueezeStage(quote);
+    default:
+      return calculateVCPStage(quote);
+  }
+}
+
 export function quotesToScanResults(quotes: QuoteData[], strategy: string = StrategyType.VCP): ScanResult[] {
   return quotes.map((quote) => {
-    let stage: string;
-    if (strategy === StrategyType.CLASSIC_PULLBACK) {
-      stage = calculateClassicPullbackStage(quote);
-    } else {
-      stage = calculateVCPStage(quote);
-    }
+    const stage = calculateStageForStrategy(quote, strategy);
     
     const resistance = quote.high * 1.02;
     const stopLoss = quote.last * 0.93;
