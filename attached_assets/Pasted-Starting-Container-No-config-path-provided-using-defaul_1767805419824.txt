@@ -1,0 +1,80 @@
+Starting Container
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/app/drizzle.config.ts'
+Running database migration...
+npm warn config production Use `--omit=dev` instead.
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[⣯] Pulling schema from database...
+[⣟] Pulling schema from database...
+[⡿] Pulling schema from database...
+[⢿] Pulling schema from database...
+[⣻] Pulling schema from database...
+[⣽] Pulling schema from database...
+[⣷] Pulling schema from database...
+[⣯] Pulling schema from database...
+[⣟] Pulling schema from database...
+[✓] Pulling schema from database...
+· You're about to add broker_connections_user_id_unique unique constraint to the table, which contains 1 items. If this statement fails, you will receive an error from the database. Do you want to truncate broker_connections table?
+❯ No, add the constraint without truncating the table
+  Yes, truncate the tableMigration complete. Starting server...
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+5:03:11 PM [express] Restored 1 broker connection(s) from database
+5:03:11 PM [express] serving on port 8080
+5:03:16 PM [express] GET /api/auth/user 304 in 14ms :: {"id":"e4f4da88-5589-4478-86cf-ed369d87fb9e","email":"admin@vcptrader.com","firstName":"Admin","lastName":"User","profileImageUrl":null,"role":"admin","stripeCustomerId":null,"subscriptionStatus":null,"subscriptionPlanId":null,"subscriptionEndDate":null,"acceptedLegalVersion":"2026-01-01","acceptedAt":"2026-01-01T18:34:03.000Z","acceptedIp":"50.35.55.84","acceptedUserAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","createdAt":"2026-01-01T18:34:03.000Z","updatedAt":"2026-01-01T18:34:03.000Z"}
+5:03:16 PM [express] GET /api/auth/legal-status 304 in 9ms :: {"accepted":true,"currentVersion":"2026-01-01","acceptedVersion":"2026-01-01","acceptedAt":"2026-01-01T18:34:03.000Z"}
+Failed to get opportunity defaults: error: relation "opportunity_defaults" does not exist
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:76:32520
+    at async Cm.getOpportunityDefaults (/app/dist/index.cjs:76:132775)
+    at async /app/dist/index.cjs:76:220670 {
+  length: 120,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '209',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+5:03:16 PM [express] GET /api/user/opportunity-defaults 500 in 14ms :: {"error":"Failed to get opportunity defaults"}
+5:03:16 PM [express] GET /api/strategies 304 in 9ms :: [{"id":"VCP","name":"Momentum Breakout","displayName":"Momentum Breakout","description":"Intraday contraction breakouts with trend and volume confirmation.","shortDescription":"Intraday contraction breakouts with trend and volume confirmation.","category":"Momentum Engine","legacyName":"Intraday VCP","stages":["FORMING","READY","BREAKOUT"]},{"id":"VCP_MULTIDAY","name":"Power Breakout","displayName":"Power Breakout","description":"Multi-timeframe contraction breakouts for swing and position traders.","shortDescription":"Multi-timeframe contraction breakouts for swing and position traders.","category":"Momentum Engine","legacyName":"Multi-timeframe VCP","stages":["FORMING","READY","TRIGGERED"]},{"id":"ORB5","name":"Open Drive (5m)","displayName":"Open Drive (5m)","description":"Five-minute opening range breakouts with volume expansion.","shortDescription":"Five-minute opening range breakouts with volume expansion.","category":"Momentum Engine","legacyName":"ORB 5m","stages":["FORMING","READY","TRIGGERED"]},{"id":"ORB15","name":"Open Drive (15m)","displayName":"Open Drive (15m)","description":"Fifteen-minute opening range breakouts with volume expansion.","shortDescription":"Fifteen-minute opening range breakouts with volume expansion.","category":"Momentum Engine","legacyName":"ORB 15m","stages":["FORMING","READY","TRIGGERED"]},{"id":"HIGH_RVOL","name":"Volume Surge","displayName":"Volume Surge","description":"High relative-volume breakouts from tight consolidations.","shortDescription":"High relative-volume breakouts from tight consolidations.","category":"Momentum Engine","legacyName":"High RVOL Breakout","stages":["FORMING","READY","TRIGGERED"]},{"id":"GAP_AND_GO","name":"Gap Force","displayName":"Gap Force","description":"Gap-up momentum conditions with continuation triggers.","shortDescription":"Gap-up momentum conditions with continuation triggers.","category":"Momentum Engine","legacyName":"Gap & Go","stages":["FORMING","READY","TRIGGERED"]},{"id":"CLASSIC_PULLBACK","name":"Precision Pullback","displayName":"Precision Pullback","description":"Shallow pullback/flag setups in an uptrend with breakout triggers and tight risk.","shortDescription":"Shallow pullback/flag setups in an uptrend with breakout triggers and tight risk.","category":"Trend Engine","legacyName":"Classic Pullback","stages":["FORMING","READY","TRIGGERED"]},{"id":"TREND_CONTINUATION","name":"Trend Pilot","displayName":"Trend Pilot","description":"Trend continuation pullbacks using moving-average structure.","shortDescription":"Trend continuation pullbacks using moving-average structure.","category":"Trend Engine","legacyName":"Trend Continuation","stages":["FORMING","READY","TRIGGERED"]},{"id":"VWAP_RECLAIM","name":"Institutional Reclaim","displayName":"Institutional Reclaim","description":"VWAP reclaim conditions that can signal professional accumulation intraday.","shortDescription":"VWAP reclaim conditions that can signal professional accumulation intraday.","category":"Trend Engine","legacyName":"VWAP Reclaim","stages":["FORMING","READY","TRIGGERED"]},{"id":"VOLATILITY_SQUEEZE","name":"Pressure Break","displayName":"Pressure Break","description":"Volatility compression setups designed to catch expansion moves.","shortDescription":"Volatility compression setups designed to catch expansion moves.","category":"Volatility Engine","legacyName":"Volatility Squeeze","stages":["FORMING","READY","TRIGGERED"]}]
+5:03:16 PM [express] GET /api/universes 304 in 8ms :: {"dow30":{"symbols":["AAPL","AMGN","AXP","BA","CAT","CRM","CSCO","CVX","DIS","DOW","GS","HD","HON","IBM","INTC","JNJ","JPM","KO","MCD","MMM","MRK","MSFT","NKE","PG","TRV","UNH","V","VZ","WBA","WMT"],"count":30},"nasdaq100":{"symbols":["AAPL","MSFT","AMZN","NVDA","META","GOOGL","GOOG","AVGO","TSLA","COST","PEP","ADBE","NFLX","AMD","CSCO","TMUS","INTC","CMCSA","AMGN","INTU","QCOM","TXN","HON","AMAT","BKNG","ISRG","SBUX","VRTX","ADP","MDLZ"],"count":30},"sp500":{"symbols":["AAPL","MSFT","AMZN","NVDA","GOOGL","META","TSLA","BRK.B","UNH","XOM","JNJ","JPM","V","PG","MA","HD","CVX","MRK","ABBV","LLY","PEP","KO","COST","AVGO","WMT","MCD","CSCO","TMO","ACN","ABT"],"count":30},"all":{"symbols":["AAPL","AMGN","AXP","BA","CAT","CRM","CSCO","CVX","DIS","DOW","GS","HD","HON","IBM","INTC","JNJ","JPM","KO","MCD","MMM","MRK","MSFT","NKE","PG","TRV","UNH","V","VZ","WBA","WMT","AMZN","NVDA","META","GOOGL","GOOG","AVGO","TSLA","COST","PEP","ADBE","NFLX","AMD","TMUS","CMCSA","INTU","QCOM","TXN","AMAT","BKNG","ISRG","SBUX","VRTX","ADP","MDLZ","BRK.B","XOM","MA","ABBV","LLY","TMO","ACN","ABT","PYPL","UBER","SQ","SHOP","SNOW","PLTR","NET","CRWD","DDOG","ZS","PANW","OKTA","TWLO","COIN","HOOD","RIVN","LCID","NIO","XPEV","LI","ABNB","DASH","RBLX","U","PTON","ROKU","PINS","SNAP","SPOT","TTD","ZM","DOCU","TEAM","MDB","ESTC","PATH","CFLT","DOCN","S","GTLB","ARM","SMCI","MRVL","ON","MU","NXPI","KLAC","LRCX","ASML","ADI","DELL","HPQ","HPE","WDC","STX","NTAP","PSTG","VRT","GFS","WOLF","RTX","LMT","GD","NOC","GE","DE","F","GM","TM","HMC","STLA","RACE","FSR","NKLA","XLF","MS","C","BAC","WFC","USB","PNC","TFC","SCHW","BLK","SPGI","ICE","CME","NDAQ","MCO","FIS","FISV","GPN","WBD","PARA","FOXA","CHTR","T","ORCL","SAP","NOW","WDAY","VMW","ADSK","SNPS","CDNS","ANSS","LULU","UAA","DECK","SKX","CROX","ONON","BIRD","SHOO","WWW","CMG","DPZ","WING","YUM","QSR","DNUT","BROS","JACK","TGT","DG","DLTR","FIVE","OLLI","ROSS","TJX","BURL"],"count":193}}
+Error getting watchlists: error: column "user_id" does not exist
+    at /app/dist/index.cjs:64:13326
+5:03:16 PM [express] GET /api/broker/status 304 in 48ms :: {"id":"08e52888-d83e-4f31-90b4-e7587c747629","userId":"e4f4da88-5589-4478-86cf-ed369d87fb9e","provider":"tradier","isConnected":true,"lastSync":"2026-01-07T02:41:59.601Z"}
+  where: undefined,
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+  schema: undefined,
+    at async /app/dist/index.cjs:76:32520
+    at async /app/dist/index.cjs:76:201320 {
+  table: undefined,
+  length: 107,
+  file: 'parse_relation.c',
+  column: undefined,
+  severity: 'ERROR',
+  dataType: undefined,
+  code: '42703',
+  line: '3716',
+  detail: undefined,
+  constraint: undefined,
+  hint: undefined,
+  routine: 'errorMissingColumn'
+  position: '14',
+}
+5:03:16 PM [express] GET /api/alerts 304 in 35ms :: []
+  internalPosition: undefined,
+  internalQuery: undefined,
+5:03:16 PM [express] GET /api/watchlists 500 in 32ms :: {"error":"Failed to get watchlists"}

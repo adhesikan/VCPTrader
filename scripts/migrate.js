@@ -14,7 +14,7 @@ async function migrate() {
     const client = await pool.connect();
     console.log('Connected. Running migrations...');
 
-    // Add encrypted credential columns
+    // Add encrypted credential columns to broker_connections
     await client.query(`
       DO $$
       BEGIN
@@ -67,6 +67,37 @@ async function migrate() {
         END IF;
       END $$;
     `);
+
+    // Add user_id column to watchlists table
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'watchlists' AND column_name = 'user_id'
+        ) THEN
+          ALTER TABLE watchlists ADD COLUMN user_id VARCHAR;
+          RAISE NOTICE 'Added user_id column to watchlists';
+        END IF;
+      END $$;
+    `);
+
+    // Create opportunity_defaults table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS opportunity_defaults (
+        user_id VARCHAR PRIMARY KEY,
+        default_mode TEXT NOT NULL DEFAULT 'single',
+        default_strategy_id TEXT NOT NULL DEFAULT 'VCP',
+        default_scan_scope TEXT NOT NULL DEFAULT 'watchlist',
+        default_watchlist_id TEXT,
+        default_symbol TEXT,
+        default_market_index TEXT,
+        default_filter_preset TEXT NOT NULL DEFAULT 'balanced',
+        auto_run_on_load BOOLEAN DEFAULT false,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified opportunity_defaults table');
 
     console.log('Migrations complete!');
     client.release();
