@@ -18,7 +18,8 @@ import {
   DEFAULT_SCAN_SYMBOLS,
   DOW_30_SYMBOLS,
   NASDAQ_100_TOP,
-  SP500_TOP
+  SP500_TOP,
+  LARGE_CAP_UNIVERSE
 } from "./broker-service";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
 
@@ -66,6 +67,15 @@ export async function registerRoutes(
       INTRADAY: STRATEGY_PRESETS.INTRADAY,
       SWING: STRATEGY_PRESETS.SWING,
       ALL: STRATEGY_PRESETS.ALL,
+    });
+  });
+
+  app.get("/api/universes", (req, res) => {
+    res.json({
+      dow30: { symbols: DOW_30_SYMBOLS, count: DOW_30_SYMBOLS.length },
+      nasdaq100: { symbols: NASDAQ_100_TOP, count: NASDAQ_100_TOP.length },
+      sp500: { symbols: SP500_TOP, count: SP500_TOP.length },
+      all: { symbols: LARGE_CAP_UNIVERSE, count: LARGE_CAP_UNIVERSE.length },
     });
   });
 

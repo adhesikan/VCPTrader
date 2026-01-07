@@ -362,6 +362,29 @@ export const SP500_TOP = [
   "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
 ];
 
+export const LARGE_CAP_UNIVERSE = [
+  ...new Set([
+    ...DOW_30_SYMBOLS,
+    ...NASDAQ_100_TOP,
+    ...SP500_TOP,
+    "PYPL", "UBER", "SQ", "SHOP", "SNOW", "PLTR", "NET", "CRWD", "DDOG", "ZS",
+    "PANW", "OKTA", "TWLO", "COIN", "HOOD", "RIVN", "LCID", "NIO", "XPEV", "LI",
+    "ABNB", "DASH", "RBLX", "U", "PTON", "ROKU", "PINS", "SNAP", "SPOT", "TTD",
+    "ZM", "DOCU", "TEAM", "MDB", "ESTC", "PATH", "CFLT", "DOCN", "S", "GTLB",
+    "ARM", "SMCI", "MRVL", "ON", "MU", "NXPI", "KLAC", "LRCX", "ASML", "ADI",
+    "DELL", "HPQ", "HPE", "WDC", "STX", "NTAP", "PSTG", "VRT", "GFS", "WOLF",
+    "BA", "RTX", "LMT", "GD", "NOC", "GE", "CAT", "DE", "MMM", "HON",
+    "F", "GM", "TM", "HMC", "STLA", "RACE", "RIVN", "LCID", "FSR", "NKLA",
+    "XLF", "GS", "MS", "C", "BAC", "WFC", "USB", "PNC", "TFC", "SCHW",
+    "BLK", "SPGI", "ICE", "CME", "NDAQ", "MCO", "FIS", "FISV", "GPN", "SQ",
+    "DIS", "NFLX", "WBD", "PARA", "CMCSA", "FOXA", "CHTR", "TMUS", "VZ", "T",
+    "CRM", "ORCL", "SAP", "NOW", "WDAY", "VMW", "ADSK", "SNPS", "CDNS", "ANSS",
+    "NKE", "LULU", "UAA", "DECK", "SKX", "CROX", "ONON", "BIRD", "SHOO", "WWW",
+    "SBUX", "MCD", "CMG", "DPZ", "WING", "YUM", "QSR", "DNUT", "BROS", "JACK",
+    "WMT", "TGT", "COST", "DG", "DLTR", "FIVE", "OLLI", "ROSS", "TJX", "BURL"
+  ])
+];
+
 export interface CandleData {
   time: string;
   open: number;

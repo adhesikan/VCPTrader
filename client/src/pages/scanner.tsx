@@ -76,30 +76,17 @@ const PRESET_FILTERS: Record<string, Partial<ScannerFilters>> = {
   swing: { minPrice: 10, maxPrice: 500, minVolume: 300000, minRvol: 1.0, excludeEtfs: true, excludeOtc: true },
 };
 
-const UNIVERSE_OPTIONS = [
-  { value: "sp500", label: "S&P 500", count: 500 },
-  { value: "nasdaq100", label: "Nasdaq 100", count: 100 },
-  { value: "dow30", label: "Dow 30", count: 30 },
-  { value: "all", label: "All US Stocks", count: "5000+" },
-];
+interface UniverseData {
+  symbols: string[];
+  count: number;
+}
 
-const DOW_30_SYMBOLS = [
-  "AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "DOW",
-  "GS", "HD", "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM",
-  "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT"
-];
-
-const NASDAQ_100_TOP = [
-  "AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "GOOG", "AVGO", "TSLA", "COST",
-  "PEP", "ADBE", "NFLX", "AMD", "CSCO", "TMUS", "INTC", "CMCSA", "AMGN", "INTU",
-  "QCOM", "TXN", "HON", "AMAT", "BKNG", "ISRG", "SBUX", "VRTX", "ADP", "MDLZ"
-];
-
-const SP500_TOP = [
-  "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "META", "TSLA", "UNH", "XOM",
-  "JNJ", "JPM", "V", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "LLY",
-  "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
-];
+interface UniversesResponse {
+  dow30: UniverseData;
+  nasdaq100: UniverseData;
+  sp500: UniverseData;
+  all: UniverseData;
+}
 
 export default function Scanner() {
   const [, navigate] = useLocation();
@@ -151,6 +138,17 @@ export default function Scanner() {
     queryKey: ["/api/scan/results"],
   });
 
+  const { data: universes } = useQuery<UniversesResponse>({
+    queryKey: ["/api/universes"],
+  });
+
+  const UNIVERSE_OPTIONS = [
+    { value: "sp500", label: "S&P 500", count: universes?.sp500?.count || 500 },
+    { value: "nasdaq100", label: "Nasdaq 100", count: universes?.nasdaq100?.count || 100 },
+    { value: "dow30", label: "Dow 30", count: universes?.dow30?.count || 30 },
+    { value: "all", label: "Large Cap Universe", count: universes?.all?.count || "150+" },
+  ];
+
   useEffect(() => {
     if (dataUpdatedAt && storedResults && storedResults.length > 0 && !liveResults) {
       setLastScanTime(new Date(dataUpdatedAt));
@@ -170,13 +168,9 @@ export default function Scanner() {
       const wl = watchlists?.find(w => w.id === selectedWatchlist);
       return wl?.symbols || undefined;
     }
-    if (targetType === "universe") {
-      switch (selectedUniverse) {
-        case "dow30": return DOW_30_SYMBOLS;
-        case "nasdaq100": return NASDAQ_100_TOP;
-        case "sp500": return SP500_TOP;
-        default: return undefined;
-      }
+    if (targetType === "universe" && universes) {
+      const universeKey = selectedUniverse as keyof UniversesResponse;
+      return universes[universeKey]?.symbols || undefined;
     }
     return undefined;
   };
@@ -504,10 +498,10 @@ export default function Scanner() {
                       <div className="flex items-start gap-2">
                         <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0" />
                         <div className="text-sm">
-                          <p className="font-medium text-yellow-700 dark:text-yellow-400">Large scan warning</p>
+                          <p className="font-medium text-yellow-700 dark:text-yellow-400">Large scan notice</p>
                           <p className="text-muted-foreground mt-1">
-                            Scanning 5000+ stocks requires many API calls and may take several minutes. 
-                            Consider using price/volume filters to reduce the number of stocks, or select a smaller index like S&P 500 or Nasdaq 100.
+                            Scanning {universes?.all?.count || "150+"} stocks may take longer and use more API calls. 
+                            Consider using price/volume filters to narrow results, or select a smaller index like S&P 500 or Nasdaq 100.
                           </p>
                         </div>
                       </div>
