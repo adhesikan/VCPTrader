@@ -5,6 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTooltipVisibility } from "@/hooks/use-tooltips";
 
 export const tradingTerms: Record<string, string> = {
   resistance: "Price level where the stock has struggled to break above. A breakout happens when price pushes through this ceiling.",
@@ -41,8 +42,9 @@ interface InfoTooltipProps {
 }
 
 export function InfoTooltip({ term, className = "" }: InfoTooltipProps) {
+  const { tooltipsEnabled } = useTooltipVisibility();
   const description = tradingTerms[term];
-  if (!description) return null;
+  if (!description || !tooltipsEnabled) return null;
 
   return (
     <Tooltip>
@@ -69,11 +71,12 @@ interface LabelWithTooltipProps {
 }
 
 export function LabelWithTooltip({ label, term, className = "", children }: LabelWithTooltipProps) {
+  const { tooltipsEnabled } = useTooltipVisibility();
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       {children}
       {label}
-      <InfoTooltip term={term} />
+      {tooltipsEnabled && <InfoTooltip term={term} />}
     </span>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, User, Loader2 } from "lucide-react";
 import { BrokerStatusProvider } from "@/hooks/use-broker-status";
+import { TooltipVisibilityProvider } from "@/hooks/use-tooltips";
 import { StatusBanner } from "@/components/status-banner";
 
 import Scanner from "@/pages/scanner";
@@ -234,10 +235,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <AuthenticatedApp />
-          <Toaster />
-        </TooltipProvider>
+        <TooltipVisibilityProvider>
+          <TooltipProvider>
+            <AuthenticatedApp />
+            <Toaster />
+          </TooltipProvider>
+        </TooltipVisibilityProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

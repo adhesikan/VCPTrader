@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List, Info, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { BrokerConnection, BrokerProviderType, OpportunityDefaults } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
+import { useTooltipVisibility } from "@/hooks/use-tooltips";
 
 const brokerProviders = [
   { 
@@ -95,6 +96,7 @@ export default function Settings() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState("");
   const [secretKey, setSecretKey] = useState("");
+  const { tooltipsEnabled, setTooltipsEnabled } = useTooltipVisibility();
 
   const { data: brokerStatus } = useQuery<BrokerConnection | null>({
     queryKey: ["/api/broker/status"],
@@ -239,6 +241,10 @@ export default function Settings() {
           <TabsTrigger value="notifications" className="gap-2" data-testid="tab-notifications">
             <Bell className="h-4 w-4" />
             Notifications
+          </TabsTrigger>
+          <TabsTrigger value="display" className="gap-2" data-testid="tab-display">
+            <Eye className="h-4 w-4" />
+            Display
           </TabsTrigger>
           <TabsTrigger value="scanner" className="gap-2" data-testid="tab-scanner">
             <Database className="h-4 w-4" />
@@ -484,6 +490,35 @@ export default function Settings() {
                   <Label htmlFor="approaching-alerts">Approaching Breakout</Label>
                   <Switch id="approaching-alerts" defaultChecked data-testid="switch-approaching-alerts" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="display">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">Display Preferences</CardTitle>
+              <CardDescription>
+                Customize how information is displayed across the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="font-medium">Show Help Tooltips</p>
+                    <p className="text-sm text-muted-foreground">
+                      Display helpful explanations when hovering over metrics and terms
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={tooltipsEnabled}
+                  onCheckedChange={setTooltipsEnabled}
+                  data-testid="switch-tooltips"
+                />
               </div>
             </CardContent>
           </Card>
