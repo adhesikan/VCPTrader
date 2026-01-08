@@ -99,6 +99,22 @@ async function migrate() {
     `);
     console.log('Created/verified opportunity_defaults table');
 
+    // Create user_settings table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_settings (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        show_tooltips VARCHAR NOT NULL DEFAULT 'true',
+        push_notifications_enabled VARCHAR NOT NULL DEFAULT 'false',
+        breakout_alerts_enabled VARCHAR NOT NULL DEFAULT 'true',
+        stop_alerts_enabled VARCHAR NOT NULL DEFAULT 'true',
+        ema_alerts_enabled VARCHAR NOT NULL DEFAULT 'true',
+        approaching_alerts_enabled VARCHAR NOT NULL DEFAULT 'true',
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified user_settings table');
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {

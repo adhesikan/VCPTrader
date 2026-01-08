@@ -1,0 +1,23 @@
+Starting Container
+Running database migration...
+Connecting to database...
+Connected. Running migrations...
+Created/verified opportunity_defaults table
+Migrations complete!
+Migration complete. Starting server...
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+8:11:29 PM [express] Restored 1 broker connection(s) from database
+8:11:29 PM [express] serving on port 8080
+8:16:24 PM [express] GET /api/auth/user 304 in 114ms :: {"id":"e4f4da88-5589-4478-86cf-ed369d87fb9e","email":"admin@vcptrader.com","firstName":"Admin","lastName":"User","profileImageUrl":null,"role":"admin","stripeCustomerId":null,"subscriptionStatus":null,"subscriptionPlanId":null,"subscriptionEndDate":null,"acceptedLegalVersion":"2026-01-01","acceptedAt":"2026-01-01T18:34:03.000Z","acceptedIp":"50.35.55.84","acceptedUserAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","createdAt":"2026-01-01T18:34:03.000Z","updatedAt":"2026-01-01T18:34:03.000Z"}
+8:31:57 PM [express] GET /api/auth/user 304 in 97ms :: {"id":"e4f4da88-5589-4478-86cf-ed369d87fb9e","email":"admin@vcptrader.com","firstName":"Admin","lastName":"User","profileImageUrl":null,"role":"admin","stripeCustomerId":null,"subscriptionStatus":null,"subscriptionPlanId":null,"subscriptionEndDate":null,"acceptedLegalVersion":"2026-01-01","acceptedAt":"2026-01-01T18:34:03.000Z","acceptedIp":"50.35.55.84","acceptedUserAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","createdAt":"2026-01-01T18:34:03.000Z","updatedAt":"2026-01-01T18:34:03.000Z"}
+11:23:36 PM [express] GET /api/auth/user 401 in 1ms :: {"message":"Unauthorized"}
+11:23:36 PM [express] GET /api/user/settings 401 in 1ms :: {"message":"Unauthorized"}
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+    at Socket.emit (node:events:529:35)
+Error: Parse Error
+    at endReadableNT (node:internal/streams/readable:1400:12)
+    at socketOnEnd (node:_http_server:787:22)
+12:46:31 AM [express] GET /api/auth/user 401 in 1ms :: {"message":"Unauthorized"}
+12:46:31 AM [express] GET /api/user/settings 401 in 1ms :: {"message":"Unauthorized"}
