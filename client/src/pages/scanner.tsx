@@ -241,100 +241,6 @@ export default function Scanner() {
     }
   }, [initialScanDone, isConnected, defaultsLoading, watchlistsLoading, userDefaults, engineMode]);
 
-  // Auto-scan when filter/strategy selection changes (debounced)
-  const autoScanTimeoutRef = useRef<number | null>(null);
-  const lastScannedParamsRef = useRef<string | null>(null);
-  const [needsRescanAfterPending, setNeedsRescanAfterPending] = useState(false);
-  
-  // Serialize scan parameters for comparison
-  const scanParamsKey = JSON.stringify({
-    engineMode,
-    selectedStrategy,
-    selectedStrategies,
-    targetType,
-    selectedWatchlist,
-    symbolInput,
-    selectedUniverse,
-    filters,
-    selectedPreset,
-  });
-  
-  const isScanning = runScanMutation.isPending || confluenceMutation.isPending;
-  
-  // Execute scan with current live state
-  const doScan = () => {
-    lastScannedParamsRef.current = scanParamsKey;
-    setNeedsRescanAfterPending(false);
-    
-    if (engineMode === "fusion") {
-      if (selectedStrategies.length >= 2) {
-        confluenceMutation.mutate();
-      }
-    } else {
-      runScanMutation.mutate();
-    }
-  };
-  
-  // Effect 1: Debounce parameter changes
-  useEffect(() => {
-    // Skip if not ready or not connected
-    if (!initialScanDone || !isConnected) return;
-    
-    // On first run, mark current params as "scanned" (initial scan already ran)
-    if (lastScannedParamsRef.current === null) {
-      lastScannedParamsRef.current = scanParamsKey;
-      return;
-    }
-    
-    // Skip if params haven't actually changed from last scan
-    if (lastScannedParamsRef.current === scanParamsKey) {
-      // If we were waiting for rescan but user reverted, cancel it
-      setNeedsRescanAfterPending(false);
-      return;
-    }
-    
-    // Clear any pending debounce timer
-    if (autoScanTimeoutRef.current !== null) {
-      window.clearTimeout(autoScanTimeoutRef.current);
-      autoScanTimeoutRef.current = null;
-    }
-    
-    // Debounce: wait 600ms then execute or mark for later
-    autoScanTimeoutRef.current = window.setTimeout(() => {
-      autoScanTimeoutRef.current = null;
-      
-      if (runScanMutation.isPending || confluenceMutation.isPending) {
-        // Scan in progress - mark that we need rescan when it settles
-        setNeedsRescanAfterPending(true);
-      } else {
-        // Execute immediately with current live state
-        doScan();
-      }
-    }, 600);
-    
-    return () => {
-      if (autoScanTimeoutRef.current !== null) {
-        window.clearTimeout(autoScanTimeoutRef.current);
-        autoScanTimeoutRef.current = null;
-      }
-    };
-  }, [scanParamsKey, initialScanDone, isConnected]);
-  
-  // Effect 2: Execute pending rescan when mutations settle (uses current live state)
-  useEffect(() => {
-    if (!needsRescanAfterPending) return;
-    if (runScanMutation.isPending || confluenceMutation.isPending) return;
-    
-    // Mutations settled - check if current params differ from last scanned
-    if (lastScannedParamsRef.current !== scanParamsKey) {
-      // Execute scan with current live state
-      doScan();
-    } else {
-      // Params same as last scan, no need to rescan
-      setNeedsRescanAfterPending(false);
-    }
-  }, [needsRescanAfterPending, isScanning, scanParamsKey]);
-
   const saveDefaultsMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("PUT", "/api/user/opportunity-defaults", {
@@ -466,6 +372,100 @@ export default function Scanner() {
       });
     },
   });
+
+  // Auto-scan when filter/strategy selection changes (debounced)
+  const autoScanTimeoutRef = useRef<number | null>(null);
+  const lastScannedParamsRef = useRef<string | null>(null);
+  const [needsRescanAfterPending, setNeedsRescanAfterPending] = useState(false);
+  
+  // Serialize scan parameters for comparison
+  const scanParamsKey = JSON.stringify({
+    engineMode,
+    selectedStrategy,
+    selectedStrategies,
+    targetType,
+    selectedWatchlist,
+    symbolInput,
+    selectedUniverse,
+    filters,
+    selectedPreset,
+  });
+  
+  const isScanning = runScanMutation.isPending || confluenceMutation.isPending;
+  
+  // Execute scan with current live state
+  const doScan = () => {
+    lastScannedParamsRef.current = scanParamsKey;
+    setNeedsRescanAfterPending(false);
+    
+    if (engineMode === "fusion") {
+      if (selectedStrategies.length >= 2) {
+        confluenceMutation.mutate();
+      }
+    } else {
+      runScanMutation.mutate();
+    }
+  };
+  
+  // Effect 1: Debounce parameter changes
+  useEffect(() => {
+    // Skip if not ready or not connected
+    if (!initialScanDone || !isConnected) return;
+    
+    // On first run, mark current params as "scanned" (initial scan already ran)
+    if (lastScannedParamsRef.current === null) {
+      lastScannedParamsRef.current = scanParamsKey;
+      return;
+    }
+    
+    // Skip if params haven't actually changed from last scan
+    if (lastScannedParamsRef.current === scanParamsKey) {
+      // If we were waiting for rescan but user reverted, cancel it
+      setNeedsRescanAfterPending(false);
+      return;
+    }
+    
+    // Clear any pending debounce timer
+    if (autoScanTimeoutRef.current !== null) {
+      window.clearTimeout(autoScanTimeoutRef.current);
+      autoScanTimeoutRef.current = null;
+    }
+    
+    // Debounce: wait 600ms then execute or mark for later
+    autoScanTimeoutRef.current = window.setTimeout(() => {
+      autoScanTimeoutRef.current = null;
+      
+      if (runScanMutation.isPending || confluenceMutation.isPending) {
+        // Scan in progress - mark that we need rescan when it settles
+        setNeedsRescanAfterPending(true);
+      } else {
+        // Execute immediately with current live state
+        doScan();
+      }
+    }, 600);
+    
+    return () => {
+      if (autoScanTimeoutRef.current !== null) {
+        window.clearTimeout(autoScanTimeoutRef.current);
+        autoScanTimeoutRef.current = null;
+      }
+    };
+  }, [scanParamsKey, initialScanDone, isConnected]);
+  
+  // Effect 2: Execute pending rescan when mutations settle (uses current live state)
+  useEffect(() => {
+    if (!needsRescanAfterPending) return;
+    if (runScanMutation.isPending || confluenceMutation.isPending) return;
+    
+    // Mutations settled - check if current params differ from last scanned
+    if (lastScannedParamsRef.current !== scanParamsKey) {
+      // Execute scan with current live state
+      doScan();
+    } else {
+      // Params same as last scan, no need to rescan
+      setNeedsRescanAfterPending(false);
+    }
+  }, [needsRescanAfterPending, isScanning, scanParamsKey]);
 
   const handleRunScan = () => {
     if (!isConnected) {
