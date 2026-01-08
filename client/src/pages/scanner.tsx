@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { 
@@ -240,6 +240,59 @@ export default function Scanner() {
       }
     }
   }, [initialScanDone, isConnected, defaultsLoading, watchlistsLoading, userDefaults, engineMode]);
+
+  // Auto-scan when filter/strategy selection changes (debounced)
+  const autoScanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUserInteracted = useRef(false);
+  
+  // Serialize scan parameters for comparison
+  const scanParamsKey = JSON.stringify({
+    engineMode,
+    selectedStrategy,
+    selectedStrategies,
+    targetType,
+    selectedWatchlist,
+    symbolInput,
+    selectedUniverse,
+    filters,
+    selectedPreset,
+  });
+  
+  useEffect(() => {
+    // Skip auto-scan on initial mount - wait for user interaction
+    if (!initialScanDone || !isConnected) return;
+    
+    // Mark that user has interacted after first change
+    if (!hasUserInteracted.current) {
+      hasUserInteracted.current = true;
+      return; // Skip first change (initial state setting)
+    }
+    
+    // Clear any pending auto-scan
+    if (autoScanTimeoutRef.current) {
+      clearTimeout(autoScanTimeoutRef.current);
+    }
+    
+    // Don't auto-scan if already scanning
+    if (runScanMutation.isPending || confluenceMutation.isPending) return;
+    
+    // Debounce: wait 600ms before triggering scan
+    autoScanTimeoutRef.current = setTimeout(() => {
+      if (engineMode === "fusion") {
+        if (selectedStrategies.length >= 2) {
+          confluenceMutation.mutate();
+        }
+      } else {
+        runScanMutation.mutate();
+      }
+    }, 600);
+    
+    return () => {
+      if (autoScanTimeoutRef.current) {
+        clearTimeout(autoScanTimeoutRef.current);
+      }
+    };
+  }, [scanParamsKey, initialScanDone, isConnected]);
 
   const saveDefaultsMutation = useMutation({
     mutationFn: async () => {
@@ -909,23 +962,16 @@ export default function Scanner() {
             <Button
               onClick={handleRunScan}
               disabled={isScanning || !isConnected}
-              size="lg"
+              variant="outline"
               className="gap-2"
               data-testid="button-run-scan"
             >
               {isScanning ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : engineMode === "single" ? (
-                <Search className="h-5 w-5" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Layers className="h-5 w-5" />
+                <RefreshCw className="h-4 w-4" />
               )}
-              {isScanning 
-                ? "Scanning..." 
-                : engineMode === "single" 
-                  ? "Run Scan" 
-                  : "Run Fusion Scan"
-              }
+              {isScanning ? "Scanning..." : "Refresh"}
             </Button>
 
             <Button
@@ -1111,7 +1157,7 @@ export default function Scanner() {
               </div>
               <p className="text-lg font-medium">No results yet</p>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Configure your scan options above and click "Run Scan" to find trading opportunities.
+                Select a strategy or adjust filters above to find trading opportunities. Results update automatically.
               </p>
             </div>
           </CardContent>
