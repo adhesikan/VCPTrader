@@ -34,6 +34,19 @@ const isAdmin: RequestHandler = async (req, res, next) => {
   next();
 };
 
+// Map user-selected timeframe to broker API timeframe
+// Returns the appropriate timeframe for broker API calls
+function getBrokerTimeframe(userTimeframe: string): string {
+  const tf = userTimeframe.toLowerCase();
+  // Intraday timeframes - use the specific interval
+  if (tf === "1m" || tf === "5m" || tf === "15m" || tf === "30m" || tf === "1h") {
+    return tf;
+  }
+  // Daily timeframes - use 3 months of daily data
+  return "3M";
+}
+
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -134,13 +147,14 @@ export async function registerRoutes(
 
       const { symbols = DEFAULT_SCAN_SYMBOLS, strategyIds, timeframe = "1d" } = req.body;
       const selectedStrategies: StrategyIdType[] = strategyIds || getAllStrategyIds();
+      const brokerTimeframe = getBrokerTimeframe(timeframe);
       
       const quotes = await fetchQuotesFromBroker(connection, symbols);
       const allResults: any[] = [];
       
       for (const quote of quotes) {
         try {
-          const history = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
+          const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
           const candles: CandleData[] = history.map(c => ({
             open: c.open,
             high: c.high,
@@ -226,6 +240,7 @@ export async function registerRoutes(
         maxPrice,
         minVolume
       } = req.body;
+      const brokerTimeframe = getBrokerTimeframe(timeframe);
       
       let marketRegime;
       try {
@@ -252,7 +267,7 @@ export async function registerRoutes(
           if (maxPrice && quote.last > maxPrice) continue;
           if (minVolume && quote.volume < minVolume) continue;
           
-          const history = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
+          const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
           const candles: CandleData[] = history.map(c => ({
             open: c.open,
             high: c.high,

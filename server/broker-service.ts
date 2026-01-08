@@ -498,7 +498,7 @@ export interface CandleData {
 }
 
 function isIntradayTimeframe(timeframe: string): boolean {
-  return ["5m", "15m", "30m", "1h"].includes(timeframe);
+  return ["1m", "5m", "15m", "30m", "1h"].includes(timeframe);
 }
 
 function getDateRange(timeframe: string): { start: string; end: string; isIntraday: boolean } {
@@ -507,6 +507,9 @@ function getDateRange(timeframe: string): { start: string; end: string; isIntrad
   const isIntraday = isIntradayTimeframe(timeframe) || timeframe === "1D";
   
   switch (timeframe) {
+    case "1m":
+      startDate.setDate(startDate.getDate() - 1); // 1 day of 1-min data
+      break;
     case "5m":
     case "15m":
     case "30m":
@@ -572,6 +575,7 @@ export function getTimeframeForDateRange(startDate: string, endDate: string): st
 
 function getTradierInterval(timeframe: string): string {
   switch (timeframe) {
+    case "1m": return "1min";
     case "5m": return "5min";
     case "15m": return "15min";
     case "30m": return "30min";
@@ -583,6 +587,7 @@ function getTradierInterval(timeframe: string): string {
 
 function getPolygonParams(timeframe: string): { multiplier: number; span: string } {
   switch (timeframe) {
+    case "1m": return { multiplier: 1, span: "minute" };
     case "5m": return { multiplier: 5, span: "minute" };
     case "15m": return { multiplier: 15, span: "minute" };
     case "30m": return { multiplier: 30, span: "minute" };
@@ -594,6 +599,7 @@ function getPolygonParams(timeframe: string): { multiplier: number; span: string
 
 function getAlpacaTimeframe(timeframe: string): string {
   switch (timeframe) {
+    case "1m": return "1Min";
     case "5m": return "5Min";
     case "15m": return "15Min";
     case "30m": return "30Min";
