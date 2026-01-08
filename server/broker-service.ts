@@ -107,6 +107,7 @@ export async function fetchAlpacaQuotes(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
+  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
   const response = await fetch(
     `https://data.alpaca.markets/v2/stocks/bars/latest?symbols=${symbolList}`,
     { headers }
@@ -610,8 +611,9 @@ export async function fetchTradierHistory(
   const { start, end, isIntraday } = getDateRange(timeframe);
   const interval = getTradierInterval(timeframe);
   
+  // Include extended hours session for pre-market and after-hours data
   const endpoint = isIntraday 
-    ? `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`
+    ? `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}&session_filter=all`
     : `https://api.tradier.com/v1/markets/history?symbol=${symbol}&interval=${interval}&start=${start}&end=${end}`;
   
   const response = await fetch(endpoint, {
@@ -663,8 +665,9 @@ export async function fetchPolygonHistory(
   const { start, end, isIntraday } = getDateRange(timeframe);
   const { multiplier, span } = getPolygonParams(timeframe);
   
+  // Split-adjusted prices (Polygon aggregates include consolidated market data)
   const response = await fetch(
-    `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${span}/${start}/${end}?apiKey=${accessToken}&limit=5000`
+    `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${span}/${start}/${end}?apiKey=${accessToken}&limit=5000&adjusted=true`
   );
 
   if (!response.ok) {
@@ -700,6 +703,7 @@ export async function fetchAlpacaHistory(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
+  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
   const response = await fetch(
     `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=${tf}&start=${start}&end=${end}`,
     { headers }
@@ -934,8 +938,9 @@ async function fetchPolygonHistoryWithDates(
   startDate: string,
   endDate: string
 ): Promise<CandleData[]> {
+  // Split-adjusted prices (Polygon aggregates include consolidated market data)
   const response = await fetch(
-    `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate}/${endDate}?apiKey=${accessToken}&limit=50000`
+    `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate}/${endDate}?apiKey=${accessToken}&limit=50000&adjusted=true`
   );
 
   if (!response.ok) {
@@ -969,6 +974,7 @@ async function fetchAlpacaHistoryWithDates(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
+  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
   const response = await fetch(
     `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000`,
     { headers }
