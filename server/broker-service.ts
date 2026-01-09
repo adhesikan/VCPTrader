@@ -107,9 +107,9 @@ export async function fetchAlpacaQuotes(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
-  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
+  // Use SIP feed for extended hours data (pre-market and after-hours)
   const response = await fetch(
-    `https://data.alpaca.markets/v2/stocks/bars/latest?symbols=${symbolList}`,
+    `https://data.alpaca.markets/v2/stocks/bars/latest?symbols=${symbolList}&feed=sip`,
     { headers }
   );
 
@@ -709,9 +709,9 @@ export async function fetchAlpacaHistory(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
-  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
+  // Use SIP feed for extended hours data (pre-market and after-hours)
   const response = await fetch(
-    `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=${tf}&start=${start}&end=${end}`,
+    `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=${tf}&start=${start}&end=${end}&feed=sip`,
     { headers }
   );
 
@@ -980,9 +980,9 @@ async function fetchAlpacaHistoryWithDates(
     headers["APCA-API-SECRET-KEY"] = secretKey;
   }
 
-  // Uses account's default feed (IEX for free tier, SIP for paid subscribers)
+  // Use SIP feed for extended hours data (pre-market and after-hours)
   const response = await fetch(
-    `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000`,
+    `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000&feed=sip`,
     { headers }
   );
 
