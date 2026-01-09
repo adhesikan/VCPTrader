@@ -15,12 +15,53 @@ export interface QuoteData {
   prevClose: number;
 }
 
+// Helper to get the latest extended hours price from timesales
+async function fetchTradierLatestPrice(
+  accessToken: string,
+  symbol: string
+): Promise<{ price: number; volume: number } | null> {
+  try {
+    // Get last 5 minutes of timesales with extended hours
+    const now = new Date();
+    const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const start = fiveMinAgo.toISOString().replace('T', ' ').slice(0, 19);
+    const end = now.toISOString().replace('T', ' ').slice(0, 19);
+    
+    const response = await fetch(
+      `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=1min&start=${start}&end=${end}&session_filter=all`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+        },
+      }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const series = data.series?.data;
+    if (!series) return null;
+    
+    const seriesArray = Array.isArray(series) ? series : [series];
+    if (seriesArray.length === 0) return null;
+    
+    // Get the most recent data point
+    const latest = seriesArray[seriesArray.length - 1];
+    return {
+      price: latest.close || latest.price || 0,
+      volume: latest.volume || 0,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function fetchTradierQuotes(
   accessToken: string,
   symbols: string[]
 ): Promise<QuoteData[]> {
   const symbolList = symbols.join(",");
-  // Include extended hours data for pre-market and after-hours prices
   const response = await fetch(
     `https://api.tradier.com/v1/markets/quotes?symbols=${symbolList}&greeks=false`,
     {
@@ -42,33 +83,48 @@ export async function fetchTradierQuotes(
   
   const quoteArray = Array.isArray(quotes) ? quotes : [quotes];
   
-  return quoteArray.map((q: any) => {
-    // Debug: log the first symbol's extended hours fields
-    if (q.symbol === quoteArray[0]?.symbol) {
-      console.log(`[Tradier Quote Debug] ${q.symbol}:`, {
-        last: q.last,
-        change: q.change,
-        change_percentage: q.change_percentage,
-        prevclose: q.prevclose,
-        close: q.close,
-        // Extended hours fields from Tradier
-        exch: q.exch,
-        // Check various possible field names
-        after_hours: q.after_hours,
-        pre_market: q.pre_market,
-        extended_hours: q.extended_hours,
-        // All keys available
-        allKeys: Object.keys(q).filter(k => k.includes('hour') || k.includes('market') || k.includes('ext') || k.includes('pre') || k.includes('after'))
-      });
+  // Check if market is in extended hours (before 9:30 AM or after 4 PM ET)
+  const now = new Date();
+  const etHour = parseInt(now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }));
+  const etMinute = parseInt(now.toLocaleString('en-US', { minute: '2-digit', timeZone: 'America/New_York' }));
+  const marketMinutes = etHour * 60 + etMinute;
+  const isExtendedHours = marketMinutes < 570 || marketMinutes >= 960; // Before 9:30 AM or after 4:00 PM ET
+  
+  // If in extended hours, try to get latest prices from timesales for first few symbols
+  const extendedPrices: Map<string, { price: number; volume: number }> = new Map();
+  
+  if (isExtendedHours) {
+    // Limit to first 10 symbols to avoid too many API calls
+    const symbolsToCheck = quoteArray.slice(0, 10).map((q: any) => q.symbol);
+    const pricePromises = symbolsToCheck.map((sym: string) => 
+      fetchTradierLatestPrice(accessToken, sym).then(result => ({ sym, result }))
+    );
+    
+    const results = await Promise.all(pricePromises);
+    for (const { sym, result } of results) {
+      if (result && result.price > 0) {
+        extendedPrices.set(sym, result);
+      }
     }
     
-    // Use prevclose to calculate change from previous day's close
+    if (extendedPrices.size > 0) {
+      console.log(`[Tradier] Found extended hours prices for ${extendedPrices.size} symbols`);
+    }
+  }
+  
+  return quoteArray.map((q: any) => {
     const prevClose = q.prevclose || q.close || 0;
-    const lastPrice = q.last || q.close || 0;
+    let lastPrice = q.last || q.close || 0;
     
-    // Calculate change from previous close (this will show movement even in extended hours)
-    let change = prevClose > 0 ? (lastPrice - prevClose) : (q.change || 0);
-    let changePercent = prevClose > 0 ? ((lastPrice - prevClose) / prevClose) * 100 : (q.change_percentage || 0);
+    // Use extended hours price if available
+    const extPrice = extendedPrices.get(q.symbol);
+    if (extPrice && extPrice.price > 0) {
+      lastPrice = extPrice.price;
+    }
+    
+    // Calculate change from previous close
+    const change = prevClose > 0 ? (lastPrice - prevClose) : (q.change || 0);
+    const changePercent = prevClose > 0 ? ((lastPrice - prevClose) / prevClose) * 100 : (q.change_percentage || 0);
     
     return {
       symbol: q.symbol,
