@@ -20,8 +20,9 @@ export async function fetchTradierQuotes(
   symbols: string[]
 ): Promise<QuoteData[]> {
   const symbolList = symbols.join(",");
+  // Include extended hours data for pre-market and after-hours prices
   const response = await fetch(
-    `https://api.tradier.com/v1/markets/quotes?symbols=${symbolList}`,
+    `https://api.tradier.com/v1/markets/quotes?symbols=${symbolList}&greeks=false`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -41,18 +42,40 @@ export async function fetchTradierQuotes(
   
   const quoteArray = Array.isArray(quotes) ? quotes : [quotes];
   
-  return quoteArray.map((q: any) => ({
-    symbol: q.symbol,
-    last: q.last || q.close || 0,
-    change: q.change || 0,
-    changePercent: q.change_percentage || 0,
-    volume: q.volume || 0,
-    avgVolume: q.average_volume || 0,
-    high: q.high || 0,
-    low: q.low || 0,
-    open: q.open || 0,
-    prevClose: q.prevclose || q.close || 0,
-  }));
+  return quoteArray.map((q: any) => {
+    // Check if market is closed and we have after-hours or pre-market data
+    // Tradier provides: last_volume, after_hours_price/change, pre_market_price/change
+    const hasAfterHours = q.after_hours_price && q.after_hours_price > 0;
+    const hasPreMarket = q.pre_market_price && q.pre_market_price > 0;
+    
+    // Use extended hours price if available (prefer after-hours, then pre-market)
+    let lastPrice = q.last || q.close || 0;
+    let change = q.change || 0;
+    let changePercent = q.change_percentage || 0;
+    
+    if (hasAfterHours) {
+      lastPrice = q.after_hours_price;
+      change = q.after_hours_change || (lastPrice - (q.close || 0));
+      changePercent = q.close ? ((lastPrice - q.close) / q.close) * 100 : 0;
+    } else if (hasPreMarket) {
+      lastPrice = q.pre_market_price;
+      change = q.pre_market_change || (lastPrice - (q.prevclose || q.close || 0));
+      changePercent = q.prevclose ? ((lastPrice - q.prevclose) / q.prevclose) * 100 : 0;
+    }
+    
+    return {
+      symbol: q.symbol,
+      last: lastPrice,
+      change: change,
+      changePercent: changePercent,
+      volume: q.volume || 0,
+      avgVolume: q.average_volume || 0,
+      high: q.high || 0,
+      low: q.low || 0,
+      open: q.open || 0,
+      prevClose: q.prevclose || q.close || 0,
+    };
+  });
 }
 
 export async function fetchPolygonQuotes(
