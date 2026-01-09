@@ -534,6 +534,10 @@ export const userSettings = pgTable("user_settings", {
   stopAlertsEnabled: varchar("stop_alerts_enabled").notNull().default("true"),
   emaAlertsEnabled: varchar("ema_alerts_enabled").notNull().default("true"),
   approachingAlertsEnabled: varchar("approaching_alerts_enabled").notNull().default("true"),
+  hasSeenWelcomeTutorial: varchar("has_seen_welcome_tutorial").notNull().default("false"),
+  hasSeenScannerTutorial: varchar("has_seen_scanner_tutorial").notNull().default("false"),
+  hasSeenVcpTutorial: varchar("has_seen_vcp_tutorial").notNull().default("false"),
+  hasSeenAlertsTutorial: varchar("has_seen_alerts_tutorial").notNull().default("false"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -550,6 +554,10 @@ export const userSettingsUpdateSchema = z.object({
   stopAlertsEnabled: z.boolean().optional(),
   emaAlertsEnabled: z.boolean().optional(),
   approachingAlertsEnabled: z.boolean().optional(),
+  hasSeenWelcomeTutorial: z.boolean().optional(),
+  hasSeenScannerTutorial: z.boolean().optional(),
+  hasSeenVcpTutorial: z.boolean().optional(),
+  hasSeenAlertsTutorial: z.boolean().optional(),
 });
 export type UserSettingsUpdate = z.infer<typeof userSettingsUpdateSchema>;
 export type UserSettings = typeof userSettings.$inferSelect;
