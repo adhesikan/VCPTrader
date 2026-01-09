@@ -1745,6 +1745,10 @@ export async function registerRoutes(
           stopAlertsEnabled: true,
           emaAlertsEnabled: true,
           approachingAlertsEnabled: true,
+          hasSeenWelcomeTutorial: false,
+          hasSeenScannerTutorial: false,
+          hasSeenVcpTutorial: false,
+          hasSeenAlertsTutorial: false,
         });
       }
       
@@ -1755,6 +1759,10 @@ export async function registerRoutes(
         stopAlertsEnabled: settings.stopAlertsEnabled === "true",
         emaAlertsEnabled: settings.emaAlertsEnabled === "true",
         approachingAlertsEnabled: settings.approachingAlertsEnabled === "true",
+        hasSeenWelcomeTutorial: settings.hasSeenWelcomeTutorial === "true",
+        hasSeenScannerTutorial: settings.hasSeenScannerTutorial === "true",
+        hasSeenVcpTutorial: settings.hasSeenVcpTutorial === "true",
+        hasSeenAlertsTutorial: settings.hasSeenAlertsTutorial === "true",
       });
     } catch (error) {
       console.error("Failed to get user settings:", error);
@@ -1762,11 +1770,12 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/user/settings", isAuthenticated, async (req, res) => {
+  const handleUserSettingsUpdate: RequestHandler = async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
+        res.status(401).json({ error: "Unauthorized" });
+        return;
       }
       
       const parsed = userSettingsUpdateSchema.parse(req.body);
@@ -1779,15 +1788,23 @@ export async function registerRoutes(
         stopAlertsEnabled: settings.stopAlertsEnabled === "true",
         emaAlertsEnabled: settings.emaAlertsEnabled === "true",
         approachingAlertsEnabled: settings.approachingAlertsEnabled === "true",
+        hasSeenWelcomeTutorial: settings.hasSeenWelcomeTutorial === "true",
+        hasSeenScannerTutorial: settings.hasSeenScannerTutorial === "true",
+        hasSeenVcpTutorial: settings.hasSeenVcpTutorial === "true",
+        hasSeenAlertsTutorial: settings.hasSeenAlertsTutorial === "true",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        res.status(400).json({ error: error.errors });
+        return;
       }
       console.error("Failed to save user settings:", error);
       res.status(500).json({ error: "Failed to save user settings" });
     }
-  });
+  };
+
+  app.put("/api/user/settings", isAuthenticated, handleUserSettingsUpdate);
+  app.patch("/api/user/settings", isAuthenticated, handleUserSettingsUpdate);
 
   app.get("/api/automation-events", isAuthenticated, async (req, res) => {
     try {

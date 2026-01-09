@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List, Info, Eye, Save, TriangleAlert } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Wifi, Shield, Database, FileText, Printer, ExternalLink, Code, Bot, Send, History, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Zap, Clock, Target, List, Info, Eye, Save, TriangleAlert, BookOpen, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { InteractiveTutorial } from "@/components/interactive-tutorial";
 import type { BrokerConnection, BrokerProviderType, OpportunityDefaults } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
 import { useTooltipVisibility } from "@/hooks/use-tooltips";
@@ -47,6 +48,10 @@ interface UserSettingsResponse {
   stopAlertsEnabled: boolean;
   emaAlertsEnabled: boolean;
   approachingAlertsEnabled: boolean;
+  hasSeenWelcomeTutorial: boolean;
+  hasSeenScannerTutorial: boolean;
+  hasSeenVcpTutorial: boolean;
+  hasSeenAlertsTutorial: boolean;
 }
 
 const brokerProviders = [
@@ -124,6 +129,10 @@ export default function Settings() {
     stopAlertsEnabled: true,
     emaAlertsEnabled: true,
     approachingAlertsEnabled: true,
+    hasSeenWelcomeTutorial: false,
+    hasSeenScannerTutorial: false,
+    hasSeenVcpTutorial: false,
+    hasSeenAlertsTutorial: false,
   });
   const [originalSettings, setOriginalSettings] = useState<UserSettingsResponse | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -679,6 +688,8 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          <TutorialSettings />
         </TabsContent>
 
         <TabsContent value="scanner">
@@ -1927,6 +1938,97 @@ function EditProfileForm({
           {isPending ? "Saving..." : "Save Changes"}
         </Button>
       </DialogFooter>
+    </>
+  );
+}
+
+function TutorialSettings() {
+  const { toast } = useToast();
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  const resetTutorialsMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", "/api/user/settings", {
+        hasSeenWelcomeTutorial: false,
+        hasSeenScannerTutorial: false,
+        hasSeenVcpTutorial: false,
+        hasSeenAlertsTutorial: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+      toast({
+        title: "Tutorials reset",
+        description: "All tutorials will appear again when you visit relevant pages",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to reset tutorials",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Card className="mt-4">
+        <CardHeader>
+          <div>
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Learning Center
+            </CardTitle>
+            <CardDescription>
+              Access tutorials and guides to master VCP Trader
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-medium">Interactive Tutorials</p>
+              <p className="text-sm text-muted-foreground">
+                Step-by-step guides on VCP patterns and using the platform
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setTutorialOpen(true)}
+              className="gap-2"
+              data-testid="button-open-tutorials-settings"
+            >
+              <BookOpen className="h-4 w-4" />
+              Open Tutorials
+            </Button>
+          </div>
+          
+          <div className="flex items-center justify-between gap-4 flex-wrap border-t pt-4">
+            <div>
+              <p className="font-medium">Reset Tutorial Progress</p>
+              <p className="text-sm text-muted-foreground">
+                Show all tutorials again as if you were a new user
+              </p>
+            </div>
+            <Button 
+              variant="ghost" 
+              onClick={() => resetTutorialsMutation.mutate()}
+              disabled={resetTutorialsMutation.isPending}
+              className="gap-2"
+              data-testid="button-reset-tutorials"
+            >
+              <RotateCcw className="h-4 w-4" />
+              {resetTutorialsMutation.isPending ? "Resetting..." : "Reset Tutorials"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <InteractiveTutorial
+        isOpen={tutorialOpen}
+        onClose={() => setTutorialOpen(false)}
+      />
     </>
   );
 }

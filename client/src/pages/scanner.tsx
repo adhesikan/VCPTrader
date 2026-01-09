@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { 
   Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
   TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
-  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown
+  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScannerTable } from "@/components/scanner-table";
 import { StrategySelector } from "@/components/strategy-selector";
+import { TutorialTrigger } from "@/components/interactive-tutorial";
+import { WelcomeTutorial } from "@/components/welcome-tutorial";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -27,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults } from "@shared/schema";
+import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults, UserSettings } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName, FUSION_ENGINE_CONFIG } from "@shared/strategies";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 import { cn } from "@/lib/utils";
@@ -521,15 +523,20 @@ export default function Scanner() {
 
   return (
     <div className="p-6 space-y-6" data-testid="scanner-page">
+      <WelcomeTutorial />
+      
       <div className="flex flex-col gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Target className="h-6 w-6" />
-            Opportunity Engine
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Find trading setups that match your strategy
-          </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+              <Target className="h-6 w-6" />
+              Opportunity Engine
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Find trading setups that match your strategy
+            </p>
+          </div>
+          <TutorialTrigger />
         </div>
       </div>
 

@@ -76,7 +76,7 @@ export function WelcomeTutorial({ onClose, forceShow }: WelcomeTutorialProps) {
       setShowWelcome(true);
       return;
     }
-    if (settings && settings.hasSeenWelcomeTutorial === "false") {
+    if (settings && !settings.hasSeenWelcomeTutorial) {
       setShowWelcome(true);
     }
   }, [settings, forceShow]);
