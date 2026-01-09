@@ -43,25 +43,32 @@ export async function fetchTradierQuotes(
   const quoteArray = Array.isArray(quotes) ? quotes : [quotes];
   
   return quoteArray.map((q: any) => {
-    // Check if market is closed and we have after-hours or pre-market data
-    // Tradier provides: last_volume, after_hours_price/change, pre_market_price/change
-    const hasAfterHours = q.after_hours_price && q.after_hours_price > 0;
-    const hasPreMarket = q.pre_market_price && q.pre_market_price > 0;
-    
-    // Use extended hours price if available (prefer after-hours, then pre-market)
-    let lastPrice = q.last || q.close || 0;
-    let change = q.change || 0;
-    let changePercent = q.change_percentage || 0;
-    
-    if (hasAfterHours) {
-      lastPrice = q.after_hours_price;
-      change = q.after_hours_change || (lastPrice - (q.close || 0));
-      changePercent = q.close ? ((lastPrice - q.close) / q.close) * 100 : 0;
-    } else if (hasPreMarket) {
-      lastPrice = q.pre_market_price;
-      change = q.pre_market_change || (lastPrice - (q.prevclose || q.close || 0));
-      changePercent = q.prevclose ? ((lastPrice - q.prevclose) / q.prevclose) * 100 : 0;
+    // Debug: log the first symbol's extended hours fields
+    if (q.symbol === quoteArray[0]?.symbol) {
+      console.log(`[Tradier Quote Debug] ${q.symbol}:`, {
+        last: q.last,
+        change: q.change,
+        change_percentage: q.change_percentage,
+        prevclose: q.prevclose,
+        close: q.close,
+        // Extended hours fields from Tradier
+        exch: q.exch,
+        // Check various possible field names
+        after_hours: q.after_hours,
+        pre_market: q.pre_market,
+        extended_hours: q.extended_hours,
+        // All keys available
+        allKeys: Object.keys(q).filter(k => k.includes('hour') || k.includes('market') || k.includes('ext') || k.includes('pre') || k.includes('after'))
+      });
     }
+    
+    // Use prevclose to calculate change from previous day's close
+    const prevClose = q.prevclose || q.close || 0;
+    const lastPrice = q.last || q.close || 0;
+    
+    // Calculate change from previous close (this will show movement even in extended hours)
+    let change = prevClose > 0 ? (lastPrice - prevClose) : (q.change || 0);
+    let changePercent = prevClose > 0 ? ((lastPrice - prevClose) / prevClose) * 100 : (q.change_percentage || 0);
     
     return {
       symbol: q.symbol,
@@ -73,7 +80,7 @@ export async function fetchTradierQuotes(
       high: q.high || 0,
       low: q.low || 0,
       open: q.open || 0,
-      prevClose: q.prevclose || q.close || 0,
+      prevClose: prevClose,
     };
   });
 }
