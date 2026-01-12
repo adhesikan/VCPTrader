@@ -4,7 +4,7 @@ import { classifyQuote, StrategyId, PullbackStage } from "./strategies";
 
 // Extended type for broker connection with decrypted credentials
 export interface DecryptedBrokerConnection extends BrokerConnection {
-  accessToken: string;
+  accessToken?: string;
   refreshToken?: string | null;
 }
 
@@ -95,38 +95,60 @@ async function fetchTradierLatestPrice(
   symbol: string
 ): Promise<{ price: number; volume: number } | null> {
   try {
-    // Get last 5 minutes of timesales with extended hours
+    // Get the last hour of timesales with extended hours (wider window for pre-market data)
+    // Use Eastern Time for Tradier API
     const now = new Date();
-    const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
-    const start = fiveMinAgo.toISOString().replace('T', ' ').slice(0, 19);
-    const end = now.toISOString().replace('T', ' ').slice(0, 19);
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     
-    const response = await fetch(
-      `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=1min&start=${start}&end=${end}&session_filter=all`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-      }
-    );
+    // Format in Eastern Time: YYYY-MM-DD HH:MM
+    const formatDateTimeET = (d: Date) => {
+      const etDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const year = etDate.getFullYear();
+      const month = String(etDate.getMonth() + 1).padStart(2, '0');
+      const day = String(etDate.getDate()).padStart(2, '0');
+      const hour = String(etDate.getHours()).padStart(2, '0');
+      const min = String(etDate.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}%20${hour}:${min}`;
+    };
     
-    if (!response.ok) return null;
+    const start = formatDateTimeET(oneHourAgo);
+    const end = formatDateTimeET(now);
+    
+    const url = `https://api.tradier.com/v1/markets/timesales?symbol=${symbol}&interval=1min&start=${start}&end=${end}&session_filter=all`;
+    
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      console.log(`[Tradier] timesales error for ${symbol}: ${response.status}`);
+      return null;
+    }
     
     const data = await response.json();
     const series = data.series?.data;
-    if (!series) return null;
+    if (!series) {
+      return null;
+    }
     
     const seriesArray = Array.isArray(series) ? series : [series];
     if (seriesArray.length === 0) return null;
     
     // Get the most recent data point
     const latest = seriesArray[seriesArray.length - 1];
+    const price = latest.close || latest.price || 0;
+    if (price > 0) {
+      console.log(`[Tradier] Extended price for ${symbol}: $${price}`);
+    }
     return {
-      price: latest.close || latest.price || 0,
+      price,
       volume: latest.volume || 0,
     };
   } catch (e) {
+    console.error(`[Tradier] timesales exception for ${symbol}:`, e);
     return null;
   }
 }
@@ -161,19 +183,20 @@ export async function fetchTradierQuotes(
   const now = new Date();
   const etHour = parseInt(now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }));
   const etMinute = parseInt(now.toLocaleString('en-US', { minute: '2-digit', timeZone: 'America/New_York' }));
+  const dayOfWeek = now.toLocaleString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
   const marketMinutes = etHour * 60 + etMinute;
   const isExtendedHours = marketMinutes < 570 || marketMinutes >= 960; // Before 9:30 AM or after 4:00 PM ET
+  
+  console.log(`[Tradier] Time check: ${dayOfWeek} ${etHour}:${etMinute} ET, marketMinutes=${marketMinutes}, isExtendedHours=${isExtendedHours}`);
   
   // If in extended hours, fetch prices for ALL symbols using cached, rate-limited batch fetcher
   let extendedPrices: Map<string, { price: number; volume: number }> = new Map();
   
   if (isExtendedHours) {
     const allSymbols = quoteArray.map((q: any) => q.symbol);
+    console.log(`[Tradier] Fetching extended hours for ${allSymbols.length} symbols...`);
     extendedPrices = await fetchExtendedPricesBatch(accessToken, allSymbols);
-    
-    if (extendedPrices.size > 0) {
-      console.log(`[Tradier] Extended hours: ${extendedPrices.size}/${allSymbols.length} symbols with live prices`);
-    }
+    console.log(`[Tradier] Extended hours result: ${extendedPrices.size}/${allSymbols.length} symbols with prices`);
   }
   
   return quoteArray.map((q: any) => {
