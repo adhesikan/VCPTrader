@@ -2,6 +2,80 @@ import { BrokerConnection, ScanResult, PatternStage, StrategyType } from "@share
 import { randomUUID } from "crypto";
 import { classifyQuote, StrategyId, PullbackStage } from "./strategies";
 
+// Extended type for broker connection with decrypted credentials
+export interface DecryptedBrokerConnection extends BrokerConnection {
+  accessToken: string;
+  refreshToken?: string | null;
+}
+
+// Cache for extended hours prices with 60-second TTL
+interface CachedExtendedPrice {
+  price: number;
+  volume: number;
+  timestamp: number;
+}
+
+const extendedPriceCache = new Map<string, CachedExtendedPrice>();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+function getCachedExtendedPrice(symbol: string): { price: number; volume: number } | null {
+  const cached = extendedPriceCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return { price: cached.price, volume: cached.volume };
+  }
+  return null;
+}
+
+function setCachedExtendedPrice(symbol: string, price: number, volume: number): void {
+  extendedPriceCache.set(symbol, { price, volume, timestamp: Date.now() });
+}
+
+// Rate-limited batch fetcher for extended hours prices
+async function fetchExtendedPricesBatch(
+  accessToken: string,
+  symbols: string[],
+  concurrencyLimit: number = 5
+): Promise<Map<string, { price: number; volume: number }>> {
+  const results = new Map<string, { price: number; volume: number }>();
+  
+  // Check cache first, filter out already cached symbols
+  const symbolsToFetch: string[] = [];
+  for (const symbol of symbols) {
+    const cached = getCachedExtendedPrice(symbol);
+    if (cached) {
+      results.set(symbol, cached);
+    } else {
+      symbolsToFetch.push(symbol);
+    }
+  }
+  
+  if (symbolsToFetch.length === 0) {
+    return results;
+  }
+  
+  // Fetch uncached symbols in batches with controlled concurrency
+  for (let i = 0; i < symbolsToFetch.length; i += concurrencyLimit) {
+    const batch = symbolsToFetch.slice(i, i + concurrencyLimit);
+    const batchPromises = batch.map(async (symbol) => {
+      const result = await fetchTradierLatestPrice(accessToken, symbol);
+      if (result && result.price > 0) {
+        setCachedExtendedPrice(symbol, result.price, result.volume);
+        return { symbol, result };
+      }
+      return { symbol, result: null };
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    for (const { symbol, result } of batchResults) {
+      if (result) {
+        results.set(symbol, result);
+      }
+    }
+  }
+  
+  return results;
+}
+
 export interface QuoteData {
   symbol: string;
   last: number;
@@ -90,25 +164,15 @@ export async function fetchTradierQuotes(
   const marketMinutes = etHour * 60 + etMinute;
   const isExtendedHours = marketMinutes < 570 || marketMinutes >= 960; // Before 9:30 AM or after 4:00 PM ET
   
-  // If in extended hours, try to get latest prices from timesales for first few symbols
-  const extendedPrices: Map<string, { price: number; volume: number }> = new Map();
+  // If in extended hours, fetch prices for ALL symbols using cached, rate-limited batch fetcher
+  let extendedPrices: Map<string, { price: number; volume: number }> = new Map();
   
   if (isExtendedHours) {
-    // Limit to first 10 symbols to avoid too many API calls
-    const symbolsToCheck = quoteArray.slice(0, 10).map((q: any) => q.symbol);
-    const pricePromises = symbolsToCheck.map((sym: string) => 
-      fetchTradierLatestPrice(accessToken, sym).then(result => ({ sym, result }))
-    );
-    
-    const results = await Promise.all(pricePromises);
-    for (const { sym, result } of results) {
-      if (result && result.price > 0) {
-        extendedPrices.set(sym, result);
-      }
-    }
+    const allSymbols = quoteArray.map((q: any) => q.symbol);
+    extendedPrices = await fetchExtendedPricesBatch(accessToken, allSymbols);
     
     if (extendedPrices.size > 0) {
-      console.log(`[Tradier] Found extended hours prices for ${extendedPrices.size} symbols`);
+      console.log(`[Tradier] Extended hours: ${extendedPrices.size}/${allSymbols.length} symbols with live prices`);
     }
   }
   
@@ -338,7 +402,7 @@ async function fetchTradeStationQuotes(accessToken: string, symbols: string[]): 
 }
 
 export async function fetchQuotesFromBroker(
-  connection: BrokerConnection,
+  connection: DecryptedBrokerConnection,
   symbols: string[]
 ): Promise<QuoteData[]> {
   if (!connection.accessToken) {
@@ -351,7 +415,7 @@ export async function fetchQuotesFromBroker(
     case "polygon":
       return fetchPolygonQuotes(connection.accessToken, symbols);
     case "alpaca":
-      return fetchAlpacaQuotes(connection.accessToken, connection.refreshToken, symbols);
+      return fetchAlpacaQuotes(connection.accessToken, connection.refreshToken ?? null, symbols);
     case "ibkr":
       return fetchIBKRQuotes(connection.accessToken, symbols);
     case "schwab":
@@ -551,28 +615,26 @@ export const SP500_TOP = [
   "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
 ];
 
-export const LARGE_CAP_UNIVERSE = [
-  ...new Set([
-    ...DOW_30_SYMBOLS,
-    ...NASDAQ_100_TOP,
-    ...SP500_TOP,
-    "PYPL", "UBER", "SQ", "SHOP", "SNOW", "PLTR", "NET", "CRWD", "DDOG", "ZS",
-    "PANW", "OKTA", "TWLO", "COIN", "HOOD", "RIVN", "LCID", "NIO", "XPEV", "LI",
-    "ABNB", "DASH", "RBLX", "U", "PTON", "ROKU", "PINS", "SNAP", "SPOT", "TTD",
-    "ZM", "DOCU", "TEAM", "MDB", "ESTC", "PATH", "CFLT", "DOCN", "S", "GTLB",
-    "ARM", "SMCI", "MRVL", "ON", "MU", "NXPI", "KLAC", "LRCX", "ASML", "ADI",
-    "DELL", "HPQ", "HPE", "WDC", "STX", "NTAP", "PSTG", "VRT", "GFS", "WOLF",
-    "BA", "RTX", "LMT", "GD", "NOC", "GE", "CAT", "DE", "MMM", "HON",
-    "F", "GM", "TM", "HMC", "STLA", "RACE", "RIVN", "LCID", "FSR", "NKLA",
-    "XLF", "GS", "MS", "C", "BAC", "WFC", "USB", "PNC", "TFC", "SCHW",
-    "BLK", "SPGI", "ICE", "CME", "NDAQ", "MCO", "FIS", "FISV", "GPN", "SQ",
-    "DIS", "NFLX", "WBD", "PARA", "CMCSA", "FOXA", "CHTR", "TMUS", "VZ", "T",
-    "CRM", "ORCL", "SAP", "NOW", "WDAY", "VMW", "ADSK", "SNPS", "CDNS", "ANSS",
-    "NKE", "LULU", "UAA", "DECK", "SKX", "CROX", "ONON", "BIRD", "SHOO", "WWW",
-    "SBUX", "MCD", "CMG", "DPZ", "WING", "YUM", "QSR", "DNUT", "BROS", "JACK",
-    "WMT", "TGT", "COST", "DG", "DLTR", "FIVE", "OLLI", "ROSS", "TJX", "BURL"
-  ])
-];
+export const LARGE_CAP_UNIVERSE = Array.from(new Set([
+  ...DOW_30_SYMBOLS,
+  ...NASDAQ_100_TOP,
+  ...SP500_TOP,
+  "PYPL", "UBER", "SQ", "SHOP", "SNOW", "PLTR", "NET", "CRWD", "DDOG", "ZS",
+  "PANW", "OKTA", "TWLO", "COIN", "HOOD", "RIVN", "LCID", "NIO", "XPEV", "LI",
+  "ABNB", "DASH", "RBLX", "U", "PTON", "ROKU", "PINS", "SNAP", "SPOT", "TTD",
+  "ZM", "DOCU", "TEAM", "MDB", "ESTC", "PATH", "CFLT", "DOCN", "S", "GTLB",
+  "ARM", "SMCI", "MRVL", "ON", "MU", "NXPI", "KLAC", "LRCX", "ASML", "ADI",
+  "DELL", "HPQ", "HPE", "WDC", "STX", "NTAP", "PSTG", "VRT", "GFS", "WOLF",
+  "BA", "RTX", "LMT", "GD", "NOC", "GE", "CAT", "DE", "MMM", "HON",
+  "F", "GM", "TM", "HMC", "STLA", "RACE", "RIVN", "LCID", "FSR", "NKLA",
+  "XLF", "GS", "MS", "C", "BAC", "WFC", "USB", "PNC", "TFC", "SCHW",
+  "BLK", "SPGI", "ICE", "CME", "NDAQ", "MCO", "FIS", "FISV", "GPN", "SQ",
+  "DIS", "NFLX", "WBD", "PARA", "CMCSA", "FOXA", "CHTR", "TMUS", "VZ", "T",
+  "CRM", "ORCL", "SAP", "NOW", "WDAY", "VMW", "ADSK", "SNPS", "CDNS", "ANSS",
+  "NKE", "LULU", "UAA", "DECK", "SKX", "CROX", "ONON", "BIRD", "SHOO", "WWW",
+  "SBUX", "MCD", "CMG", "DPZ", "WING", "YUM", "QSR", "DNUT", "BROS", "JACK",
+  "WMT", "TGT", "COST", "DG", "DLTR", "FIVE", "OLLI", "ROSS", "TJX", "BURL"
+]));
 
 export interface CandleData {
   time: string;
@@ -904,7 +966,7 @@ export async function fetchTradeStationHistory(
 }
 
 export async function fetchHistoryFromBroker(
-  connection: BrokerConnection,
+  connection: DecryptedBrokerConnection,
   symbol: string,
   timeframe: string
 ): Promise<CandleData[]> {
@@ -918,18 +980,18 @@ export async function fetchHistoryFromBroker(
     case "polygon":
       return fetchPolygonHistory(connection.accessToken, symbol, timeframe);
     case "alpaca":
-      return fetchAlpacaHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
+      return fetchAlpacaHistory(connection.accessToken, connection.refreshToken ?? null, symbol, timeframe);
     case "tastytrade":
-      return fetchTastyTradeHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
+      return fetchTastyTradeHistory(connection.accessToken, connection.refreshToken ?? null, symbol, timeframe);
     case "tradestation":
-      return fetchTradeStationHistory(connection.accessToken, connection.refreshToken, symbol, timeframe);
+      return fetchTradeStationHistory(connection.accessToken, connection.refreshToken ?? null, symbol, timeframe);
     default:
       throw new Error(`Provider ${connection.provider} not supported for historical data`);
   }
 }
 
 export async function fetchHistoryWithDateRange(
-  connection: BrokerConnection,
+  connection: DecryptedBrokerConnection,
   symbol: string,
   startDate: string,
   endDate: string
@@ -949,13 +1011,13 @@ export async function fetchHistoryWithDateRange(
         candles = await fetchPolygonHistoryWithDates(connection.accessToken, symbol, startDate, endDate);
         break;
       case "alpaca":
-        candles = await fetchAlpacaHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        candles = await fetchAlpacaHistoryWithDates(connection.accessToken, connection.refreshToken ?? null, symbol, startDate, endDate);
         break;
       case "tastytrade":
-        candles = await fetchTastyTradeHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        candles = await fetchTastyTradeHistoryWithDates(connection.accessToken, connection.refreshToken ?? null, symbol, startDate, endDate);
         break;
       case "tradestation":
-        candles = await fetchTradeStationHistoryWithDates(connection.accessToken, connection.refreshToken, symbol, startDate, endDate);
+        candles = await fetchTradeStationHistoryWithDates(connection.accessToken, connection.refreshToken ?? null, symbol, startDate, endDate);
         break;
       default:
         try {
