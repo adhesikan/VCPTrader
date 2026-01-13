@@ -352,8 +352,10 @@ export default function Settings() {
       return true;
     },
     onSuccess: (enabled) => {
-      setLocalSettings(prev => ({ ...prev, pushNotificationsEnabled: enabled }));
+      const newSettings = { ...localSettings, pushNotificationsEnabled: enabled };
+      setLocalSettings(newSettings);
       if (enabled) {
+        saveSettingsMutation.mutate(newSettings);
         toast({
           title: "Push Notifications Enabled",
           description: "You will receive alerts on this device",

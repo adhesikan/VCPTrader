@@ -28,6 +28,7 @@ import { LogOut, User, Loader2 } from "lucide-react";
 import { BrokerStatusProvider } from "@/hooks/use-broker-status";
 import { TooltipVisibilityProvider } from "@/hooks/use-tooltips";
 import { StatusBanner } from "@/components/status-banner";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 import Scanner from "@/pages/scanner";
 import Charts from "@/pages/charts";
@@ -176,9 +177,13 @@ function AppLayout() {
             <SidebarInset className="flex flex-col flex-1 min-w-0">
               <AppHeader />
               <StatusBanner />
-              <main className="flex-1 overflow-auto">
+              <PullToRefresh
+                onRefresh={async () => {
+                  await queryClient.invalidateQueries();
+                }}
+              >
                 <AppRouter />
-              </main>
+              </PullToRefresh>
               <Footer />
             </SidebarInset>
           </div>
