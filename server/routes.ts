@@ -2230,5 +2230,432 @@ export async function registerRoutes(
     }
   });
 
+  // Automation Endpoints CRUD
+  app.get("/api/automation-endpoints", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const endpoints = await storage.getAutomationEndpoints(userId);
+      res.json(endpoints);
+    } catch (error) {
+      console.error("Failed to get automation endpoints:", error);
+      res.status(500).json({ error: "Failed to get endpoints" });
+    }
+  });
+
+  app.get("/api/automation-endpoints/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const endpoint = await storage.getAutomationEndpoint(req.params.id);
+      if (!endpoint || endpoint.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+      res.json(endpoint);
+    } catch (error) {
+      console.error("Failed to get automation endpoint:", error);
+      res.status(500).json({ error: "Failed to get endpoint" });
+    }
+  });
+
+  app.post("/api/automation-endpoints", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { name, webhookUrl, webhookSecret } = req.body;
+      if (!name || !webhookUrl) {
+        return res.status(400).json({ error: "Name and webhook URL are required" });
+      }
+
+      const endpoint = await storage.createAutomationEndpoint(
+        { userId, name, webhookUrl, isActive: true },
+        webhookSecret
+      );
+      res.json(endpoint);
+    } catch (error) {
+      console.error("Failed to create automation endpoint:", error);
+      res.status(500).json({ error: "Failed to create endpoint" });
+    }
+  });
+
+  app.patch("/api/automation-endpoints/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const existing = await storage.getAutomationEndpoint(req.params.id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      const { name, webhookUrl, webhookSecret, isActive } = req.body;
+      const endpoint = await storage.updateAutomationEndpoint(
+        req.params.id,
+        { name, webhookUrl, isActive },
+        webhookSecret
+      );
+      res.json(endpoint);
+    } catch (error) {
+      console.error("Failed to update automation endpoint:", error);
+      res.status(500).json({ error: "Failed to update endpoint" });
+    }
+  });
+
+  app.post("/api/automation-endpoints/:id/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const endpointWithSecret = await storage.getAutomationEndpointWithSecret(req.params.id);
+      if (!endpointWithSecret || endpointWithSecret.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      if (!endpointWithSecret.webhookUrl) {
+        return res.status(400).json({ error: "Webhook URL not configured" });
+      }
+
+      const testPayload = {
+        type: "test",
+        timestamp: new Date().toISOString(),
+        message: "VCP Trader connection test",
+        endpointId: endpointWithSecret.id,
+        endpointName: endpointWithSecret.name,
+      };
+
+      const response = await fetch(endpointWithSecret.webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testPayload),
+      });
+
+      const success = response.ok;
+      await storage.updateAutomationEndpointTestResult(req.params.id, success);
+
+      res.json({ success, status: response.status });
+    } catch (error: any) {
+      console.error("Failed to test automation endpoint:", error);
+      await storage.updateAutomationEndpointTestResult(req.params.id, false);
+      res.json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/automation-endpoints/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const existing = await storage.getAutomationEndpoint(req.params.id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      await storage.deleteAutomationEndpoint(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete automation endpoint:", error);
+      res.status(500).json({ error: "Failed to delete endpoint" });
+    }
+  });
+
+  // Trades CRUD
+  app.get("/api/trades", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const status = req.query.status as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const trades = await storage.getTrades(userId, status, limit);
+      res.json(trades);
+    } catch (error) {
+      console.error("Failed to get trades:", error);
+      res.status(500).json({ error: "Failed to get trades" });
+    }
+  });
+
+  app.get("/api/trades/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const trade = await storage.getTrade(req.params.id);
+      if (!trade || trade.userId !== userId) {
+        return res.status(404).json({ error: "Trade not found" });
+      }
+      res.json(trade);
+    } catch (error) {
+      console.error("Failed to get trade:", error);
+      res.status(500).json({ error: "Failed to get trade" });
+    }
+  });
+
+  app.post("/api/trades", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { symbol, strategyId, endpointId, entryPrice, quantity, stopLoss, target, setupPayload } = req.body;
+      if (!symbol || !strategyId) {
+        return res.status(400).json({ error: "Symbol and strategyId are required" });
+      }
+
+      const trade = await storage.createTrade({
+        userId,
+        symbol,
+        strategyId,
+        endpointId,
+        entryPrice,
+        quantity,
+        stopLoss,
+        target,
+        setupPayload,
+        side: "LONG",
+        status: "OPEN",
+        entryTimestamp: new Date(),
+      });
+      res.json(trade);
+    } catch (error) {
+      console.error("Failed to create trade:", error);
+      res.status(500).json({ error: "Failed to create trade" });
+    }
+  });
+
+  app.patch("/api/trades/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const existing = await storage.getTrade(req.params.id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Trade not found" });
+      }
+
+      const trade = await storage.updateTrade(req.params.id, req.body);
+      res.json(trade);
+    } catch (error) {
+      console.error("Failed to update trade:", error);
+      res.status(500).json({ error: "Failed to update trade" });
+    }
+  });
+
+  // InstaTrade Entry - send to endpoint and create trade record
+  app.post("/api/instatrade/entry", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { endpointId, symbol, strategyId, setupPayload } = req.body;
+      if (!endpointId || !symbol || !strategyId) {
+        return res.status(400).json({ error: "Endpoint, symbol, and strategyId are required" });
+      }
+
+      const endpointWithSecret = await storage.getAutomationEndpointWithSecret(endpointId);
+      if (!endpointWithSecret || endpointWithSecret.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      if (!endpointWithSecret.webhookUrl) {
+        return res.status(400).json({ error: "Endpoint webhook URL not configured" });
+      }
+
+      const nonce = randomUUID();
+      const entryPayload = {
+        type: "entry",
+        action: "BUY",
+        symbol,
+        strategyId,
+        timestamp: new Date().toISOString(),
+        nonce,
+        ...setupPayload,
+      };
+
+      const executionRequest = await storage.createExecutionRequest({
+        userId,
+        symbol,
+        strategyId,
+        timeframe: setupPayload?.timeframe,
+        setupPayload: entryPayload,
+        automationProfileId: endpointId,
+        status: "CREATED",
+      });
+
+      try {
+        const response = await fetch(endpointWithSecret.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...entryPayload, executionRequestId: executionRequest.id }),
+        });
+
+        if (response.ok) {
+          const responseData = await response.json().catch(() => ({}));
+          await storage.updateExecutionRequest(executionRequest.id, {
+            status: "SENT",
+            algoPilotxReference: responseData.reference || responseData.id,
+          });
+
+          const trade = await storage.createTrade({
+            userId,
+            symbol,
+            strategyId,
+            endpointId,
+            entryExecutionId: executionRequest.id,
+            side: "LONG",
+            status: "OPEN",
+            entryPrice: setupPayload?.price || setupPayload?.entryTrigger,
+            stopLoss: setupPayload?.stopLoss,
+            target: setupPayload?.resistance,
+            setupPayload,
+            entryTimestamp: new Date(),
+          });
+
+          res.json({
+            success: true,
+            executionRequestId: executionRequest.id,
+            tradeId: trade.id,
+            message: "Entry sent to AlgoPilotX",
+          });
+        } else {
+          await storage.updateExecutionRequest(executionRequest.id, {
+            status: "FAILED",
+            errorMessage: `HTTP ${response.status}`,
+          });
+          res.status(500).json({ error: `Webhook returned ${response.status}` });
+        }
+      } catch (fetchError: any) {
+        await storage.updateExecutionRequest(executionRequest.id, {
+          status: "FAILED",
+          errorMessage: fetchError.message,
+        });
+        res.status(500).json({ error: `Failed to send: ${fetchError.message}` });
+      }
+    } catch (error) {
+      console.error("Failed to send entry:", error);
+      res.status(500).json({ error: "Failed to send entry" });
+    }
+  });
+
+  // InstaTrade Exit - send exit signal and close trade
+  app.post("/api/instatrade/exit", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { tradeId, exitPrice } = req.body;
+      if (!tradeId) {
+        return res.status(400).json({ error: "Trade ID is required" });
+      }
+
+      const trade = await storage.getTrade(tradeId);
+      if (!trade || trade.userId !== userId) {
+        return res.status(404).json({ error: "Trade not found" });
+      }
+
+      if (trade.status !== "OPEN") {
+        return res.status(400).json({ error: "Trade is not open" });
+      }
+
+      if (!trade.endpointId) {
+        return res.status(400).json({ error: "Trade has no associated endpoint" });
+      }
+
+      const endpointWithSecret = await storage.getAutomationEndpointWithSecret(trade.endpointId);
+      if (!endpointWithSecret || !endpointWithSecret.webhookUrl) {
+        return res.status(400).json({ error: "Endpoint not found or webhook not configured" });
+      }
+
+      const nonce = randomUUID();
+      const exitPayload = {
+        type: "exit",
+        action: "SELL",
+        symbol: trade.symbol,
+        strategyId: trade.strategyId,
+        tradeId: trade.id,
+        timestamp: new Date().toISOString(),
+        nonce,
+        entryPrice: trade.entryPrice,
+        exitPrice,
+      };
+
+      const executionRequest = await storage.createExecutionRequest({
+        userId,
+        symbol: trade.symbol,
+        strategyId: trade.strategyId,
+        setupPayload: exitPayload,
+        automationProfileId: trade.endpointId,
+        status: "CREATED",
+      });
+
+      try {
+        const response = await fetch(endpointWithSecret.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...exitPayload, executionRequestId: executionRequest.id }),
+        });
+
+        if (response.ok) {
+          await storage.updateExecutionRequest(executionRequest.id, { status: "SENT" });
+
+          const finalExitPrice = exitPrice || trade.entryPrice;
+          const pnl = trade.entryPrice && finalExitPrice ? (finalExitPrice - trade.entryPrice) * (trade.quantity || 1) : null;
+          const pnlPercent = trade.entryPrice && finalExitPrice ? ((finalExitPrice - trade.entryPrice) / trade.entryPrice) * 100 : null;
+
+          await storage.updateTrade(tradeId, {
+            status: "CLOSED",
+            exitExecutionId: executionRequest.id,
+            exitPrice: finalExitPrice,
+            exitTimestamp: new Date(),
+            pnl,
+            pnlPercent,
+          });
+
+          res.json({
+            success: true,
+            executionRequestId: executionRequest.id,
+            message: "Exit sent to AlgoPilotX",
+          });
+        } else {
+          await storage.updateExecutionRequest(executionRequest.id, {
+            status: "FAILED",
+            errorMessage: `HTTP ${response.status}`,
+          });
+          res.status(500).json({ error: `Webhook returned ${response.status}` });
+        }
+      } catch (fetchError: any) {
+        await storage.updateExecutionRequest(executionRequest.id, {
+          status: "FAILED",
+          errorMessage: fetchError.message,
+        });
+        res.status(500).json({ error: `Failed to send: ${fetchError.message}` });
+      }
+    } catch (error) {
+      console.error("Failed to send exit:", error);
+      res.status(500).json({ error: "Failed to send exit" });
+    }
+  });
+
   return httpServer;
 }
