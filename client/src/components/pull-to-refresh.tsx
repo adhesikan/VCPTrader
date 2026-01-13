@@ -77,6 +77,11 @@ export function PullToRefresh({
     }
   }, [pullDistance, threshold, isRefreshing, onRefresh, disabled]);
 
+  const handleTouchCancel = useCallback(() => {
+    isPulling.current = false;
+    setPullDistance(0);
+  }, []);
+
   const progress = Math.min(pullDistance / threshold, 1);
   const isReady = progress >= 1;
 
@@ -91,6 +96,7 @@ export function PullToRefresh({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
       <div
         className={cn(
