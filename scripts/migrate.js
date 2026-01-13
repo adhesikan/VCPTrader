@@ -115,6 +115,45 @@ async function migrate() {
     `);
     console.log('Created/verified user_settings table');
 
+    // Add tutorial tracking columns to user_settings
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'user_settings' AND column_name = 'has_seen_welcome_tutorial'
+        ) THEN
+          ALTER TABLE user_settings ADD COLUMN has_seen_welcome_tutorial VARCHAR NOT NULL DEFAULT 'false';
+          RAISE NOTICE 'Added has_seen_welcome_tutorial column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'user_settings' AND column_name = 'has_seen_scanner_tutorial'
+        ) THEN
+          ALTER TABLE user_settings ADD COLUMN has_seen_scanner_tutorial VARCHAR NOT NULL DEFAULT 'false';
+          RAISE NOTICE 'Added has_seen_scanner_tutorial column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'user_settings' AND column_name = 'has_seen_vcp_tutorial'
+        ) THEN
+          ALTER TABLE user_settings ADD COLUMN has_seen_vcp_tutorial VARCHAR NOT NULL DEFAULT 'false';
+          RAISE NOTICE 'Added has_seen_vcp_tutorial column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'user_settings' AND column_name = 'has_seen_alerts_tutorial'
+        ) THEN
+          ALTER TABLE user_settings ADD COLUMN has_seen_alerts_tutorial VARCHAR NOT NULL DEFAULT 'false';
+          RAISE NOTICE 'Added has_seen_alerts_tutorial column';
+        END IF;
+      END $$;
+    `);
+    console.log('Added/verified tutorial tracking columns');
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {
