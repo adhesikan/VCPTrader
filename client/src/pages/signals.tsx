@@ -58,10 +58,11 @@ interface SignalCardProps {
   stopLoss: number;
   rvol: number;
   atr: number;
+  strategy?: string;
   onClick: () => void;
 }
 
-function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, onClick }: SignalCardProps) {
+function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, strategy, onClick }: SignalCardProps) {
   const upside = ((resistance - price) / price * 100).toFixed(1);
   const risk = ((price - stopLoss) / price * 100).toFixed(1);
 
@@ -73,14 +74,19 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, onCl
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-lg font-bold font-mono">{ticker}</span>
             <Badge 
-              variant={type === "BREAKOUT" ? "default" : type === "APPROACHING" ? "secondary" : "outline"}
+              variant={type === "BREAKOUT" ? "default" : type === "READY" ? "secondary" : "outline"}
               className="text-xs"
             >
               {type}
             </Badge>
+            {strategy && (
+              <Badge variant="outline" className="text-xs">
+                {strategy}
+              </Badge>
+            )}
           </div>
           <div className="text-right">
             <p className="font-mono font-bold">${price.toFixed(2)}</p>
@@ -378,6 +384,7 @@ export default function Signals() {
       stopLoss: result.stopLoss,
       rvol: result.rvol || 1.0,
       atr: result.atr || result.price * 0.02,
+      strategy: result.strategy || "VCP",
     })) || [];
 
     // Filter by search query
@@ -533,6 +540,7 @@ export default function Signals() {
               stopLoss={signal.stopLoss}
               rvol={signal.rvol}
               atr={signal.atr}
+              strategy={signal.strategy}
               onClick={() => setSelectedTicker(signal.ticker)}
             />
           ))}
@@ -546,6 +554,7 @@ export default function Signals() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium">Ticker</th>
                     <th className="text-left p-3 font-medium">Stage</th>
+                    <th className="text-left p-3 font-medium">Strategy</th>
                     <th className="text-right p-3 font-medium">Price</th>
                     <th className="text-right p-3 font-medium">Resistance</th>
                     <th className="text-right p-3 font-medium">Stop Loss</th>
@@ -565,10 +574,15 @@ export default function Signals() {
                       </td>
                       <td className="p-3">
                         <Badge 
-                          variant={signal.type === "BREAKOUT" ? "default" : signal.type === "APPROACHING" ? "secondary" : "outline"}
+                          variant={signal.type === "BREAKOUT" ? "default" : signal.type === "READY" ? "secondary" : "outline"}
                           className="text-xs"
                         >
                           {signal.type}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="outline" className="text-xs">
+                          {signal.strategy}
                         </Badge>
                       </td>
                       <td className="p-3 text-right font-mono">${signal.price?.toFixed(2)}</td>
