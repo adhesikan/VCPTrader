@@ -548,7 +548,7 @@ export default function Scanner() {
             {lastScanTime && (
               <div className="flex items-center gap-2 text-sm flex-wrap">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{format(lastScanTime, "MMM d, h:mm a")}</span>
+                <span className="font-medium">Last Scan: {format(lastScanTime, "MMM d, h:mm a")}</span>
                 <Button
                   variant="outline"
                   size="sm"
