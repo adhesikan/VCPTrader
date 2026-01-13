@@ -151,9 +151,9 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-        <DialogHeader className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">
+        <DialogHeader className="p-4 pb-3 sticky top-0 bg-background z-10 border-b">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <DialogTitle className="flex items-center gap-2">
                 <span className="text-xl font-bold font-mono">{ticker}</span>
                 {chartData?.name && <span className="text-muted-foreground font-normal">{chartData.name}</span>}
@@ -181,6 +181,14 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
               {chartData?.patternScore && (
                 <Badge variant="outline" className="font-mono">Score: {chartData.patternScore}</Badge>
               )}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onClose}
+                data-testid="button-close-chart-dialog"
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </DialogHeader>
