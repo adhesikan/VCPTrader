@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable } from "@shared/schema";
+import { desc } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -40,6 +41,10 @@ import type {
   InsertOpportunityDefaults,
   UserSettings,
   UserSettingsUpdate,
+  AlgoPilotxConnection,
+  InsertAlgoPilotxConnection,
+  ExecutionRequest,
+  InsertExecutionRequest,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -139,6 +144,17 @@ export interface IStorage {
 
   getUserSettings(userId: string): Promise<UserSettings | null>;
   setUserSettings(userId: string, settings: UserSettingsUpdate): Promise<UserSettings>;
+
+  getAlgoPilotxConnection(userId: string): Promise<AlgoPilotxConnection | null>;
+  getAlgoPilotxConnectionWithSecrets(userId: string): Promise<(AlgoPilotxConnection & { webhookSecret?: string }) | null>;
+  setAlgoPilotxConnection(userId: string, connection: Partial<InsertAlgoPilotxConnection>, webhookSecret?: string): Promise<AlgoPilotxConnection>;
+  updateAlgoPilotxConnectionTestResult(userId: string, success: boolean): Promise<void>;
+  deleteAlgoPilotxConnection(userId: string): Promise<void>;
+
+  getExecutionRequests(userId: string, limit?: number): Promise<ExecutionRequest[]>;
+  getExecutionRequest(id: string): Promise<ExecutionRequest | null>;
+  createExecutionRequest(request: InsertExecutionRequest): Promise<ExecutionRequest>;
+  updateExecutionRequest(id: string, data: Partial<ExecutionRequest>): Promise<ExecutionRequest | null>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1340,6 +1356,122 @@ export class MemStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async getAlgoPilotxConnection(userId: string): Promise<AlgoPilotxConnection | null> {
+    const [connection] = await db
+      .select()
+      .from(algoPilotxConnectionsTable)
+      .where(eq(algoPilotxConnectionsTable.userId, userId))
+      .limit(1);
+    return connection || null;
+  }
+
+  async getAlgoPilotxConnectionWithSecrets(userId: string): Promise<(AlgoPilotxConnection & { webhookSecret?: string }) | null> {
+    const connection = await this.getAlgoPilotxConnection(userId);
+    if (!connection) return null;
+
+    let webhookSecret: string | undefined;
+    if (connection.webhookSecretEncrypted && connection.webhookSecretIv && connection.webhookSecretAuthTag) {
+      try {
+        webhookSecret = decryptCredentials(
+          connection.webhookSecretEncrypted,
+          connection.webhookSecretIv,
+          connection.webhookSecretAuthTag
+        );
+      } catch (error) {
+        console.error("Failed to decrypt webhook secret:", error);
+      }
+    }
+
+    return { ...connection, webhookSecret };
+  }
+
+  async setAlgoPilotxConnection(userId: string, connection: Partial<InsertAlgoPilotxConnection>, webhookSecret?: string): Promise<AlgoPilotxConnection> {
+    const existing = await this.getAlgoPilotxConnection(userId);
+
+    let encryptedSecret: { encrypted: string; iv: string; authTag: string } | null = null;
+    if (webhookSecret && hasEncryptionKey()) {
+      encryptedSecret = encryptCredentials(webhookSecret);
+    }
+
+    const data: Record<string, any> = {
+      ...connection,
+      updatedAt: new Date(),
+    };
+
+    if (encryptedSecret) {
+      data.webhookSecretEncrypted = encryptedSecret.encrypted;
+      data.webhookSecretIv = encryptedSecret.iv;
+      data.webhookSecretAuthTag = encryptedSecret.authTag;
+    }
+
+    if (existing) {
+      const [updated] = await db
+        .update(algoPilotxConnectionsTable)
+        .set(data)
+        .where(eq(algoPilotxConnectionsTable.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(algoPilotxConnectionsTable)
+        .values({ userId, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  async updateAlgoPilotxConnectionTestResult(userId: string, success: boolean): Promise<void> {
+    await db
+      .update(algoPilotxConnectionsTable)
+      .set({ 
+        lastTestedAt: new Date(), 
+        lastTestSuccess: success,
+        updatedAt: new Date() 
+      })
+      .where(eq(algoPilotxConnectionsTable.userId, userId));
+  }
+
+  async deleteAlgoPilotxConnection(userId: string): Promise<void> {
+    await db
+      .delete(algoPilotxConnectionsTable)
+      .where(eq(algoPilotxConnectionsTable.userId, userId));
+  }
+
+  async getExecutionRequests(userId: string, limit: number = 50): Promise<ExecutionRequest[]> {
+    return await db
+      .select()
+      .from(executionRequestsTable)
+      .where(eq(executionRequestsTable.userId, userId))
+      .orderBy(desc(executionRequestsTable.createdAt))
+      .limit(limit);
+  }
+
+  async getExecutionRequest(id: string): Promise<ExecutionRequest | null> {
+    const [request] = await db
+      .select()
+      .from(executionRequestsTable)
+      .where(eq(executionRequestsTable.id, id))
+      .limit(1);
+    return request || null;
+  }
+
+  async createExecutionRequest(request: InsertExecutionRequest): Promise<ExecutionRequest> {
+    const [created] = await db
+      .insert(executionRequestsTable)
+      .values(request)
+      .returning();
+    return created;
+  }
+
+  async updateExecutionRequest(id: string, data: Partial<ExecutionRequest>): Promise<ExecutionRequest | null> {
+    const [updated] = await db
+      .update(executionRequestsTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(executionRequestsTable.id, id))
+      .returning();
+    return updated || null;
   }
 }
 

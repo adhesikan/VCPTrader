@@ -1,0 +1,208 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Implement a best-in-class, compliant integration flow between:
+- VCP Trader (Opportunity Engine = market intelligence + educational alerts)
+and
+- AlgoPilotX (execution layer with InstaTrade™ + TradeGuard).
+
+VCP Trader must NEVER place trades directly. It should only:
+1) help users discover setups,
+2) let users optionally connect AlgoPilotX,
+3) send a setup payload to AlgoPilotX to pre-fill InstaTrade™,
+4) display execution status returned from AlgoPilotX.
+
+COMPLIANCE PRINCIPLES (NON-NEGOTIABLE)
+- VCP Trader remains educational/informational only (no “buy/sell recommendations” language).
+- All trade placement happens only inside AlgoPilotX after explicit user confirmation.
+- UI wording must use: “Open in AlgoPilotX”, “Send setup”, “Automation”, “Execute with InstaTrade™”.
+- Append disclaimer to setup detail + automation prompts:
+  “Educational & informational only. Not investment advice.”
+
+HIGH-LEVEL USER FLOW TO IMPLEMENT
+1) User finds a setup in Opportunity Engine (scanner results).
+2) Setup detail panel shows levels + explanation and two buttons:
+   - “Create Alert”
+   - “Open in AlgoPilotX”
+3) If user has NOT connected AlgoPilotX:
+   - clicking “Open in AlgoPilotX” opens a modal explaining:
+     “Connect AlgoPilotX to execute this setup with InstaTrade™ and risk controls.”
+     Button: “Connect AlgoPilotX”
+4) Connect AlgoPilotX (one-time):
+   - User saves AlgoPilotX connection info (OAuth preferred if available; otherwise webhook + secret).
+   - User can create/select an AlgoPilotX “Automation Profile” (name, risk rules, allowed strategies, etc.)
+5) After connected:
+   - “Open in AlgoPilotX” deep-links to AlgoPilotX InstaTrade™ screen with pre-filled trade template.
+6) VCP Trader records the send event and shows status:
+   - “Sent to AlgoPilotX”
+   - “Executed / Rejected / Pending” (based on callback/webhook from AlgoPilotX)
+
+TECHNICAL APPROACH
+Implement this as a secure “Send Setup” integration:
+- VCP Trader generates a signed payload describing the setup (symbol, strategy, levels, timeframe).
+- It either:
+  A) redirects user to AlgoPilotX with a short-lived token (recommended)
+  OR
+  B) POSTs to an AlgoPilotX endpoint and receives a redirect URL to open.
+
+REQUIRED PAGES / UI CHANGES
+
+A) Opportunity Engine Results + Setup Detail
+- Add a “Setup Detail” drawer/modal when a user clicks a row.
+Show:
+  - Symbol
+  - Strategy display name
+  - Stage (FORMING/READY/TRIGGERED)
+  - Key levels (resistance/entryTrigger/stopLevel/exitRule)
+  - RVOL/score if available
+  - Explanation text
+Buttons:
+  - “Create Alert”
+  - “Open in AlgoPilotX”
+Add disclaimer text at bottom.
+
+B) New “Execution” / “Automation” Settings Page
+Route: /automation (or /settings/automation)
+Sections:
+1) “Connect AlgoPilotX”
+   - Status: Connected / Not connected
+   - If not connected: show Connect button
+   - If connected: show connected date + Disconnect (optional) + Test Connection
+2) “Automation Profiles”
+   - Create, edit, delete profiles:
+     - profile_name
+     - max_positions
+     - dollar_risk_per_trade (or %)
+     - order_type default (limit)
+     - OCO enabled (always true for InstaTrade™)
+     - stop method (entry candle low / fixed % / ATR)
+     - target method (R multiple / fixed %)
+     - allowed strategies (multi-select)
+   - A “Default profile” selector
+
+C) Upsell/CTA Components (high conversion, compliant)
+- If user not connected, show a locked panel in setup detail:
+  “Automate this setup with AlgoPilotX”
+  Button: “Connect AlgoPilotX”
+- If user is connected but no profiles:
+  “Create an automation profile to use InstaTrade™”
+  Button: “Create Profile”
+- On pricing or dashboard, add a small banner:
+  “Execute setups with AlgoPilotX InstaTrade™ (optional)”
+
+BACKEND CHANGES
+
+1) Data Models (Postgres)
+Add tables:
+
+algo_pilotx_connections
+- id uuid
+- user_id uuid
+- tenant_id uuid
+- connection_type enum('OAUTH','WEBHOOK')
+- api_base_url text (for AlgoPilotX)
+- webhook_url text nullable
+- webhook_secret_encrypted text nullable
+- oauth_refresh_token_encrypted text nullable
+- oauth_access_token_encrypted text nullable
+- created_at, updated_at
+- last_tested_at nullable
+
+automation_profiles
+- id uuid
+- user_id uuid
+- tenant_id uuid
+- name text
+- settings jsonb (risk, sizing, stop, target, allowed strategies, etc.)
+- is_default boolean
+- created_at, updated_at
+
+execution_requests (audit trail)
+- id uuid
+- user_id uuid
+- tenant_id uuid
+- symbol text
+- strategy_id text
+- timeframe text
+- setup_payload jsonb
+- automation_profile_id uuid nullable
+- status enum('CREATED','SENT','ACKED','EXECUTED','REJECTED','FAILED')
+- algo_pilotx_reference text nullable
+- created_at, updated_at
+
+2) API Endpoints in VCP Trader
+- POST /api/algo-pilotx/connect
+  Save connection details securely (encrypt secrets with existing encryption key).
+- POST /api/algo-pilotx/test
+  Send a test ping to AlgoPilotX (webhook or OAuth endpoint).
+- CRUD /api/automation-profiles
+- POST /api/execution/send
+  Input: { symbol, strategyId, timeframe, automationProfileId }
+  Server:
+    - Loads latest computed setup details (levels, stage, explanation)
+    - Builds a “setup payload”
+    - Signs it (HMAC SHA256 with per-user secret)
+    - Creates execution_requests row status=CREATED
+    - Sends to AlgoPilotX and gets back either:
+      a) redirect_url to open InstaTrade™
+      b) ack id (reference)
+    - Updates status=SENT/ACKED
+    - Returns redirect_url to client
+
+3) AlgoPilotX Callback Receiver (optional but recommended)
+Add endpoint:
+- POST /api/execution/callback
+AlgoPilotX posts updates:
+  { execution_request_id, status, message, broker_order_ids, filled_price, timestamp, signature }
+Verify signature. Update execution_requests.
+Show status in UI.
+
+SECURITY REQUIREMENTS
+- Never trust client for pricing/levels; build payload server-side.
+- Sign outbound payloads:
+  - HMAC secret stored encrypted per user.
+  - Include timestamp + nonce.
+- Replay protection:
+  - AlgoPilotX should reject duplicate (execution_request_id).
+- Store secrets encrypted at rest using BROKER_TOKEN_KEY or a dedicated key.
+- Log redaction: never log tokens, webhook secrets, or payload signatures.
+
+DEEP LINK FORMAT (Recommended)
+After creating execution request, redirect user to AlgoPilotX:
+https://app.algopilotx.com/instratrade?req=<short_lived_token>
+Token:
+- generated by VCP Trader
+- expires in 2–5 minutes
+- maps to execution_request_id
+AlgoPilotX uses token to fetch details from VCP Trader OR VCP Trader posts details to AlgoPilotX.
+
+If you cannot implement token exchange, use:
+- POST to AlgoPilotX -> returns redirect_url
+
+COPY / TEXT (Use these exact phrases)
+Buttons:
+- “Open in AlgoPilotX”
+- “Connect AlgoPilotX”
+- “Create Automation Profile”
+- “Send Setup to InstaTrade™”
+Explainers:
+- “VCP Trader provides market intelligence. Trade execution occurs in AlgoPilotX after you confirm.”
+Disclaimer:
+- “Educational & informational only. Not investment advice.”
+
+TESTING / QA
+- Verify clicking “Open in AlgoPilotX” without connection shows connect modal, no trade sent.
+- Verify connecting saves connection and test passes.
+- Verify sending setup creates execution_requests and opens AlgoPilotX redirect_url.
+- Verify status updates appear in execution history.
+- Verify multi-tenant scoping (tenant_id) is applied to all new tables and queries.
+
+DELIVERABLE
+Implement the full compliant integration:
+- Setup detail UI with “Open in AlgoPilotX”
+- Automation settings page
+- Automation profiles
+- Secure send-to-AlgoPilotX execution request flow with signed payloads
+- Optional callback status updates
+- Execution history UI
+All without VCP Trader ever placing trades directly.

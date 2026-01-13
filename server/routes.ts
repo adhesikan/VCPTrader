@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { insertAlertSchema, insertAlertRuleSchema, insertWatchlistSchema, insertAutomationSettingsSchema, scannerFilters, UserRole, RuleConditionType, PatternStage, StrategyType, userSettingsUpdateSchema } from "@shared/schema";
 import { sendEntrySignal, sendExitSignal, createAutomationLogEntry, type EntrySignal, type ExitSignal } from "./algopilotx";
@@ -1938,6 +1939,294 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to reject automation event:", error);
       res.status(500).json({ error: "Failed to reject event" });
+    }
+  });
+
+  // AlgoPilotX Integration Endpoints
+  app.get("/api/algo-pilotx/connection", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const connection = await storage.getAlgoPilotxConnection(userId);
+      if (!connection) {
+        return res.json({ connected: false });
+      }
+
+      res.json({
+        connected: connection.isConnected,
+        connectionType: connection.connectionType,
+        webhookUrl: connection.webhookUrl,
+        apiBaseUrl: connection.apiBaseUrl,
+        lastTestedAt: connection.lastTestedAt,
+        lastTestSuccess: connection.lastTestSuccess,
+        createdAt: connection.createdAt,
+      });
+    } catch (error) {
+      console.error("Failed to get AlgoPilotX connection:", error);
+      res.status(500).json({ error: "Failed to get connection" });
+    }
+  });
+
+  app.post("/api/algo-pilotx/connect", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { connectionType, webhookUrl, webhookSecret, apiBaseUrl } = req.body;
+
+      if (!connectionType || !webhookUrl) {
+        return res.status(400).json({ error: "Connection type and webhook URL are required" });
+      }
+
+      const connection = await storage.setAlgoPilotxConnection(
+        userId,
+        {
+          connectionType,
+          webhookUrl,
+          apiBaseUrl: apiBaseUrl || "https://app.algopilotx.com",
+          isConnected: true,
+        },
+        webhookSecret
+      );
+
+      res.json({
+        success: true,
+        connected: connection.isConnected,
+        connectionType: connection.connectionType,
+      });
+    } catch (error) {
+      console.error("Failed to connect AlgoPilotX:", error);
+      res.status(500).json({ error: "Failed to connect" });
+    }
+  });
+
+  app.post("/api/algo-pilotx/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const connectionWithSecrets = await storage.getAlgoPilotxConnectionWithSecrets(userId);
+      if (!connectionWithSecrets) {
+        return res.status(400).json({ error: "No AlgoPilotX connection found" });
+      }
+
+      if (!connectionWithSecrets.webhookUrl) {
+        return res.status(400).json({ error: "Webhook URL not configured" });
+      }
+
+      // Send test ping to AlgoPilotX
+      const testPayload = {
+        type: "test",
+        timestamp: new Date().toISOString(),
+        message: "VCP Trader connection test",
+      };
+
+      try {
+        const response = await fetch(connectionWithSecrets.webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(connectionWithSecrets.webhookSecret && {
+              "X-Webhook-Secret": connectionWithSecrets.webhookSecret,
+            }),
+          },
+          body: JSON.stringify(testPayload),
+        });
+
+        const success = response.ok;
+        await storage.updateAlgoPilotxConnectionTestResult(userId, success);
+
+        if (success) {
+          res.json({ success: true, message: "Connection test successful" });
+        } else {
+          res.json({ success: false, message: `Test failed: HTTP ${response.status}` });
+        }
+      } catch (fetchError: any) {
+        await storage.updateAlgoPilotxConnectionTestResult(userId, false);
+        res.json({ success: false, message: `Test failed: ${fetchError.message}` });
+      }
+    } catch (error) {
+      console.error("Failed to test AlgoPilotX connection:", error);
+      res.status(500).json({ error: "Failed to test connection" });
+    }
+  });
+
+  app.delete("/api/algo-pilotx/disconnect", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      await storage.deleteAlgoPilotxConnection(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to disconnect AlgoPilotX:", error);
+      res.status(500).json({ error: "Failed to disconnect" });
+    }
+  });
+
+  // Execution Requests (Send Setup to AlgoPilotX)
+  app.get("/api/execution-requests", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const requests = await storage.getExecutionRequests(userId, limit);
+      res.json(requests);
+    } catch (error) {
+      console.error("Failed to get execution requests:", error);
+      res.status(500).json({ error: "Failed to get requests" });
+    }
+  });
+
+  app.post("/api/execution/send", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { symbol, strategyId, timeframe, automationProfileId } = req.body;
+
+      if (!symbol || !strategyId) {
+        return res.status(400).json({ error: "Symbol and strategy ID are required" });
+      }
+
+      // Get user's AlgoPilotX connection
+      const connectionWithSecrets = await storage.getAlgoPilotxConnectionWithSecrets(userId);
+      if (!connectionWithSecrets || !connectionWithSecrets.isConnected) {
+        return res.status(400).json({ error: "AlgoPilotX not connected" });
+      }
+
+      // Get latest scan result for this symbol
+      const scanResult = await storage.getScanResult(symbol);
+      if (!scanResult) {
+        return res.status(404).json({ error: "No scan result found for symbol" });
+      }
+
+      // Build signed setup payload
+      const nonce = crypto.randomUUID();
+      const timestamp = new Date().toISOString();
+      
+      const setupPayload = {
+        symbol: scanResult.ticker,
+        strategyId,
+        strategyName: strategyId,
+        stage: scanResult.stage,
+        price: scanResult.price,
+        resistance: scanResult.resistance,
+        stopLoss: scanResult.stopLoss,
+        entryTrigger: scanResult.resistance,
+        rvol: scanResult.rvol,
+        patternScore: scanResult.patternScore,
+        explanation: `${scanResult.stage} signal for ${scanResult.ticker} - Price: $${scanResult.price?.toFixed(2)}, Resistance: $${scanResult.resistance?.toFixed(2)}, Stop: $${scanResult.stopLoss?.toFixed(2)}`,
+        timestamp,
+        nonce,
+      };
+
+      // Create execution request record
+      const executionRequest = await storage.createExecutionRequest({
+        userId,
+        symbol,
+        strategyId,
+        timeframe: timeframe || "1D",
+        setupPayload,
+        automationProfileId,
+        status: "CREATED",
+      });
+
+      // Send to AlgoPilotX
+      if (connectionWithSecrets.webhookUrl) {
+        try {
+          const webhookPayload = {
+            type: "setup",
+            executionRequestId: executionRequest.id,
+            ...setupPayload,
+          };
+
+          const response = await fetch(connectionWithSecrets.webhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(connectionWithSecrets.webhookSecret && {
+                "X-Webhook-Secret": connectionWithSecrets.webhookSecret,
+              }),
+            },
+            body: JSON.stringify(webhookPayload),
+          });
+
+          if (response.ok) {
+            const responseData = await response.json().catch(() => ({}));
+            await storage.updateExecutionRequest(executionRequest.id, {
+              status: "SENT",
+              algoPilotxReference: responseData.reference || responseData.id,
+              redirectUrl: responseData.redirectUrl || `${connectionWithSecrets.apiBaseUrl}/instatrade?req=${executionRequest.id}`,
+            });
+
+            res.json({
+              success: true,
+              executionRequestId: executionRequest.id,
+              redirectUrl: responseData.redirectUrl || `${connectionWithSecrets.apiBaseUrl}/instatrade?req=${executionRequest.id}`,
+              message: "Setup sent to AlgoPilotX",
+            });
+          } else {
+            await storage.updateExecutionRequest(executionRequest.id, {
+              status: "FAILED",
+              errorMessage: `HTTP ${response.status}`,
+            });
+            res.status(500).json({ error: "Failed to send to AlgoPilotX" });
+          }
+        } catch (fetchError: any) {
+          await storage.updateExecutionRequest(executionRequest.id, {
+            status: "FAILED",
+            errorMessage: fetchError.message,
+          });
+          res.status(500).json({ error: `Failed to send: ${fetchError.message}` });
+        }
+      } else {
+        res.status(400).json({ error: "No webhook URL configured" });
+      }
+    } catch (error) {
+      console.error("Failed to send execution request:", error);
+      res.status(500).json({ error: "Failed to send setup" });
+    }
+  });
+
+  // Callback endpoint for AlgoPilotX to update execution status
+  app.post("/api/execution/callback", async (req, res) => {
+    try {
+      const { execution_request_id, status, message, broker_order_ids, filled_price } = req.body;
+
+      if (!execution_request_id || !status) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const request = await storage.getExecutionRequest(execution_request_id);
+      if (!request) {
+        return res.status(404).json({ error: "Execution request not found" });
+      }
+
+      // Update execution request status
+      await storage.updateExecutionRequest(execution_request_id, {
+        status: status.toUpperCase(),
+        algoPilotxReference: broker_order_ids?.[0] || request.algoPilotxReference,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to process execution callback:", error);
+      res.status(500).json({ error: "Failed to process callback" });
     }
   });
 

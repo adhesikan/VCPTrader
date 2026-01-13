@@ -561,3 +561,93 @@ export const userSettingsUpdateSchema = z.object({
 });
 export type UserSettingsUpdate = z.infer<typeof userSettingsUpdateSchema>;
 export type UserSettings = typeof userSettings.$inferSelect;
+
+export const AlgoPilotXConnectionType = {
+  OAUTH: "OAUTH",
+  WEBHOOK: "WEBHOOK",
+} as const;
+
+export type AlgoPilotXConnectionTypeValue = typeof AlgoPilotXConnectionType[keyof typeof AlgoPilotXConnectionType];
+
+export const algoPilotxConnections = pgTable("algo_pilotx_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  connectionType: text("connection_type").notNull().default("WEBHOOK"),
+  apiBaseUrl: text("api_base_url"),
+  webhookUrl: text("webhook_url"),
+  webhookSecretEncrypted: text("webhook_secret_encrypted"),
+  webhookSecretIv: text("webhook_secret_iv"),
+  webhookSecretAuthTag: text("webhook_secret_auth_tag"),
+  oauthRefreshTokenEncrypted: text("oauth_refresh_token_encrypted"),
+  oauthAccessTokenEncrypted: text("oauth_access_token_encrypted"),
+  oauthTokenIv: text("oauth_token_iv"),
+  oauthTokenAuthTag: text("oauth_token_auth_tag"),
+  isConnected: boolean("is_connected").default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  lastTestSuccess: boolean("last_test_success"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAlgoPilotxConnectionSchema = createInsertSchema(algoPilotxConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastTestedAt: true,
+  lastTestSuccess: true,
+});
+export type InsertAlgoPilotxConnection = z.infer<typeof insertAlgoPilotxConnectionSchema>;
+export type AlgoPilotxConnection = typeof algoPilotxConnections.$inferSelect;
+
+export const ExecutionRequestStatus = {
+  CREATED: "CREATED",
+  SENT: "SENT",
+  ACKED: "ACKED",
+  EXECUTED: "EXECUTED",
+  REJECTED: "REJECTED",
+  FAILED: "FAILED",
+} as const;
+
+export type ExecutionRequestStatusValue = typeof ExecutionRequestStatus[keyof typeof ExecutionRequestStatus];
+
+export const executionRequests = pgTable("execution_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  strategyId: text("strategy_id").notNull(),
+  timeframe: text("timeframe"),
+  setupPayload: jsonb("setup_payload"),
+  automationProfileId: varchar("automation_profile_id"),
+  status: text("status").notNull().default("CREATED"),
+  algoPilotxReference: text("algo_pilotx_reference"),
+  redirectUrl: text("redirect_url"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExecutionRequestSchema = createInsertSchema(executionRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertExecutionRequest = z.infer<typeof insertExecutionRequestSchema>;
+export type ExecutionRequest = typeof executionRequests.$inferSelect;
+
+export const setupPayloadSchema = z.object({
+  symbol: z.string(),
+  strategyId: z.string(),
+  strategyName: z.string(),
+  stage: z.string(),
+  price: z.number(),
+  resistance: z.number().optional(),
+  stopLoss: z.number().optional(),
+  entryTrigger: z.number().optional(),
+  exitRule: z.string().optional(),
+  rvol: z.number().optional(),
+  patternScore: z.number().optional(),
+  explanation: z.string().optional(),
+  timestamp: z.string(),
+  nonce: z.string(),
+});
+export type SetupPayload = z.infer<typeof setupPayloadSchema>;
