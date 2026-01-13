@@ -16,9 +16,12 @@ import {
   fetchHistoryWithDateRange,
   processChartData,
   DEFAULT_SCAN_SYMBOLS,
-  DOW_30_SYMBOLS,
-  NASDAQ_100_TOP,
-  SP500_TOP,
+  DOW_30,
+  NASDAQ_100,
+  SP_500,
+  ALL_MAJOR_INDICES,
+  UNIVERSE_OPTIONS,
+  getUniverseSymbols,
   LARGE_CAP_UNIVERSE
 } from "./broker-service";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
@@ -85,10 +88,11 @@ export async function registerRoutes(
 
   app.get("/api/universes", (req, res) => {
     res.json({
-      dow30: { symbols: DOW_30_SYMBOLS, count: DOW_30_SYMBOLS.length },
-      nasdaq100: { symbols: NASDAQ_100_TOP, count: NASDAQ_100_TOP.length },
-      sp500: { symbols: SP500_TOP, count: SP500_TOP.length },
-      all: { symbols: LARGE_CAP_UNIVERSE, count: LARGE_CAP_UNIVERSE.length },
+      dow30: { symbols: DOW_30, count: DOW_30.length, name: "Dow 30", description: "30 blue-chip stocks" },
+      nasdaq100: { symbols: NASDAQ_100, count: NASDAQ_100.length, name: "Nasdaq 100", description: "100 largest Nasdaq stocks" },
+      sp500: { symbols: SP_500, count: SP_500.length, name: "S&P 500", description: "500 largest US companies" },
+      all: { symbols: ALL_MAJOR_INDICES, count: ALL_MAJOR_INDICES.length, name: "All Major Indices", description: "Combined unique stocks from all indices" },
+      options: UNIVERSE_OPTIONS,
     });
   });
 

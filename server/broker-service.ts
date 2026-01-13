@@ -615,49 +615,20 @@ export function quotesToScanResults(quotes: QuoteData[], strategy: string = Stra
   });
 }
 
-export const DEFAULT_SCAN_SYMBOLS = [
-  "NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AMD",
-  "CRM", "NFLX", "AVGO", "COST", "ADBE", "INTC", "ORCL", "CSCO",
-];
+// Re-export symbol universes
+export { DOW_30, NASDAQ_100, SP_500, ALL_MAJOR_INDICES, UNIVERSE_OPTIONS, getUniverseSymbols } from "./symbol-universes";
+import { DOW_30, NASDAQ_100, SP_500, ALL_MAJOR_INDICES } from "./symbol-universes";
 
-export const DOW_30_SYMBOLS = [
-  "AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "DOW",
-  "GS", "HD", "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM",
-  "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT"
-];
+// Default to Dow 30 for quick scans (legacy compatibility)
+export const DEFAULT_SCAN_SYMBOLS = DOW_30;
 
-export const NASDAQ_100_TOP = [
-  "AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "GOOG", "AVGO", "TSLA", "COST",
-  "PEP", "ADBE", "NFLX", "AMD", "CSCO", "TMUS", "INTC", "CMCSA", "AMGN", "INTU",
-  "QCOM", "TXN", "HON", "AMAT", "BKNG", "ISRG", "SBUX", "VRTX", "ADP", "MDLZ"
-];
+// Legacy exports for backward compatibility
+export const DOW_30_SYMBOLS = DOW_30;
+export const NASDAQ_100_TOP = NASDAQ_100.slice(0, 30);
+export const SP500_TOP = SP_500.slice(0, 30);
 
-export const SP500_TOP = [
-  "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "META", "TSLA", "BRK.B", "UNH", "XOM",
-  "JNJ", "JPM", "V", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "LLY",
-  "PEP", "KO", "COST", "AVGO", "WMT", "MCD", "CSCO", "TMO", "ACN", "ABT"
-];
-
-export const LARGE_CAP_UNIVERSE = Array.from(new Set([
-  ...DOW_30_SYMBOLS,
-  ...NASDAQ_100_TOP,
-  ...SP500_TOP,
-  "PYPL", "UBER", "SQ", "SHOP", "SNOW", "PLTR", "NET", "CRWD", "DDOG", "ZS",
-  "PANW", "OKTA", "TWLO", "COIN", "HOOD", "RIVN", "LCID", "NIO", "XPEV", "LI",
-  "ABNB", "DASH", "RBLX", "U", "PTON", "ROKU", "PINS", "SNAP", "SPOT", "TTD",
-  "ZM", "DOCU", "TEAM", "MDB", "ESTC", "PATH", "CFLT", "DOCN", "S", "GTLB",
-  "ARM", "SMCI", "MRVL", "ON", "MU", "NXPI", "KLAC", "LRCX", "ASML", "ADI",
-  "DELL", "HPQ", "HPE", "WDC", "STX", "NTAP", "PSTG", "VRT", "GFS", "WOLF",
-  "BA", "RTX", "LMT", "GD", "NOC", "GE", "CAT", "DE", "MMM", "HON",
-  "F", "GM", "TM", "HMC", "STLA", "RACE", "RIVN", "LCID", "FSR", "NKLA",
-  "XLF", "GS", "MS", "C", "BAC", "WFC", "USB", "PNC", "TFC", "SCHW",
-  "BLK", "SPGI", "ICE", "CME", "NDAQ", "MCO", "FIS", "FISV", "GPN", "SQ",
-  "DIS", "NFLX", "WBD", "PARA", "CMCSA", "FOXA", "CHTR", "TMUS", "VZ", "T",
-  "CRM", "ORCL", "SAP", "NOW", "WDAY", "VMW", "ADSK", "SNPS", "CDNS", "ANSS",
-  "NKE", "LULU", "UAA", "DECK", "SKX", "CROX", "ONON", "BIRD", "SHOO", "WWW",
-  "SBUX", "MCD", "CMG", "DPZ", "WING", "YUM", "QSR", "DNUT", "BROS", "JACK",
-  "WMT", "TGT", "COST", "DG", "DLTR", "FIVE", "OLLI", "ROSS", "TJX", "BURL"
-]));
+// Use the comprehensive ALL_MAJOR_INDICES for large cap universe
+export const LARGE_CAP_UNIVERSE = ALL_MAJOR_INDICES;
 
 export interface CandleData {
   time: string;
