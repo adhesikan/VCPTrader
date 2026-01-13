@@ -41,7 +41,7 @@ const VCP_TUTORIAL: Tutorial = {
     {
       id: "vcp-intro",
       title: "What is a VCP?",
-      content: "The Volatility Contraction Pattern (VCP) was developed by Mark Minervini and is one of the most reliable patterns for identifying stocks ready to break out. It shows a stock consolidating with decreasing volatility, building energy for a significant move.",
+      content: "The Volatility Contraction Pattern (VCP) is one of the most reliable chart patterns for identifying stocks ready to break out. It shows a stock consolidating with decreasing volatility, building energy for a significant move.",
       icon: TrendingUp,
       tips: [
         "VCPs typically form over 3-7 weeks",
