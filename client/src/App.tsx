@@ -32,6 +32,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 
 import Scanner from "@/pages/scanner";
 import Charts from "@/pages/charts";
+import Alerts from "@/pages/alerts";
 import Watchlists from "@/pages/watchlists";
 import Backtest from "@/pages/backtest";
 import Settings from "@/pages/settings";
@@ -54,6 +55,7 @@ function AppRouter() {
       <Route path="/signals" component={Signals} />
       <Route path="/charts" component={Charts} />
       <Route path="/charts/:ticker" component={Charts} />
+      <Route path="/alerts" component={Alerts} />
       <Route path="/watchlists" component={Watchlists} />
       <Route path="/backtest" component={Backtest} />
       <Route path="/strategy-guide" component={StrategyGuide} />

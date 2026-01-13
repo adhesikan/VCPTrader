@@ -1,0 +1,598 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Bell, Plus, Check, Trash2, List, Power, PowerOff, Clock, AlertCircle, TrendingUp, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationProfile } from "@shared/schema";
+import { RuleConditionType, PatternStage } from "@shared/schema";
+import { Zap } from "lucide-react";
+
+function getStageBadgeVariant(stage: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (stage) {
+    case "BREAKOUT":
+      return "default";
+    case "READY":
+      return "secondary";
+    case "FORMING":
+      return "outline";
+    default:
+      return "outline";
+  }
+}
+
+function AlertRuleCard({ 
+  rule, 
+  onToggle, 
+  onDelete,
+  profiles,
+  onUpdateProfile,
+}: { 
+  rule: AlertRule; 
+  onToggle: (id: string, enabled: boolean) => void;
+  onDelete: (id: string) => void;
+  profiles?: AutomationProfile[];
+  onUpdateProfile?: (id: string, profileId: string | null) => void;
+}) {
+  const payload = rule.conditionPayload as { targetStage?: string } | null;
+  const targetStage = payload?.targetStage || "BREAKOUT";
+  const lastState = rule.lastState as { stage?: string; price?: number } | null;
+  const assignedProfile = profiles?.find(p => p.id === rule.automationProfileId);
+  
+  return (
+    <Card 
+      className={`relative overflow-visible ${rule.isEnabled ? "" : "opacity-60"}`}
+      data-testid={`rule-card-${rule.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
+            <Badge variant={getStageBadgeVariant(targetStage)} className="gap-1">
+              <TrendingUp className="h-3 w-3" />
+              {targetStage}
+            </Badge>
+            {assignedProfile && (
+              <Badge variant="secondary" className="gap-1">
+                <Zap className="h-3 w-3" />
+                {assignedProfile.name}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={rule.isEnabled ?? true}
+              onCheckedChange={(checked) => onToggle(rule.id, checked)}
+              data-testid={`switch-rule-${rule.id}`}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(rule.id)}
+              data-testid={`button-delete-rule-${rule.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-2 text-sm text-muted-foreground">
+          Alert when {rule.symbol} enters {targetStage} stage
+        </div>
+
+        {profiles && profiles.length > 0 && onUpdateProfile && (
+          <div className="mt-3">
+            <Select
+              value={rule.automationProfileId || "none"}
+              onValueChange={(value) => onUpdateProfile(rule.id, value === "none" ? null : value)}
+            >
+              <SelectTrigger className="h-8 text-xs" data-testid={`select-profile-${rule.id}`}>
+                <Zap className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="No automation profile" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No automation profile</SelectItem>
+                {profiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name} ({profile.mode})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3">
+            {lastState?.stage && (
+              <span className="flex items-center gap-1">
+                Current: <Badge variant="outline" className="h-5 text-xs">{lastState.stage}</Badge>
+              </span>
+            )}
+            {lastState?.price && (
+              <span className="font-mono">${lastState.price.toFixed(2)}</span>
+            )}
+          </div>
+          {rule.lastEvaluatedAt && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDistanceToNow(new Date(rule.lastEvaluatedAt), { addSuffix: true })}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AlertEventCard({ 
+  event, 
+  onMarkRead 
+}: { 
+  event: AlertEvent; 
+  onMarkRead?: (id: string) => void;
+}) {
+  const payload = event.payload as { message?: string; resistance?: number; stopLoss?: number } | null;
+  const timeAgo = event.triggeredAt
+    ? formatDistanceToNow(new Date(event.triggeredAt), { addSuffix: true })
+    : "";
+  
+  return (
+    <Card 
+      className={`relative overflow-visible ${!event.isRead ? "border-primary/30" : ""}`}
+      data-testid={`event-card-${event.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant={getStageBadgeVariant(event.toState)} className="gap-1">
+              <TrendingUp className="h-3 w-3" />
+              {event.toState}
+            </Badge>
+            {!event.isRead && (
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            )}
+          </div>
+          {onMarkRead && !event.isRead && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onMarkRead(event.id)}
+              data-testid={`button-mark-read-${event.id}`}
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Mark Read
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-lg font-semibold font-mono">{event.symbol}</span>
+          {event.price != null && (
+            <span className="text-lg font-mono font-semibold text-chart-2">
+              ${event.price.toFixed(2)}
+            </span>
+          )}
+        </div>
+
+        {event.fromState && (
+          <div className="mt-1 text-sm text-muted-foreground">
+            Transitioned from {event.fromState} to {event.toState}
+          </div>
+        )}
+
+        {payload?.message && (
+          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+            {payload.message}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          <Link href={`/charts/${event.symbol}`}>
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+              <ExternalLink className="h-3 w-3" />
+              View Chart
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Alerts() {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("none");
+  const [newRule, setNewRule] = useState({
+    symbol: "",
+    targetStage: "BREAKOUT" as string,
+    automationProfileId: "none" as string,
+  });
+  const { toast } = useToast();
+
+  const { data: rules, isLoading: rulesLoading } = useQuery<AlertRule[]>({
+    queryKey: ["/api/alert-rules"],
+  });
+
+  const { data: events, isLoading: eventsLoading } = useQuery<AlertEvent[]>({
+    queryKey: ["/api/alert-events"],
+  });
+
+  const { data: watchlists } = useQuery<Watchlist[]>({
+    queryKey: ["/api/watchlists"],
+  });
+
+  const { data: automationProfiles = [] } = useQuery<AutomationProfile[]>({
+    queryKey: ["/api/automation-profiles"],
+  });
+
+  const selectedWatchlistData = watchlists?.find(w => w.id === selectedWatchlist);
+
+  useEffect(() => {
+    if (selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0) {
+      setNewRule(prev => ({ ...prev, symbol: selectedWatchlistData.symbols![0] }));
+    }
+  }, [selectedWatchlistData]);
+
+  const createRuleMutation = useMutation({
+    mutationFn: async (data: Partial<InsertAlertRule>) => {
+      const response = await apiRequest("POST", "/api/alert-rules", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+      setIsCreateOpen(false);
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationProfileId: "none" });
+      setSelectedWatchlist("none");
+      toast({
+        title: "Alert Rule Created",
+        description: "You'll be notified when conditions are met",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to create rule",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleRuleMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      await apiRequest("PATCH", `/api/alert-rules/${id}`, { isEnabled: enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+    },
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/alert-rules/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+      toast({ title: "Alert rule deleted" });
+    },
+  });
+
+  const updateRuleProfileMutation = useMutation({
+    mutationFn: async ({ id, profileId }: { id: string; profileId: string | null }) => {
+      await apiRequest("PATCH", `/api/alert-rules/${id}`, { automationProfileId: profileId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
+      toast({ title: "Automation profile updated" });
+    },
+  });
+
+  const markEventReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/alert-events/${id}/read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-events"] });
+    },
+  });
+
+  const markAllEventsReadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/alert-events/mark-all-read", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-events"] });
+      toast({ title: "All events marked as read" });
+    },
+  });
+
+  const handleCreateRule = () => {
+    if (newRule.symbol) {
+      createRuleMutation.mutate({
+        symbol: newRule.symbol.toUpperCase(),
+        conditionType: RuleConditionType.STAGE_ENTERED,
+        conditionPayload: { targetStage: newRule.targetStage },
+        strategy: "VCP",
+        timeframe: "1d",
+        isEnabled: true,
+        automationProfileId: newRule.automationProfileId === "none" || !newRule.automationProfileId ? null : newRule.automationProfileId,
+        watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
+      });
+    }
+  };
+
+  const enabledRules = rules?.filter(r => r.isEnabled) || [];
+  const disabledRules = rules?.filter(r => !r.isEnabled) || [];
+  const unreadEvents = events?.filter(e => !e.isRead) || [];
+  const readEvents = events?.filter(e => e.isRead) || [];
+
+  return (
+    <div className="p-6 space-y-6" data-testid="alerts-page">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your VCP stage alerts and view triggered events
+          </p>
+        </div>
+
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2" data-testid="button-create-rule">
+              <Plus className="h-4 w-4" />
+              New Alert Rule
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create VCP Stage Alert</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {watchlists && watchlists.length > 0 && (
+                <div className="space-y-2">
+                  <Label>From Watchlist (optional)</Label>
+                  <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+                    <SelectTrigger data-testid="select-rule-watchlist">
+                      <List className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Select a watchlist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None - enter manually</SelectItem>
+                      {watchlists.map((wl) => (
+                        <SelectItem key={wl.id} value={wl.id}>
+                          {wl.name} ({wl.symbols?.length || 0} symbols)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="symbol">Symbol</Label>
+                {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
+                  <Select
+                    value={newRule.symbol}
+                    onValueChange={(value) => setNewRule(prev => ({ ...prev, symbol: value }))}
+                  >
+                    <SelectTrigger className="font-mono" data-testid="input-rule-symbol">
+                      <SelectValue placeholder="Select symbol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedWatchlistData.symbols.map((symbol) => (
+                        <SelectItem key={symbol} value={symbol}>
+                          {symbol}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id="symbol"
+                    placeholder="AAPL"
+                    value={newRule.symbol}
+                    onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                    className="font-mono uppercase"
+                    data-testid="input-rule-symbol"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stage">Target VCP Stage</Label>
+                <Select
+                  value={newRule.targetStage}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, targetStage: value }))}
+                >
+                  <SelectTrigger id="stage" data-testid="select-rule-stage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BREAKOUT">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Breakout</span>
+                        <span className="text-xs text-muted-foreground">Alert when price breaks above resistance</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="READY">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Ready</span>
+                        <span className="text-xs text-muted-foreground">Alert when pattern is ready for breakout</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="FORMING">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Forming</span>
+                        <span className="text-xs text-muted-foreground">Alert when VCP pattern starts forming</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You'll be notified when the stock enters this VCP stage
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Automation Profile (optional)</Label>
+                <Select
+                  value={newRule.automationProfileId}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, automationProfileId: value }))}
+                >
+                  <SelectTrigger data-testid="select-rule-automation-profile">
+                    <Zap className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Select automation profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None - use default</SelectItem>
+                    {automationProfiles.map((profile) => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{profile.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Mode: {profile.mode}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Link this alert to a specific automation profile for webhook delivery
+                </p>
+              </div>
+
+              <Button
+                onClick={handleCreateRule}
+                disabled={!newRule.symbol || createRuleMutation.isPending}
+                className="w-full"
+                data-testid="button-submit-rule"
+              >
+                {createRuleMutation.isPending ? "Creating..." : "Create Alert Rule"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <Badge variant="default" className="gap-1">
+          <Power className="h-3 w-3" />
+          Active Rules <span className="font-mono">{enabledRules.length}</span>
+        </Badge>
+        <Badge variant="secondary" className="gap-1">
+          <Bell className="h-3 w-3" />
+          Unread <span className="font-mono">{unreadEvents.length}</span>
+        </Badge>
+        <Badge variant="outline" className="gap-1">
+          Total Events <span className="font-mono">{events?.length || 0}</span>
+        </Badge>
+      </div>
+
+      <Tabs defaultValue="rules" className="w-full">
+        <TabsList>
+          <TabsTrigger value="rules" data-testid="tab-rules">
+            Rules ({rules?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="history" data-testid="tab-history">
+            History ({events?.length || 0})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rules" className="mt-6">
+          {rulesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : rules && rules.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {rules.map((rule) => (
+                <AlertRuleCard
+                  key={rule.id}
+                  rule={rule}
+                  onToggle={(id, enabled) => toggleRuleMutation.mutate({ id, enabled })}
+                  onDelete={(id) => deleteRuleMutation.mutate(id)}
+                  profiles={automationProfiles}
+                  onUpdateProfile={(id, profileId) => updateRuleProfileMutation.mutate({ id, profileId })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm font-medium">No alert rules</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Create a rule to monitor VCP stage transitions
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6 space-y-4">
+          {unreadEvents.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markAllEventsReadMutation.mutate()}
+                className="gap-1"
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-4 w-4" />
+                Mark All Read
+              </Button>
+            </div>
+          )}
+
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : events && events.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {events.map((event) => (
+                <AlertEventCard
+                  key={event.id}
+                  event={event}
+                  onMarkRead={(id) => markEventReadMutation.mutate(id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Bell className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm font-medium">No alert events</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Events will appear here when your rules are triggered
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

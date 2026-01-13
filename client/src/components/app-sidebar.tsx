@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   Search,
   BarChart3,
+  Bell,
   List,
   FlaskConical,
   Settings,
@@ -23,13 +24,15 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import type { BrokerConnection } from "@shared/schema";
+import type { BrokerConnection, Alert } from "@shared/schema";
 
 const mainNavItems = [
   { title: "Opportunity Engine", url: "/", icon: Search },
   { title: "Breakout Alerts", url: "/signals", icon: Zap },
   { title: "Charts", url: "/charts", icon: BarChart3 },
+  { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Watchlists", url: "/watchlists", icon: List },
 ];
 
@@ -48,6 +51,11 @@ export function AppSidebar() {
     queryKey: ["/api/broker/status"],
   });
 
+  const { data: alerts } = useQuery<Alert[]>({
+    queryKey: ["/api/alerts"],
+  });
+
+  const unreadAlerts = alerts?.filter(a => !a.isRead).length || 0;
   const isConnected = brokerStatus?.isConnected ?? false;
 
   const handleNavClick = () => {
@@ -86,6 +94,11 @@ export function AppSidebar() {
                     <Link href={item.url} onClick={handleNavClick} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
+                      {item.title === "Alerts" && unreadAlerts > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-xs">
+                          {unreadAlerts}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
