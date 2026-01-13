@@ -1,0 +1,53 @@
+Failed to get user settings: error: column "has_seen_welcome_tutorial" does not exist
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:76:32520
+    at async Om.getUserSettings (/app/dist/index.cjs:76:135532)
+    at async /app/dist/index.cjs:76:232684 {
+  length: 126,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '174',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+4:33:57 PM [express] GET /api/user/settings 500 in 12ms :: {"error":"Failed to get user settings"}
+4:34:00 PM [express] GET /api/push/vapid-key 304 in 9ms :: {"publicKey":"BCK7Y-y0EFBrPyvy6NfZShiwz2FNevrDTNnh543jp-T7IA5W1EpKLXvOadF_FjGBUawmWptSVxn_OxqnBgMxoRw"}
+4:34:00 PM [express] POST /api/push/subscribe 200 in 6ms :: {"endpoint":"https://web.push.apple.com/QFXnCLjoA3gpUu3J29CnGRetao4Xdb_vq8gC8SmmuCdsooHtY6lYm4MnV8EDKGYzkLt1b61GEmk-2peswiYr2Mlyxf9FfMLCMP4PLfH2i0Ui9pAn0UCC2LgV9NqPI0HbiHubEmLxrf5jJdtU7q_QWXnIWQ6xEPDKMPLufAnHO0E","p256dh":"BKkrywuAqIjqXwcdP79eheYn554Uftp3FpcImtsTc2C8POFmDYnjRC3AT_J4Ip6vL-ndn788wmWHSrfF9LrPND0","auth":"l4w5YubhuPn47FW_IYgqBQ","id":"b76d72ef-50e4-4b5e-aee1-beaf2dc925c1","createdAt":"2026-01-13T16:34:00.442Z"}
+Failed to save user settings: error: column "has_seen_welcome_tutorial" does not exist
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:76:32520
+    at async Om.getUserSettings (/app/dist/index.cjs:76:135532)
+    at async Om.setUserSettings (/app/dist/index.cjs:76:135639)
+    at async n (/app/dist/index.cjs:76:233751) {
+  length: 126,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '174',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+4:34:00 PM [express] PUT /api/user/settings 500 in 10ms :: {"error":"Failed to save user settings"}
