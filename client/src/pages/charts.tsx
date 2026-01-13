@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ChevronRight, ExternalLink, Plug, Settings } from "lucide-react";
+import { Search, ChevronRight, ExternalLink, Plug, Settings, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,7 @@ interface ChartData {
 
 export default function Charts() {
   const [, params] = useRoute("/charts/:ticker");
+  const [, navigate] = useLocation();
   const initialTicker = params?.ticker || "";
   
   const [searchInput, setSearchInput] = useState(initialTicker);
@@ -113,11 +114,21 @@ export default function Charts() {
   return (
     <div className="p-4 lg:p-6 space-y-4" data-testid="charts-page">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Charts</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Technical analysis with VCP overlays
-          </p>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/scanner")}
+            data-testid="button-close-chart"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Charts</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Technical analysis with VCP overlays
+            </p>
+          </div>
         </div>
 
         <div className="relative flex-1 min-w-[180px] lg:w-64 lg:flex-none">

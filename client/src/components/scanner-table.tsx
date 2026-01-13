@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, ExternalLink, Zap } from "lucide-react";
 import { Link } from "wouter";
 import {
   Table,
@@ -28,6 +28,8 @@ interface ScannerTableProps {
   results: ScanResult[];
   isLoading?: boolean;
   onRowClick?: (result: ScanResult) => void;
+  onInstaTrade?: (result: ScanResult, e?: React.MouseEvent) => void;
+  isInstaTrading?: boolean;
   searchQuery?: string;
 }
 
@@ -62,7 +64,7 @@ function getStageBadgeVariant(stage: PatternStageType): "default" | "secondary" 
   }
 }
 
-export function ScannerTable({ results, isLoading, onRowClick, searchQuery = "" }: ScannerTableProps) {
+export function ScannerTable({ results, isLoading, onRowClick, onInstaTrade, isInstaTrading, searchQuery = "" }: ScannerTableProps) {
   const [sortField, setSortField] = useState<SortField>("stage");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -262,16 +264,33 @@ export function ScannerTable({ results, isLoading, onRowClick, searchQuery = "" 
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Link href={`/charts/${result.ticker}`}>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      data-testid={`button-chart-${result.ticker}`}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
+                  <div className="flex items-center gap-1">
+                    {onInstaTrade && (
+                      <Button 
+                        variant="default" 
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInstaTrade(result, e);
+                        }}
+                        disabled={isInstaTrading}
+                        data-testid={`button-instatrade-${result.ticker}`}
+                      >
+                        <Zap className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Link href={`/charts/${result.ticker}`}>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-7 w-7"
+                        data-testid={`button-chart-${result.ticker}`}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  </div>
                 </TableCell>
               </TableRow>
             );

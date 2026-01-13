@@ -29,7 +29,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults, UserSettings } from "@shared/schema";
+import type { ScanResult, ScannerFilters, Watchlist, StrategyInfo, OpportunityDefaults, UserSettings, AutomationEndpoint } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { STRATEGY_CONFIGS, getStrategyDisplayName, FUSION_ENGINE_CONFIG } from "@shared/strategies";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 import { cn } from "@/lib/utils";
@@ -157,6 +165,77 @@ export default function Scanner() {
   const { data: universes } = useQuery<UniversesResponse>({
     queryKey: ["/api/universes"],
   });
+
+  const { data: automationEndpoints } = useQuery<AutomationEndpoint[]>({
+    queryKey: ["/api/automation-endpoints"],
+  });
+
+  const [instaTradeResult, setInstaTradeResult] = useState<ScanResult | null>(null);
+  const [showEndpointDialog, setShowEndpointDialog] = useState(false);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<AutomationEndpoint | null>(null);
+
+  const hasEndpoints = automationEndpoints && automationEndpoints.length > 0;
+
+  const instatradeMutation = useMutation({
+    mutationFn: async ({ endpointId, result }: { endpointId: string; result: ScanResult }) => {
+      const response = await apiRequest("POST", "/api/instatrade/entry", {
+        endpointId,
+        symbol: result.ticker,
+        strategyId: selectedStrategy,
+        setupPayload: {
+          price: result.price,
+          resistance: result.resistance,
+          stopLoss: result.stopLoss,
+          patternScore: result.patternScore,
+          stage: result.stage,
+          rvol: result.rvol,
+        },
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "InstaTrade Sent",
+        description: `Entry signal sent for ${instaTradeResult?.ticker}`,
+      });
+      setShowEndpointDialog(false);
+      setInstaTradeResult(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "InstaTrade Failed",
+        description: error.message || "Could not send entry signal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleInstaTrade = (result: ScanResult, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!hasEndpoints) {
+      toast({
+        title: "No Automation Endpoints",
+        description: "Create an endpoint on the Automation page first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setInstaTradeResult(result);
+    if (automationEndpoints!.length === 1) {
+      instatradeMutation.mutate({ endpointId: automationEndpoints![0].id, result });
+    } else {
+      setSelectedEndpoint(automationEndpoints![0]);
+      setShowEndpointDialog(true);
+    }
+  };
+
+  const handleConfirmInstaTrade = () => {
+    if (selectedEndpoint && instaTradeResult) {
+      instatradeMutation.mutate({ endpointId: selectedEndpoint.id, result: instaTradeResult });
+    }
+  };
 
   const UNIVERSE_OPTIONS = [
     { value: "sp500", label: universes?.sp500?.name || "S&P 500", count: universes?.sp500?.count || 500, description: universes?.sp500?.description },
@@ -706,6 +785,16 @@ export default function Scanner() {
                             </TooltipContent>
                           </Tooltip>
                         </div>
+                        <Button
+                          size="sm"
+                          className="w-full gap-1 mt-2"
+                          onClick={(e) => handleInstaTrade(result, e)}
+                          disabled={instatradeMutation.isPending}
+                          data-testid={`button-instatrade-card-${result.ticker}`}
+                        >
+                          <Zap className="h-3 w-3" />
+                          InstaTrade™
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -761,6 +850,16 @@ export default function Scanner() {
                         {result.patternScore && (
                           <Badge variant="secondary" className="w-12 justify-center">{result.patternScore}%</Badge>
                         )}
+                        <Button
+                          size="sm"
+                          className="gap-1"
+                          onClick={(e) => handleInstaTrade(result, e)}
+                          disabled={instatradeMutation.isPending}
+                          data-testid={`button-instatrade-list-${result.ticker}`}
+                        >
+                          <Zap className="h-3 w-3" />
+                          <span className="hidden sm:inline">InstaTrade™</span>
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -1169,6 +1268,8 @@ export default function Scanner() {
           <ScannerTable
             results={filteredResults}
             onRowClick={handleRowClick}
+            onInstaTrade={handleInstaTrade}
+            isInstaTrading={instatradeMutation.isPending}
             isLoading={isLoading}
           />
         </>
@@ -1239,6 +1340,54 @@ export default function Scanner() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showEndpointDialog} onOpenChange={setShowEndpointDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Endpoint</DialogTitle>
+            <DialogDescription>
+              Choose which automation endpoint to send the InstaTrade signal for {instaTradeResult?.ticker}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {automationEndpoints?.map((endpoint) => (
+              <div
+                key={endpoint.id}
+                className={cn(
+                  "p-3 rounded-lg border cursor-pointer hover-elevate",
+                  selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
+                )}
+                onClick={() => setSelectedEndpoint(endpoint)}
+                data-testid={`endpoint-option-${endpoint.id}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{endpoint.name}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-xs">
+                      {endpoint.webhookUrl}
+                    </p>
+                  </div>
+                  {selectedEndpoint?.id === endpoint.id && (
+                    <Badge variant="default" className="text-xs">Selected</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEndpointDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmInstaTrade}
+              disabled={!selectedEndpoint || instatradeMutation.isPending}
+              data-testid="button-confirm-instatrade"
+            >
+              {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
