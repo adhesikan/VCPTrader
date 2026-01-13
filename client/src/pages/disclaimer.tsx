@@ -31,7 +31,7 @@ export default function DisclaimerPage() {
           </CardHeader>
           <CardContent className="prose prose-sm dark:prose-invert max-w-none space-y-4">
             <p>
-              VCP Trader is an educational market-analysis and alerting platform designed to help users identify technical patterns and market conditions.
+              VCP Trader is an educational market-analysis and alerting platform developed by Sunfish Technologies LLC, designed to help users identify technical patterns and market conditions.
             </p>
 
             <p>
@@ -51,7 +51,7 @@ export default function DisclaimerPage() {
             </p>
 
             <p>
-              By using this platform, you acknowledge and agree that VCP Trader, its operators, developers, and affiliates shall not be liable for any trading losses, missed opportunities, or decisions made based on information provided by the platform.
+              By using this platform, you acknowledge and agree that Sunfish Technologies LLC, VCP Trader, its operators, developers, and affiliates shall not be liable for any trading losses, missed opportunities, or decisions made based on information provided by the platform.
             </p>
           </CardContent>
         </Card>

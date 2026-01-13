@@ -2,7 +2,7 @@ self.addEventListener('push', function(event) {
   if (!event.data) return;
   
   const data = event.data.json();
-  const title = data.title || 'VCP Trader Alert';
+  const title = data.title || 'VCP Trader';
   const options = {
     body: data.body || 'New trading opportunity detected',
     icon: '/favicon.png',

@@ -72,7 +72,7 @@ export function AppSidebar() {
             <img src="/logo.png" alt="VCP Trader" className="h-8 w-auto" />
             <div className="flex flex-col">
               <span className="font-semibold text-sm leading-tight">VCP Trader</span>
-              <span className="text-xs text-muted-foreground leading-tight">Multi-Strategy Trading Intelligence</span>
+              <span className="text-xs text-muted-foreground leading-tight">by Sunfish Technologies</span>
             </div>
           </div>
         </Link>

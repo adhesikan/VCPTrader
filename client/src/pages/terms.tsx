@@ -33,7 +33,7 @@ export default function TermsPage() {
             <section>
               <h3>1. Description of Service</h3>
               <p>
-                VCP Trader is a software platform that provides market scanning tools, pattern detection, technical analysis charts, price alerts, and educational resources for traders. The platform includes features such as volatility contraction pattern (VCP) scanners, watchlists, backtesting tools, and push notifications.
+                VCP Trader is a software platform developed and operated by Sunfish Technologies LLC that provides market scanning tools, pattern detection, technical analysis charts, price alerts, and educational resources for traders. The platform includes features such as volatility contraction pattern (VCP) scanners, watchlists, backtesting tools, and push notifications.
               </p>
             </section>
 
@@ -61,14 +61,14 @@ export default function TermsPage() {
             <section>
               <h3>5. Limitation of Liability</h3>
               <p>
-                To the maximum extent permitted by law, VCP Trader and its operators, developers, affiliates, and partners shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from your use of the platform, including but not limited to trading losses, lost profits, or missed opportunities.
+                To the maximum extent permitted by law, Sunfish Technologies LLC, VCP Trader, and its operators, developers, affiliates, and partners shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from your use of the platform, including but not limited to trading losses, lost profits, or missed opportunities.
               </p>
             </section>
 
             <section>
               <h3>6. Indemnification</h3>
               <p>
-                You agree to indemnify and hold harmless VCP Trader and its operators from any claims, damages, losses, or expenses arising from your use of the platform, your violation of these terms, or your violation of any rights of third parties.
+                You agree to indemnify and hold harmless Sunfish Technologies LLC, VCP Trader, and its operators from any claims, damages, losses, or expenses arising from your use of the platform, your violation of these terms, or your violation of any rights of third parties.
               </p>
             </section>
 
@@ -110,7 +110,7 @@ export default function TermsPage() {
             <section>
               <h3>12. Contact</h3>
               <p>
-                For questions about these Terms, please contact us at support@vcptrader.com.
+                For questions about these Terms, please contact Sunfish Technologies LLC at support@sunfishtechnologies.com.
               </p>
             </section>
           </CardContent>

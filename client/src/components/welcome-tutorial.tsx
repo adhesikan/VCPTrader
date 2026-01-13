@@ -144,7 +144,7 @@ export function WelcomeTutorial({ onClose, forceShow }: WelcomeTutorialProps) {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">Welcome to VCP Trader</h2>
-                  <p className="text-muted-foreground text-sm">Multi-Strategy Trading Intelligence</p>
+                  <p className="text-muted-foreground text-sm">by Sunfish Technologies</p>
                 </div>
               </motion.div>
 

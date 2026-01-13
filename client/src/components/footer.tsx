@@ -7,7 +7,7 @@ export function Footer() {
     <footer className="border-t bg-background/95 py-4 px-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
         <p data-testid="text-copyright">
-          {currentYear} VCP Trader. All rights reserved.
+          {currentYear} Sunfish Technologies LLC. All rights reserved.
         </p>
         <nav className="flex flex-wrap items-center gap-4">
           <Link href="/terms" className="hover:text-foreground transition-colors" data-testid="link-footer-terms">
