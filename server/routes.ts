@@ -2301,7 +2301,7 @@ export async function registerRoutes(
       const endpoint = await storage.updateAutomationEndpoint(
         req.params.id,
         { name, webhookUrl, isActive },
-        webhookSecret
+        webhookSecret && webhookSecret.length > 0 ? webhookSecret : undefined
       );
       res.json(endpoint);
     } catch (error) {

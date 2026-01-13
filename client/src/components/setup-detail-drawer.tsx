@@ -1,11 +1,25 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { X, Target, TrendingUp, AlertTriangle, ExternalLink, Bell, Zap, ArrowUpRight, ArrowDownRight, Info } from "lucide-react";
+import { X, Target, TrendingUp, AlertTriangle, ExternalLink, Bell, Zap, ArrowUpRight, ArrowDownRight, Info, ChevronDown, Check } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ScanResult } from "@shared/schema";
@@ -19,10 +33,12 @@ interface SetupDetailDrawerProps {
   onCreateAlert?: () => void;
 }
 
-interface AlgoPilotxConnection {
-  connected: boolean;
-  connectionType?: string;
-  webhookUrl?: string;
+interface AutomationEndpoint {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  isActive: boolean;
+  lastTestSuccess?: boolean;
 }
 
 export function SetupDetailDrawer({ 
@@ -34,47 +50,71 @@ export function SetupDetailDrawer({
 }: SetupDetailDrawerProps) {
   const { toast } = useToast();
   const [showConnectPrompt, setShowConnectPrompt] = useState(false);
+  const [showEndpointDialog, setShowEndpointDialog] = useState(false);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<AutomationEndpoint | null>(null);
 
-  const { data: algoPilotxConnection } = useQuery<AlgoPilotxConnection>({
-    queryKey: ["/api/algo-pilotx/connection"],
+  const { data: endpoints } = useQuery<AutomationEndpoint[]>({
+    queryKey: ["/api/automation-endpoints"],
     enabled: isOpen,
   });
 
-  const sendSetupMutation = useMutation({
-    mutationFn: async () => {
+  const hasEndpoints = endpoints && endpoints.length > 0;
+
+  const instatradeMutation = useMutation({
+    mutationFn: async (endpointId: string) => {
       if (!result) throw new Error("No result selected");
-      const response = await apiRequest("POST", "/api/execution/send", {
+      const response = await apiRequest("POST", "/api/instatrade/entry", {
+        endpointId,
         symbol: result.ticker,
         strategyId: strategyName,
-        timeframe: "1D",
+        setupPayload: {
+          price: result.price,
+          resistance: result.resistance,
+          stopLoss: result.stopLoss,
+          entryTrigger: result.resistance,
+          stage: result.stage,
+          patternScore: result.patternScore,
+          timeframe: "1D",
+        },
       });
       return response.json();
     },
     onSuccess: (data: any) => {
       toast({
-        title: "Setup Sent",
-        description: "Opening AlgoPilotX InstaTrade™...",
+        title: "InstaTrade Sent",
+        description: `Entry signal sent for ${result?.ticker}`,
       });
-      if (data.redirectUrl) {
-        window.open(data.redirectUrl, "_blank");
-      }
+      setShowEndpointDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
       queryClient.invalidateQueries({ queryKey: ["/api/execution-requests"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to Send",
-        description: error.message || "Could not send setup to AlgoPilotX",
+        title: "InstaTrade Failed",
+        description: error.message || "Could not send entry signal",
         variant: "destructive",
       });
     },
   });
 
-  const handleOpenInAlgoPilotX = () => {
-    if (!algoPilotxConnection?.connected) {
+  const handleInstaTrade = () => {
+    if (!hasEndpoints) {
       setShowConnectPrompt(true);
       return;
     }
-    sendSetupMutation.mutate();
+    
+    if (endpoints!.length === 1) {
+      instatradeMutation.mutate(endpoints![0].id);
+    } else {
+      setSelectedEndpoint(endpoints![0]);
+      setShowEndpointDialog(true);
+    }
+  };
+
+  const handleConfirmInstaTrade = () => {
+    if (selectedEndpoint) {
+      instatradeMutation.mutate(selectedEndpoint.id);
+    }
   };
 
   if (!result) return null;
@@ -93,203 +133,305 @@ export function SetupDetailDrawer({
   }[result.stage?.toUpperCase() || "FORMING"] || "bg-muted text-muted-foreground";
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader className="pb-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <SheetTitle className="text-2xl font-bold">{result.ticker}</SheetTitle>
-              <Badge className={cn("text-xs", stageColor)}>
-                {result.stage}
+    <>
+      <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="pb-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <SheetTitle className="text-2xl font-bold">{result.ticker}</SheetTitle>
+                <Badge className={cn("text-xs", stageColor)}>
+                  {result.stage}
+                </Badge>
+              </div>
+              {result.patternScore && (
+                <Badge variant="secondary" className="text-sm">
+                  {result.patternScore}% Score
+                </Badge>
+              )}
+            </div>
+            <SheetDescription className="text-base">{result.name || result.ticker}</SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-3xl font-bold">${result.price?.toFixed(2)}</p>
+                <p className={cn(
+                  "text-sm flex items-center gap-1",
+                  isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                )}>
+                  {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                  {isPositive ? "+" : ""}{priceChange.toFixed(2)}%
+                </p>
+              </div>
+              <Badge variant="outline" className="text-sm">
+                {strategyName}
               </Badge>
             </div>
-            {result.patternScore && (
-              <Badge variant="secondary" className="text-sm">
-                {result.patternScore}% Score
-              </Badge>
-            )}
-          </div>
-          <SheetDescription className="text-base">{result.name || result.ticker}</SheetDescription>
-        </SheetHeader>
 
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">${result.price?.toFixed(2)}</p>
-              <p className={cn(
-                "text-sm flex items-center gap-1",
-                isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-              )}>
-                {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                {isPositive ? "+" : ""}{priceChange.toFixed(2)}%
+            <Separator />
+
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Key Levels
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {result.resistance && (
+                  <Card>
+                    <CardContent className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Resistance (Entry)</p>
+                      <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                        ${result.resistance.toFixed(2)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {result.stopLoss && (
+                  <Card>
+                    <CardContent className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Stop Loss</p>
+                      <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                        ${result.stopLoss.toFixed(2)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {result.rvol && (
+                  <Card>
+                    <CardContent className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">RVOL</p>
+                      <p className={cn(
+                        "text-lg font-semibold",
+                        result.rvol >= 1.5 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                      )}>
+                        {result.rvol.toFixed(2)}x
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {riskReward && (
+                  <Card>
+                    <CardContent className="p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Risk/Reward</p>
+                      <p className={cn(
+                        "text-lg font-semibold",
+                        parseFloat(riskReward) >= 2 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                      )}>
+                        {riskReward}R
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+
+            {(result.volume || result.avgVolume || result.ema9 || result.ema21 || result.atr) && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Technical Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {result.volume && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Volume:</span>{" "}
+                        <span className="font-medium">{(result.volume / 1000000).toFixed(2)}M</span>
+                      </div>
+                    )}
+                    {result.avgVolume && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Avg Vol:</span>{" "}
+                        <span className="font-medium">{(result.avgVolume / 1000000).toFixed(2)}M</span>
+                      </div>
+                    )}
+                    {result.ema9 && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">9 EMA:</span>{" "}
+                        <span className="font-medium">${result.ema9.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {result.ema21 && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">21 EMA:</span>{" "}
+                        <span className="font-medium">${result.ema21.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {result.atr && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">ATR:</span>{" "}
+                        <span className="font-medium">${result.atr.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                Setup Explanation
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {result.stage === "BREAKOUT" || result.stage === "TRIGGERED"
+                  ? `${result.ticker} has broken above resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""} with ${result.rvol && result.rvol >= 1.5 ? "strong" : "moderate"} volume confirmation.${result.stopLoss ? ` Consider entries with stop at $${result.stopLoss.toFixed(2)}.` : ""}`
+                  : result.stage === "READY"
+                  ? `${result.ticker} is approaching resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""}. Watch for a breakout with volume above 1.5x average.`
+                  : `${result.ticker} is forming a ${strategyName} pattern. Volatility is contracting as the stock consolidates${result.price ? ` near $${result.price.toFixed(2)}` : ""}.`
+                }
               </p>
             </div>
-            <Badge variant="outline" className="text-sm">
-              {strategyName}
-            </Badge>
-          </div>
 
-          <Separator />
+            <Separator />
 
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Key Levels
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {result.resistance && (
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Resistance (Entry)</p>
-                    <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                      ${result.resistance.toFixed(2)}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              {result.stopLoss && (
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Stop Loss</p>
-                    <p className="text-lg font-semibold text-red-600 dark:text-red-400">
-                      ${result.stopLoss.toFixed(2)}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              {result.rvol && (
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">RVOL</p>
-                    <p className={cn(
-                      "text-lg font-semibold",
-                      result.rvol >= 1.5 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                    )}>
-                      {result.rvol.toFixed(2)}x
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              {riskReward && (
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Risk/Reward</p>
-                    <p className="text-lg font-semibold">
-                      1:{riskReward}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-
-          {(result.ema9 || result.ema21) && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Technical Indicators
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {result.ema9 && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">9 EMA:</span>{" "}
-                      <span className="font-medium">${result.ema9.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {result.ema21 && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">21 EMA:</span>{" "}
-                      <span className="font-medium">${result.ema21.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {result.atr && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">ATR:</span>{" "}
-                      <span className="font-medium">${result.atr.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 gap-2"
+                  onClick={onCreateAlert}
+                  data-testid="button-create-alert"
+                >
+                  <Bell className="h-4 w-4" />
+                  Create Alert
+                </Button>
+                <Button 
+                  className="flex-1 gap-2"
+                  onClick={handleInstaTrade}
+                  disabled={instatradeMutation.isPending}
+                  data-testid="button-instatrade"
+                >
+                  <Zap className="h-4 w-4" />
+                  {instatradeMutation.isPending ? "Sending..." : "InstaTrade™"}
+                </Button>
               </div>
-            </>
-          )}
 
-          <Separator />
-
-          <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              Setup Explanation
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {result.stage === "BREAKOUT" || result.stage === "TRIGGERED"
-                ? `${result.ticker} has broken above resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""} with ${result.rvol && result.rvol >= 1.5 ? "strong" : "moderate"} volume confirmation.${result.stopLoss ? ` Consider entries with stop at $${result.stopLoss.toFixed(2)}.` : ""}`
-                : result.stage === "READY"
-                ? `${result.ticker} is approaching resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""}. Watch for a breakout with volume above 1.5x average.`
-                : `${result.ticker} is forming a ${strategyName} pattern. Volatility is contracting as the stock consolidates${result.price ? ` near $${result.price.toFixed(2)}` : ""}.`
-              }
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 gap-2"
-                onClick={onCreateAlert}
-                data-testid="button-create-alert"
-              >
-                <Bell className="h-4 w-4" />
-                Create Alert
-              </Button>
-              <Button 
-                className="flex-1 gap-2"
-                onClick={handleOpenInAlgoPilotX}
-                disabled={sendSetupMutation.isPending}
-                data-testid="button-open-algopilotx"
-              >
-                <ExternalLink className="h-4 w-4" />
-                {sendSetupMutation.isPending ? "Sending..." : "Open in AlgoPilotX"}
-              </Button>
+              {showConnectPrompt && !hasEndpoints && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Zap className="h-5 w-5 text-primary mt-0.5" />
+                      <div>
+                        <p className="font-medium">Connect AlgoPilotX</p>
+                        <p className="text-sm text-muted-foreground">
+                          Create an automation endpoint to execute setups with InstaTrade™.
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="default" 
+                      className="w-full gap-2"
+                      onClick={() => window.location.href = "/automation"}
+                      data-testid="button-connect-algopilotx"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Create Endpoint
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
-            {showConnectPrompt && !algoPilotxConnection?.connected && (
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Zap className="h-5 w-5 text-primary mt-0.5" />
+            <div className="pt-4 border-t">
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Educational & informational only. Not investment advice.
+              </p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={showEndpointDialog} onOpenChange={setShowEndpointDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Endpoint</DialogTitle>
+            <DialogDescription>
+              Choose which automation endpoint to send this setup to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {endpoints?.map((endpoint) => (
+                <div
+                  key={endpoint.id}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover-elevate",
+                    selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
+                  )}
+                  onClick={() => setSelectedEndpoint(endpoint)}
+                  data-testid={`endpoint-option-${endpoint.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "h-8 w-8 rounded-full flex items-center justify-center",
+                      endpoint.lastTestSuccess ? "bg-green-500/10" : "bg-muted"
+                    )}>
+                      <Zap className={cn(
+                        "h-4 w-4",
+                        endpoint.lastTestSuccess ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                      )} />
+                    </div>
                     <div>
-                      <p className="font-medium">Connect AlgoPilotX</p>
-                      <p className="text-sm text-muted-foreground">
-                        Execute this setup with InstaTrade™ and automated risk controls.
+                      <p className="font-medium">{endpoint.name}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {endpoint.webhookUrl}
                       </p>
                     </div>
                   </div>
-                  <Button 
-                    variant="default" 
-                    className="w-full gap-2"
-                    onClick={() => window.location.href = "/automation"}
-                    data-testid="button-connect-algopilotx"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Connect AlgoPilotX
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                  {selectedEndpoint?.id === endpoint.id && (
+                    <Check className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+              ))}
+            </div>
 
-          <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              Educational & informational only. Not investment advice.
-            </p>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-sm font-medium mb-1">Setup Summary</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Symbol:</span>{" "}
+                  <span className="font-medium">{result.ticker}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Strategy:</span>{" "}
+                  <span className="font-medium">{strategyName}</span>
+                </div>
+                {result.resistance && (
+                  <div>
+                    <span className="text-muted-foreground">Entry:</span>{" "}
+                    <span className="font-medium text-green-600">${result.resistance.toFixed(2)}</span>
+                  </div>
+                )}
+                {result.stopLoss && (
+                  <div>
+                    <span className="text-muted-foreground">Stop:</span>{" "}
+                    <span className="font-medium text-red-600">${result.stopLoss.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEndpointDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmInstaTrade}
+              disabled={!selectedEndpoint || instatradeMutation.isPending}
+              data-testid="button-confirm-instatrade"
+            >
+              {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
