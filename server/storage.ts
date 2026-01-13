@@ -1530,8 +1530,10 @@ export class MemStorage implements IStorage {
 
   async createAutomationEndpoint(endpoint: InsertAutomationEndpoint, webhookSecret?: string): Promise<AutomationEndpoint> {
     let encryptedSecret: { ciphertext: string; iv: string; authTag: string } | null = null;
+    console.log("[Storage] createAutomationEndpoint - webhookSecret:", !!webhookSecret, "hasEncryptionKey:", hasEncryptionKey());
     if (webhookSecret && hasEncryptionKey()) {
       encryptedSecret = encryptToken(webhookSecret);
+      console.log("[Storage] Encrypted secret:", !!encryptedSecret?.ciphertext);
     }
 
     const data: any = {

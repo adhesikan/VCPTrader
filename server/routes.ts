@@ -2270,6 +2270,7 @@ export async function registerRoutes(
       }
 
       const { name, webhookUrl, webhookSecret } = req.body;
+      console.log("[Automation] Creating endpoint - webhookSecret provided:", !!webhookSecret, "length:", webhookSecret?.length || 0);
       if (!name || !webhookUrl) {
         return res.status(400).json({ error: "Name and webhook URL are required" });
       }
