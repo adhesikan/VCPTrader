@@ -165,6 +165,73 @@ async function migrate() {
     `);
     console.log(`Marked ${updateResult.rowCount} existing users as having seen tutorials`);
 
+    // Create automation_endpoints table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS automation_endpoints (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        name TEXT NOT NULL,
+        webhook_url TEXT NOT NULL,
+        webhook_secret_encrypted TEXT,
+        webhook_secret_iv TEXT,
+        webhook_secret_auth_tag TEXT,
+        is_active BOOLEAN DEFAULT true,
+        last_tested_at TIMESTAMP,
+        last_test_success BOOLEAN,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified automation_endpoints table');
+
+    // Create trades table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS trades (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        symbol TEXT NOT NULL,
+        strategy_id TEXT NOT NULL,
+        endpoint_id VARCHAR,
+        entry_execution_id VARCHAR,
+        exit_execution_id VARCHAR,
+        side TEXT NOT NULL DEFAULT 'LONG',
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        entry_price REAL,
+        exit_price REAL,
+        quantity REAL,
+        stop_loss REAL,
+        target REAL,
+        pnl REAL,
+        pnl_percent REAL,
+        setup_payload JSONB,
+        entry_timestamp TIMESTAMP DEFAULT NOW(),
+        exit_timestamp TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified trades table');
+
+    // Create execution_requests table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS execution_requests (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        endpoint_id VARCHAR NOT NULL,
+        trade_id VARCHAR,
+        action TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        strategy_id TEXT NOT NULL,
+        payload JSONB,
+        webhook_response JSONB,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified execution_requests table');
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {
