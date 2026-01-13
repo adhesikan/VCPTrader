@@ -212,25 +212,40 @@ async function migrate() {
     `);
     console.log('Created/verified trades table');
 
-    // Create execution_requests table if it doesn't exist
+    // Create execution_requests table if it doesn't exist (matches Drizzle schema)
     await client.query(`
       CREATE TABLE IF NOT EXISTS execution_requests (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
         user_id VARCHAR NOT NULL,
-        endpoint_id VARCHAR NOT NULL,
-        trade_id VARCHAR,
-        action TEXT NOT NULL,
         symbol TEXT NOT NULL,
         strategy_id TEXT NOT NULL,
-        payload JSONB,
-        webhook_response JSONB,
-        status TEXT NOT NULL DEFAULT 'PENDING',
+        timeframe TEXT,
+        setup_payload JSONB,
+        automation_profile_id VARCHAR,
+        status TEXT NOT NULL DEFAULT 'CREATED',
+        algo_pilotx_reference TEXT,
+        redirect_url TEXT,
         error_message TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
     console.log('Created/verified execution_requests table');
+
+    // Add timeframe column to execution_requests if it doesn't exist
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'execution_requests' AND column_name = 'timeframe'
+        ) THEN
+          ALTER TABLE execution_requests ADD COLUMN timeframe TEXT;
+          RAISE NOTICE 'Added timeframe column to execution_requests';
+        END IF;
+      END $$;
+    `);
+    console.log('Verified timeframe column exists in execution_requests');
 
     console.log('Migrations complete!');
     client.release();
