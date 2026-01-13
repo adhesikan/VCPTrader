@@ -544,7 +544,32 @@ export default function Scanner() {
               Find trading setups that match your strategy
             </p>
           </div>
-          <TutorialTrigger />
+          <div className="flex items-center gap-3 flex-wrap">
+            {lastScanTime && (
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{format(lastScanTime, "MMM d, h:mm a")}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runScanMutation.mutate()}
+                  disabled={runScanMutation.isPending || !isConnected}
+                  className="gap-1 h-7"
+                  data-testid="button-scan-now-header"
+                >
+                  <RefreshCw className={`h-3 w-3 ${runScanMutation.isPending ? "animate-spin" : ""}`} />
+                  {runScanMutation.isPending ? "Scanning..." : "Scan Now"}
+                </Button>
+                {scanMetadata && (
+                  <Badge variant="outline" className="gap-1 text-xs">
+                    <Activity className="h-3 w-3" />
+                    {scanMetadata.provider.toUpperCase()}
+                  </Badge>
+                )}
+              </div>
+            )}
+            <TutorialTrigger />
+          </div>
         </div>
       </div>
 
@@ -1090,37 +1115,16 @@ export default function Scanner() {
         </CardContent>
       </Card>
 
-      {lastScanTime && (
+      {filteredResults && filteredResults.length > 0 && (
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 text-sm flex-wrap">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Last scan: {format(lastScanTime, "MMM d, h:mm a")}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => runScanMutation.mutate()}
-                disabled={runScanMutation.isPending || !isConnected}
-                className="gap-1 h-7"
-                data-testid="button-scan-now"
-              >
-                <RefreshCw className={`h-3 w-3 ${runScanMutation.isPending ? "animate-spin" : ""}`} />
-                {runScanMutation.isPending ? "Scanning..." : "Scan Now"}
-              </Button>
-            </div>
-            <span className="text-muted-foreground">({filteredResults?.length || 0} results)</span>
+            <span className="text-muted-foreground">{filteredResults.length} results</span>
             {scanMetadata && (
-              <>
-                <Badge variant="outline" className="gap-1 text-xs">
-                  <Activity className="h-3 w-3" />
-                  {scanMetadata.provider.toUpperCase()}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols
-                  {scanMetadata.batchCount && scanMetadata.batchCount > 1 && ` (${scanMetadata.batchCount} batches)`}
-                  {" "}in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s
-                </span>
-              </>
+              <span className="text-xs text-muted-foreground">
+                ({scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols
+                {scanMetadata.batchCount && scanMetadata.batchCount > 1 && `, ${scanMetadata.batchCount} batches`}
+                {" "}in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s)
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2">
