@@ -1515,11 +1515,11 @@ export class MemStorage implements IStorage {
     let webhookSecret: string | undefined;
     if (endpoint.webhookSecretEncrypted && endpoint.webhookSecretIv && endpoint.webhookSecretAuthTag) {
       try {
-        webhookSecret = decryptCredentials(
-          endpoint.webhookSecretEncrypted,
-          endpoint.webhookSecretIv,
-          endpoint.webhookSecretAuthTag
-        );
+        webhookSecret = decryptToken({
+          ciphertext: endpoint.webhookSecretEncrypted,
+          iv: endpoint.webhookSecretIv,
+          authTag: endpoint.webhookSecretAuthTag
+        });
       } catch (err) {
         console.error("Failed to decrypt webhook secret:", err);
       }
@@ -1529,14 +1529,14 @@ export class MemStorage implements IStorage {
   }
 
   async createAutomationEndpoint(endpoint: InsertAutomationEndpoint, webhookSecret?: string): Promise<AutomationEndpoint> {
-    let encryptedSecret: { encrypted: string; iv: string; authTag: string } | null = null;
+    let encryptedSecret: { ciphertext: string; iv: string; authTag: string } | null = null;
     if (webhookSecret && hasEncryptionKey()) {
-      encryptedSecret = encryptCredentials(webhookSecret);
+      encryptedSecret = encryptToken(webhookSecret);
     }
 
     const data: any = {
       ...endpoint,
-      webhookSecretEncrypted: encryptedSecret?.encrypted || null,
+      webhookSecretEncrypted: encryptedSecret?.ciphertext || null,
       webhookSecretIv: encryptedSecret?.iv || null,
       webhookSecretAuthTag: encryptedSecret?.authTag || null,
     };
@@ -1553,8 +1553,8 @@ export class MemStorage implements IStorage {
 
     if (webhookSecret !== undefined) {
       if (webhookSecret && hasEncryptionKey()) {
-        const encrypted = encryptCredentials(webhookSecret);
-        updateData.webhookSecretEncrypted = encrypted.encrypted;
+        const encrypted = encryptToken(webhookSecret);
+        updateData.webhookSecretEncrypted = encrypted.ciphertext;
         updateData.webhookSecretIv = encrypted.iv;
         updateData.webhookSecretAuthTag = encrypted.authTag;
       } else {
