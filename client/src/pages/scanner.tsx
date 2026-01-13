@@ -82,11 +82,17 @@ interface UniverseData {
   count: number;
 }
 
+interface UniverseInfo extends UniverseData {
+  name?: string;
+  description?: string;
+}
+
 interface UniversesResponse {
-  dow30: UniverseData;
-  nasdaq100: UniverseData;
-  sp500: UniverseData;
-  all: UniverseData;
+  dow30: UniverseInfo;
+  nasdaq100: UniverseInfo;
+  sp500: UniverseInfo;
+  all: UniverseInfo;
+  options?: Array<{ id: string; name: string; description: string; count: number }>;
 }
 
 export default function Scanner() {
@@ -152,10 +158,10 @@ export default function Scanner() {
   });
 
   const UNIVERSE_OPTIONS = [
-    { value: "sp500", label: "S&P 500", count: universes?.sp500?.count || 500 },
-    { value: "nasdaq100", label: "Nasdaq 100", count: universes?.nasdaq100?.count || 100 },
-    { value: "dow30", label: "Dow 30", count: universes?.dow30?.count || 30 },
-    { value: "all", label: "Large Cap Universe", count: universes?.all?.count || "150+" },
+    { value: "sp500", label: universes?.sp500?.name || "S&P 500", count: universes?.sp500?.count || 500, description: universes?.sp500?.description },
+    { value: "nasdaq100", label: universes?.nasdaq100?.name || "Nasdaq 100", count: universes?.nasdaq100?.count || 100, description: universes?.nasdaq100?.description },
+    { value: "dow30", label: universes?.dow30?.name || "Dow 30", count: universes?.dow30?.count || 30, description: universes?.dow30?.description },
+    { value: "all", label: universes?.all?.name || "All Major Indices", count: universes?.all?.count || 550, description: universes?.all?.description },
   ];
 
   useEffect(() => {
@@ -287,7 +293,8 @@ export default function Scanner() {
       return wl?.symbols || undefined;
     }
     if (targetType === "universe" && universes) {
-      const universeKey = selectedUniverse as keyof UniversesResponse;
+      type UniverseKey = "dow30" | "nasdaq100" | "sp500" | "all";
+      const universeKey = selectedUniverse as UniverseKey;
       return universes[universeKey]?.symbols || undefined;
     }
     return undefined;
@@ -871,13 +878,25 @@ export default function Scanner() {
                         <div className="text-sm">
                           <p className="font-medium text-yellow-700 dark:text-yellow-400">Large scan notice</p>
                           <p className="text-muted-foreground mt-1">
-                            Scanning {universes?.all?.count || "150+"} stocks may take longer and use more API calls. 
+                            Scanning {universes?.all?.count || 550} stocks may take longer and use more API calls. 
                             Consider using price/volume filters to narrow results, or select a smaller index like S&P 500 or Nasdaq 100.
                           </p>
                         </div>
                       </div>
                     </div>
                   )}
+                  <div className="mt-2 p-3 rounded-md bg-blue-500/10 border border-blue-500/30">
+                    <div className="flex items-start gap-2">
+                      <Target className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-blue-700 dark:text-blue-400">Pro tip: Create a watchlist</p>
+                        <p className="text-muted-foreground mt-1">
+                          For faster, more focused scans, create a custom watchlist with your favorite stocks. 
+                          Go to <Link href="/settings" className="text-primary hover:underline">Settings → Watchlists</Link> to add your own.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
