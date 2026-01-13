@@ -260,7 +260,10 @@ export default function AutomationPage() {
   };
 
   const openCreateDialog = () => {
-    resetForm();
+    setEditingEndpoint(null);
+    setFormName("");
+    setFormWebhookUrl("https://app.algopilotx.com/webhook/");
+    setFormWebhookSecret("");
     setDialogOpen(true);
   };
 
