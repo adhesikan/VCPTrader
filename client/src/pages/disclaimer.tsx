@@ -31,27 +31,23 @@ export default function DisclaimerPage() {
           </CardHeader>
           <CardContent className="prose prose-sm dark:prose-invert max-w-none space-y-4">
             <p>
-              VCP Trader is an educational market-analysis and alerting platform developed by Sunfish Technologies LLC, designed to help users identify technical patterns and market conditions.
+              VCP Trader is a software platform designed to help traders and investors scan the financial markets for potential opportunities using widely recognized technical analysis strategies. The platform provides tools to explore, filter, and monitor market conditions based on objective data such as price, volume, and technical indicators.
             </p>
 
             <p>
-              VCP Trader does not provide investment advice, personalized recommendations, or trade instructions. All information, alerts, pattern detections, rankings, and analytics are provided for educational and informational purposes only.
+              VCP Trader includes an in-app Strategy Guide that explains how each supported strategy works, allowing users to learn about different market patterns and select strategies that align with their individual trading style, experience level, and risk tolerance. Users control which strategies they apply, how they filter results, and how they interpret the information presented.
             </p>
 
             <p>
-              Nothing on this platform should be interpreted as a recommendation to buy, sell, or hold any security, option, or financial instrument. You are solely responsible for your trading decisions and any resulting gains or losses.
+              All data, charts, alerts, and strategy outputs provided by VCP Trader are for educational and informational purposes only and do not constitute investment advice, trading recommendations, or a solicitation to buy or sell any security. VCP Trader does not manage, place, or execute trades on behalf of users and does not have access to user brokerage accounts.
             </p>
 
             <p>
-              Trading stocks, options, and other financial instruments involves substantial risk and may result in partial or total loss of capital. Past performance, back-tested results, and historical patterns do not guarantee future outcomes.
+              Users may choose to place trades manually through their own brokerage accounts, or they may optionally connect to InstaTrade™, a self-directed automation feature powered by AlgoPilotX, which allows users to automate trade execution based on their own predefined rules and risk settings. All automated trading activity is user-configured, user-authorized, and executed entirely through AlgoPilotX and the user's selected brokerage.
             </p>
 
             <p>
-              Market data and alerts may be delayed, incomplete, or inaccurate due to exchange, brokerage, or technology limitations. VCP Trader makes no guarantee regarding the timeliness or accuracy of any data, alerts, or analysis.
-            </p>
-
-            <p>
-              By using this platform, you acknowledge and agree that Sunfish Technologies LLC, VCP Trader, its operators, developers, and affiliates shall not be liable for any trading losses, missed opportunities, or decisions made based on information provided by the platform.
+              Trading and investing involve substantial risk, including the potential loss of capital. Past performance of any strategy or market pattern does not guarantee future results. Users are solely responsible for all trading decisions, settings, and outcomes.
             </p>
           </CardContent>
         </Card>
