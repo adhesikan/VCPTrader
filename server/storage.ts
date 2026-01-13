@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
@@ -45,6 +45,10 @@ import type {
   InsertAlgoPilotxConnection,
   ExecutionRequest,
   InsertExecutionRequest,
+  AutomationEndpoint,
+  InsertAutomationEndpoint,
+  Trade,
+  InsertTrade,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -155,6 +159,19 @@ export interface IStorage {
   getExecutionRequest(id: string): Promise<ExecutionRequest | null>;
   createExecutionRequest(request: InsertExecutionRequest): Promise<ExecutionRequest>;
   updateExecutionRequest(id: string, data: Partial<ExecutionRequest>): Promise<ExecutionRequest | null>;
+
+  getAutomationEndpoints(userId: string): Promise<AutomationEndpoint[]>;
+  getAutomationEndpoint(id: string): Promise<AutomationEndpoint | null>;
+  getAutomationEndpointWithSecret(id: string): Promise<(AutomationEndpoint & { webhookSecret?: string }) | null>;
+  createAutomationEndpoint(endpoint: InsertAutomationEndpoint, webhookSecret?: string): Promise<AutomationEndpoint>;
+  updateAutomationEndpoint(id: string, data: Partial<InsertAutomationEndpoint>, webhookSecret?: string): Promise<AutomationEndpoint | null>;
+  updateAutomationEndpointTestResult(id: string, success: boolean): Promise<void>;
+  deleteAutomationEndpoint(id: string): Promise<void>;
+
+  getTrades(userId: string, status?: string, limit?: number): Promise<Trade[]>;
+  getTrade(id: string): Promise<Trade | null>;
+  createTrade(trade: InsertTrade): Promise<Trade>;
+  updateTrade(id: string, data: Partial<Trade>): Promise<Trade | null>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1470,6 +1487,147 @@ export class MemStorage implements IStorage {
       .update(executionRequestsTable)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(executionRequestsTable.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async getAutomationEndpoints(userId: string): Promise<AutomationEndpoint[]> {
+    return await db
+      .select()
+      .from(automationEndpointsTable)
+      .where(eq(automationEndpointsTable.userId, userId))
+      .orderBy(desc(automationEndpointsTable.createdAt));
+  }
+
+  async getAutomationEndpoint(id: string): Promise<AutomationEndpoint | null> {
+    const [endpoint] = await db
+      .select()
+      .from(automationEndpointsTable)
+      .where(eq(automationEndpointsTable.id, id))
+      .limit(1);
+    return endpoint || null;
+  }
+
+  async getAutomationEndpointWithSecret(id: string): Promise<(AutomationEndpoint & { webhookSecret?: string }) | null> {
+    const endpoint = await this.getAutomationEndpoint(id);
+    if (!endpoint) return null;
+
+    let webhookSecret: string | undefined;
+    if (endpoint.webhookSecretEncrypted && endpoint.webhookSecretIv && endpoint.webhookSecretAuthTag) {
+      try {
+        webhookSecret = decryptCredentials(
+          endpoint.webhookSecretEncrypted,
+          endpoint.webhookSecretIv,
+          endpoint.webhookSecretAuthTag
+        );
+      } catch (err) {
+        console.error("Failed to decrypt webhook secret:", err);
+      }
+    }
+
+    return { ...endpoint, webhookSecret };
+  }
+
+  async createAutomationEndpoint(endpoint: InsertAutomationEndpoint, webhookSecret?: string): Promise<AutomationEndpoint> {
+    let encryptedSecret: { encrypted: string; iv: string; authTag: string } | null = null;
+    if (webhookSecret && hasEncryptionKey()) {
+      encryptedSecret = encryptCredentials(webhookSecret);
+    }
+
+    const data: any = {
+      ...endpoint,
+      webhookSecretEncrypted: encryptedSecret?.encrypted || null,
+      webhookSecretIv: encryptedSecret?.iv || null,
+      webhookSecretAuthTag: encryptedSecret?.authTag || null,
+    };
+
+    const [created] = await db
+      .insert(automationEndpointsTable)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async updateAutomationEndpoint(id: string, data: Partial<InsertAutomationEndpoint>, webhookSecret?: string): Promise<AutomationEndpoint | null> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+
+    if (webhookSecret !== undefined) {
+      if (webhookSecret && hasEncryptionKey()) {
+        const encrypted = encryptCredentials(webhookSecret);
+        updateData.webhookSecretEncrypted = encrypted.encrypted;
+        updateData.webhookSecretIv = encrypted.iv;
+        updateData.webhookSecretAuthTag = encrypted.authTag;
+      } else {
+        updateData.webhookSecretEncrypted = null;
+        updateData.webhookSecretIv = null;
+        updateData.webhookSecretAuthTag = null;
+      }
+    }
+
+    const [updated] = await db
+      .update(automationEndpointsTable)
+      .set(updateData)
+      .where(eq(automationEndpointsTable.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async updateAutomationEndpointTestResult(id: string, success: boolean): Promise<void> {
+    await db
+      .update(automationEndpointsTable)
+      .set({ 
+        lastTestedAt: new Date(), 
+        lastTestSuccess: success,
+        updatedAt: new Date() 
+      })
+      .where(eq(automationEndpointsTable.id, id));
+  }
+
+  async deleteAutomationEndpoint(id: string): Promise<void> {
+    await db
+      .delete(automationEndpointsTable)
+      .where(eq(automationEndpointsTable.id, id));
+  }
+
+  async getTrades(userId: string, status?: string, limit: number = 50): Promise<Trade[]> {
+    if (status) {
+      return await db
+        .select()
+        .from(tradesTable)
+        .where(and(eq(tradesTable.userId, userId), eq(tradesTable.status, status)))
+        .orderBy(desc(tradesTable.createdAt))
+        .limit(limit);
+    }
+    return await db
+      .select()
+      .from(tradesTable)
+      .where(eq(tradesTable.userId, userId))
+      .orderBy(desc(tradesTable.createdAt))
+      .limit(limit);
+  }
+
+  async getTrade(id: string): Promise<Trade | null> {
+    const [trade] = await db
+      .select()
+      .from(tradesTable)
+      .where(eq(tradesTable.id, id))
+      .limit(1);
+    return trade || null;
+  }
+
+  async createTrade(trade: InsertTrade): Promise<Trade> {
+    const [created] = await db
+      .insert(tradesTable)
+      .values(trade)
+      .returning();
+    return created;
+  }
+
+  async updateTrade(id: string, data: Partial<Trade>): Promise<Trade | null> {
+    const [updated] = await db
+      .update(tradesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tradesTable.id, id))
       .returning();
     return updated || null;
   }
