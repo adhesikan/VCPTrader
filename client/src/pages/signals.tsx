@@ -385,7 +385,8 @@ export default function Signals() {
       ? mapped.filter(s => s.ticker.toLowerCase().includes(searchQuery.toLowerCase()))
       : mapped;
 
-    // Sort
+    // Sort - custom order for stage: BREAKOUT first, then READY, then FORMING
+    const stageOrder: Record<string, number> = { BREAKOUT: 0, READY: 1, FORMING: 2 };
     const sorted = [...filtered].sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
@@ -393,7 +394,8 @@ export default function Signals() {
           comparison = a.ticker.localeCompare(b.ticker);
           break;
         case "type":
-          comparison = a.type.localeCompare(b.type);
+          // Use custom stage order instead of alphabetical
+          comparison = (stageOrder[a.type] ?? 3) - (stageOrder[b.type] ?? 3);
           break;
         case "price":
           comparison = (a.price || 0) - (b.price || 0);
@@ -401,6 +403,10 @@ export default function Signals() {
         case "rvol":
           comparison = (a.rvol || 0) - (b.rvol || 0);
           break;
+      }
+      // For stage sorting, always show BREAKOUT first (don't reverse)
+      if (sortField === "type") {
+        return comparison;
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
