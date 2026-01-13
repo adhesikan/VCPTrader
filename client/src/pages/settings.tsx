@@ -311,19 +311,45 @@ export default function Settings() {
 
   const enablePushMutation = useMutation({
     mutationFn: async () => {
-      if ("Notification" in window && "serviceWorker" in navigator) {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          const registration = await navigator.serviceWorker.ready;
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: "demo-vapid-key",
-          });
-          await apiRequest("POST", "/api/push/subscribe", subscription.toJSON());
-          return true;
-        }
+      if (!("Notification" in window)) {
+        throw new Error("This browser does not support notifications");
       }
-      return false;
+      if (!("serviceWorker" in navigator)) {
+        throw new Error("This browser does not support service workers");
+      }
+      
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Notification permission denied");
+      }
+      
+      const vapidResponse = await fetch("/api/push/vapid-key");
+      if (!vapidResponse.ok) {
+        throw new Error("Push notifications not configured on server");
+      }
+      const { publicKey } = await vapidResponse.json();
+      
+      const urlBase64ToUint8Array = (base64String: string) => {
+        const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+      
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      
+      await apiRequest("POST", "/api/push/subscribe", subscription.toJSON());
+      return true;
     },
     onSuccess: (enabled) => {
       setLocalSettings(prev => ({ ...prev, pushNotificationsEnabled: enabled }));
@@ -334,10 +360,10 @@ export default function Settings() {
         });
       }
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Push Notifications Failed",
-        description: "Could not enable push notifications",
+        description: error.message || "Could not enable push notifications",
         variant: "destructive",
       });
     },

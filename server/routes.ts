@@ -96,6 +96,14 @@ export async function registerRoutes(
     });
   });
 
+  app.get("/api/push/vapid-key", (req, res) => {
+    const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) {
+      return res.status(500).json({ error: "Push notifications not configured" });
+    }
+    res.json({ publicKey: vapidPublicKey });
+  });
+
   app.get("/api/market/regime", async (req, res) => {
     try {
       const userId = req.session?.userId;
