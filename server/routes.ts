@@ -2480,7 +2480,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Endpoint webhook URL not configured" });
       }
 
-      const nonce = randomUUID();
+      const nonce = crypto.randomUUID();
       const entryPayload = {
         type: "entry",
         action: "BUY",
@@ -2587,7 +2587,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Endpoint not found or webhook not configured" });
       }
 
-      const nonce = randomUUID();
+      const nonce = crypto.randomUUID();
       const exitPayload = {
         type: "exit",
         action: "SELL",

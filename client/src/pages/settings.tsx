@@ -402,10 +402,6 @@ export default function Settings() {
             <FileText className="h-4 w-4" />
             Legal
           </TabsTrigger>
-          <TabsTrigger value="automation" className="gap-2" data-testid="tab-automation">
-            <Bot className="h-4 w-4" />
-            Automation
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="broker">
@@ -726,10 +722,6 @@ export default function Settings() {
 
         <TabsContent value="legal">
           <LegalSettings />
-        </TabsContent>
-
-        <TabsContent value="automation">
-          <AutomationSettings />
         </TabsContent>
       </Tabs>
       
