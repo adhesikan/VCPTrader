@@ -347,8 +347,17 @@ export default function Alerts() {
 
   const enabledRules = rules?.filter(r => r.isEnabled) || [];
   const disabledRules = rules?.filter(r => !r.isEnabled) || [];
-  const unreadEvents = events?.filter(e => !e.isRead) || [];
-  const readEvents = events?.filter(e => e.isRead) || [];
+  
+  // Sort events by stage: BREAKOUT first, then READY, then FORMING
+  const stageOrder: Record<string, number> = { BREAKOUT: 0, READY: 1, FORMING: 2 };
+  const sortedEvents = [...(events || [])].sort((a, b) => {
+    const orderA = stageOrder[a.toState] ?? 3;
+    const orderB = stageOrder[b.toState] ?? 3;
+    return orderA - orderB;
+  });
+  
+  const unreadEvents = sortedEvents.filter(e => !e.isRead);
+  const readEvents = sortedEvents.filter(e => e.isRead);
 
   return (
     <div className="p-6 space-y-6" data-testid="alerts-page">
@@ -572,9 +581,9 @@ export default function Alerts() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
-          ) : events && events.length > 0 ? (
+          ) : sortedEvents && sortedEvents.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {events.map((event) => (
+              {sortedEvents.map((event) => (
                 <AlertEventCard
                   key={event.id}
                   event={event}
