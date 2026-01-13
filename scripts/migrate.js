@@ -232,7 +232,7 @@ async function migrate() {
     `);
     console.log('Created/verified execution_requests table');
 
-    // Add timeframe column to execution_requests if it doesn't exist
+    // Add missing columns to execution_requests table
     await client.query(`
       DO $$
       BEGIN
@@ -243,9 +243,41 @@ async function migrate() {
           ALTER TABLE execution_requests ADD COLUMN timeframe TEXT;
           RAISE NOTICE 'Added timeframe column to execution_requests';
         END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'execution_requests' AND column_name = 'setup_payload'
+        ) THEN
+          ALTER TABLE execution_requests ADD COLUMN setup_payload JSONB;
+          RAISE NOTICE 'Added setup_payload column to execution_requests';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'execution_requests' AND column_name = 'automation_profile_id'
+        ) THEN
+          ALTER TABLE execution_requests ADD COLUMN automation_profile_id VARCHAR;
+          RAISE NOTICE 'Added automation_profile_id column to execution_requests';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'execution_requests' AND column_name = 'algo_pilotx_reference'
+        ) THEN
+          ALTER TABLE execution_requests ADD COLUMN algo_pilotx_reference TEXT;
+          RAISE NOTICE 'Added algo_pilotx_reference column to execution_requests';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'execution_requests' AND column_name = 'redirect_url'
+        ) THEN
+          ALTER TABLE execution_requests ADD COLUMN redirect_url TEXT;
+          RAISE NOTICE 'Added redirect_url column to execution_requests';
+        END IF;
       END $$;
     `);
-    console.log('Verified timeframe column exists in execution_requests');
+    console.log('Verified all columns exist in execution_requests');
 
     console.log('Migrations complete!');
     client.release();
