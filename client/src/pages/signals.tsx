@@ -82,11 +82,6 @@ function SignalCard({ ticker, type, price, resistance, stopLoss, rvol, atr, stra
             >
               {type}
             </Badge>
-            {strategy && (
-              <Badge variant="outline" className="text-xs">
-                {strategy}
-              </Badge>
-            )}
           </div>
           <div className="text-right">
             <p className="font-mono font-bold">${price.toFixed(2)}</p>
@@ -431,11 +426,19 @@ export default function Signals() {
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
-      <div>
-        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Pattern alerts - click for detailed analysis
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Pattern alerts - click for detailed analysis
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant="outline" className="font-medium">VCP</Badge>
+          <span className="text-muted-foreground">
+            Volatility Contraction Pattern - Identifies stocks with tightening price ranges and declining volume, signaling potential breakouts
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -562,7 +565,6 @@ export default function Signals() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium">Ticker</th>
                     <th className="text-left p-3 font-medium">Stage</th>
-                    <th className="text-left p-3 font-medium">Strategy</th>
                     <th className="text-right p-3 font-medium">Price</th>
                     <th className="text-right p-3 font-medium">Resistance</th>
                     <th className="text-right p-3 font-medium">Stop Loss</th>
@@ -586,11 +588,6 @@ export default function Signals() {
                           className="text-xs"
                         >
                           {signal.type}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="text-xs">
-                          {signal.strategy}
                         </Badge>
                       </td>
                       <td className="p-3 text-right font-mono">${signal.price?.toFixed(2)}</td>
