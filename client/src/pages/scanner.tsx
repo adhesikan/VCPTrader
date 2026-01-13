@@ -151,6 +151,7 @@ export default function Scanner() {
 
   const { data: storedResults, isLoading, refetch, dataUpdatedAt } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
+    refetchInterval: 60000,
   });
 
   const { data: universes } = useQuery<UniversesResponse>({
