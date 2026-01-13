@@ -345,11 +345,19 @@ export default function Alerts() {
     }
   };
 
-  const enabledRules = rules?.filter(r => r.isEnabled) || [];
-  const disabledRules = rules?.filter(r => !r.isEnabled) || [];
-  
-  // Sort events by stage: BREAKOUT first, then READY, then FORMING
+  // Sort rules and events by stage: BREAKOUT first, then READY, then FORMING
   const stageOrder: Record<string, number> = { BREAKOUT: 0, READY: 1, FORMING: 2 };
+  
+  const sortedRules = [...(rules || [])].sort((a, b) => {
+    const payloadA = a.conditionPayload as { targetStage?: string } | null;
+    const payloadB = b.conditionPayload as { targetStage?: string } | null;
+    const orderA = stageOrder[payloadA?.targetStage || "BREAKOUT"] ?? 3;
+    const orderB = stageOrder[payloadB?.targetStage || "BREAKOUT"] ?? 3;
+    return orderA - orderB;
+  });
+  
+  const enabledRules = sortedRules.filter(r => r.isEnabled);
+  const disabledRules = sortedRules.filter(r => !r.isEnabled);
   const sortedEvents = [...(events || [])].sort((a, b) => {
     const orderA = stageOrder[a.toState] ?? 3;
     const orderB = stageOrder[b.toState] ?? 3;
@@ -537,9 +545,9 @@ export default function Alerts() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
-          ) : rules && rules.length > 0 ? (
+          ) : sortedRules && sortedRules.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {rules.map((rule) => (
+              {sortedRules.map((rule) => (
                 <AlertRuleCard
                   key={rule.id}
                   rule={rule}
