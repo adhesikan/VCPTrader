@@ -154,6 +154,17 @@ async function migrate() {
     `);
     console.log('Added/verified tutorial tracking columns');
 
+    // Set all existing users to have seen tutorials (so they don't get popups after migration)
+    const updateResult = await client.query(`
+      UPDATE user_settings 
+      SET has_seen_welcome_tutorial = 'true',
+          has_seen_scanner_tutorial = 'true',
+          has_seen_vcp_tutorial = 'true',
+          has_seen_alerts_tutorial = 'true'
+      WHERE has_seen_welcome_tutorial = 'false'
+    `);
+    console.log(`Marked ${updateResult.rowCount} existing users as having seen tutorials`);
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {
