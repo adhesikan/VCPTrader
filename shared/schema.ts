@@ -651,3 +651,75 @@ export const setupPayloadSchema = z.object({
   nonce: z.string(),
 });
 export type SetupPayload = z.infer<typeof setupPayloadSchema>;
+
+export const automationEndpoints = pgTable("automation_endpoints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  webhookUrl: text("webhook_url").notNull(),
+  webhookSecretEncrypted: text("webhook_secret_encrypted"),
+  webhookSecretIv: text("webhook_secret_iv"),
+  webhookSecretAuthTag: text("webhook_secret_auth_tag"),
+  isActive: boolean("is_active").default(true),
+  lastTestedAt: timestamp("last_tested_at"),
+  lastTestSuccess: boolean("last_test_success"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAutomationEndpointSchema = createInsertSchema(automationEndpoints).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastTestedAt: true,
+  lastTestSuccess: true,
+});
+export type InsertAutomationEndpoint = z.infer<typeof insertAutomationEndpointSchema>;
+export type AutomationEndpoint = typeof automationEndpoints.$inferSelect;
+
+export const TradeStatus = {
+  OPEN: "OPEN",
+  CLOSED: "CLOSED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type TradeStatusValue = typeof TradeStatus[keyof typeof TradeStatus];
+
+export const TradeSide = {
+  LONG: "LONG",
+  SHORT: "SHORT",
+} as const;
+
+export type TradeSideValue = typeof TradeSide[keyof typeof TradeSide];
+
+export const trades = pgTable("trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  strategyId: text("strategy_id").notNull(),
+  endpointId: varchar("endpoint_id"),
+  entryExecutionId: varchar("entry_execution_id"),
+  exitExecutionId: varchar("exit_execution_id"),
+  side: text("side").notNull().default("LONG"),
+  status: text("status").notNull().default("OPEN"),
+  entryPrice: real("entry_price"),
+  exitPrice: real("exit_price"),
+  quantity: real("quantity"),
+  stopLoss: real("stop_loss"),
+  target: real("target"),
+  pnl: real("pnl"),
+  pnlPercent: real("pnl_percent"),
+  setupPayload: jsonb("setup_payload"),
+  entryTimestamp: timestamp("entry_timestamp").defaultNow(),
+  exitTimestamp: timestamp("exit_timestamp"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradeSchema = createInsertSchema(trades).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTrade = z.infer<typeof insertTradeSchema>;
+export type Trade = typeof trades.$inferSelect;
