@@ -620,6 +620,7 @@ export const executionRequests = pgTable("execution_requests", {
   timeframe: text("timeframe"),
   setupPayload: jsonb("setup_payload"),
   automationProfileId: varchar("automation_profile_id"),
+  endpointId: varchar("endpoint_id"),
   status: text("status").notNull().default("CREATED"),
   algoPilotxReference: text("algo_pilotx_reference"),
   redirectUrl: text("redirect_url"),

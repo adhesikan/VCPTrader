@@ -2511,6 +2511,7 @@ export async function registerRoutes(
         timeframe: setupPayload?.timeframe,
         setupPayload: entryPayload,
         automationProfileId: endpointId,
+        endpointId,
         status: "CREATED",
       });
 
@@ -2619,6 +2620,7 @@ export async function registerRoutes(
         strategyId: trade.strategyId,
         setupPayload: exitPayload,
         automationProfileId: trade.endpointId,
+        endpointId: trade.endpointId,
         status: "CREATED",
       });
 
