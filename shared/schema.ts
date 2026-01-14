@@ -617,7 +617,6 @@ export const executionRequests = pgTable("execution_requests", {
   userId: varchar("user_id").notNull(),
   endpointId: varchar("endpoint_id"),
   action: text("action"),
-  type: text("type"),
   symbol: text("symbol").notNull(),
   strategyId: text("strategy_id").notNull(),
   timeframe: text("timeframe"),

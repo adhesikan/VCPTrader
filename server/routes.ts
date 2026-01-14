@@ -2513,7 +2513,6 @@ export async function registerRoutes(
         automationProfileId: endpointId,
         endpointId,
         action: "BUY",
-        type: "entry",
         status: "CREATED",
       });
 
@@ -2624,7 +2623,6 @@ export async function registerRoutes(
         automationProfileId: trade.endpointId,
         endpointId: trade.endpointId,
         action: "SELL",
-        type: "exit",
         status: "CREATED",
       });
 
