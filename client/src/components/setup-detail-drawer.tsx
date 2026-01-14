@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { X, Target, TrendingUp, AlertTriangle, ExternalLink, Bell, Zap, ArrowUpRight, ArrowDownRight, Info, ChevronDown, Check } from "lucide-react";
+import { X, Target, TrendingUp, AlertTriangle, ExternalLink, Bell, Zap, ArrowUpRight, ArrowDownRight, Info, ChevronDown, Check, Calculator, DollarSign, Crosshair } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,9 @@ export function SetupDetailDrawer({
   const [showConnectPrompt, setShowConnectPrompt] = useState(false);
   const [showEndpointDialog, setShowEndpointDialog] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<AutomationEndpoint | null>(null);
+  
+  const [accountSize, setAccountSize] = useState<string>("50000");
+  const [riskPercent, setRiskPercent] = useState<string>("1");
 
   const { data: endpoints } = useQuery<AutomationEndpoint[]>({
     queryKey: ["/api/automation-endpoints"],
@@ -116,6 +121,48 @@ export function SetupDetailDrawer({
       instatradeMutation.mutate(selectedEndpoint.id);
     }
   };
+
+  const positionCalc = useMemo(() => {
+    if (!result?.resistance || !result?.stopLoss) return null;
+    
+    const account = parseFloat(accountSize) || 0;
+    const riskPct = parseFloat(riskPercent) || 0;
+    const entryPrice = result.resistance;
+    const stopPrice = result.stopLoss;
+    
+    if (account <= 0 || riskPct <= 0 || entryPrice <= stopPrice) return null;
+    
+    const riskAmount = account * (riskPct / 100);
+    const riskPerShare = entryPrice - stopPrice;
+    const shares = Math.floor(riskAmount / riskPerShare);
+    const positionValue = shares * entryPrice;
+    const actualRisk = shares * riskPerShare;
+    
+    return {
+      shares,
+      positionValue,
+      riskAmount: actualRisk,
+      riskPerShare,
+      percentOfAccount: (positionValue / account) * 100,
+    };
+  }, [result?.resistance, result?.stopLoss, accountSize, riskPercent]);
+
+  const priceTargets = useMemo(() => {
+    if (!result?.resistance || !result?.stopLoss) return null;
+    
+    const entry = result.resistance;
+    const stop = result.stopLoss;
+    const riskAmount = entry - stop;
+    
+    return {
+      target1R: entry + riskAmount,
+      target2R: entry + (riskAmount * 2),
+      target3R: entry + (riskAmount * 3),
+      riskRewardAt1R: 1,
+      riskRewardAt2R: 2,
+      riskRewardAt3R: 3,
+    };
+  }, [result?.resistance, result?.stopLoss]);
 
   if (!result) return null;
 
@@ -226,6 +273,133 @@ export function SetupDetailDrawer({
                 )}
               </div>
             </div>
+
+            {priceTargets && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Crosshair className="h-4 w-4" />
+                    Price Targets
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Target 1R</p>
+                        <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                          ${priceTargets.target1R.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">+{((priceTargets.target1R - result.resistance!) / result.resistance! * 100).toFixed(1)}%</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Target 2R</p>
+                        <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                          ${priceTargets.target2R.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">+{((priceTargets.target2R - result.resistance!) / result.resistance! * 100).toFixed(1)}%</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Target 3R</p>
+                        <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                          ${priceTargets.target3R.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">+{((priceTargets.target3R - result.resistance!) / result.resistance! * 100).toFixed(1)}%</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Based on risk/reward multiples from entry at ${result.resistance?.toFixed(2)}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {result.resistance && result.stopLoss && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Position Size Calculator
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="account-size" className="text-xs">Account Size</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="account-size"
+                          type="number"
+                          value={accountSize}
+                          onChange={(e) => setAccountSize(e.target.value)}
+                          className="pl-8"
+                          placeholder="50000"
+                          data-testid="input-account-size"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="risk-percent" className="text-xs">Risk Per Trade (%)</Label>
+                      <Input
+                        id="risk-percent"
+                        type="number"
+                        step="0.5"
+                        min="0.1"
+                        max="10"
+                        value={riskPercent}
+                        onChange={(e) => setRiskPercent(e.target.value)}
+                        placeholder="1"
+                        data-testid="input-risk-percent"
+                      />
+                    </div>
+                  </div>
+                  {positionCalc && (
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Shares to Buy</p>
+                            <p className="text-2xl font-bold text-primary" data-testid="text-shares-to-buy">
+                              {positionCalc.shares.toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Position Value</p>
+                            <p className="text-lg font-semibold" data-testid="text-position-value">
+                              ${positionCalc.positionValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Risk Amount</p>
+                            <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="text-risk-amount">
+                              ${positionCalc.riskAmount.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">% of Account</p>
+                            <p className={cn(
+                              "text-sm font-medium",
+                              positionCalc.percentOfAccount > 25 ? "text-yellow-600 dark:text-yellow-400" : ""
+                            )} data-testid="text-percent-of-account">
+                              {positionCalc.percentOfAccount.toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {!positionCalc && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      Enter account size and risk percentage to calculate position
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {(result.volume || result.avgVolume || result.ema9 || result.ema21 || result.atr) && (
               <>
