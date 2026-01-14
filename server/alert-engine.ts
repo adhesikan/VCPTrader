@@ -257,16 +257,18 @@ export async function processAlertRules(
           
           // Send webhook if enabled and endpoint configured
           if (rule.sendWebhook && rule.automationEndpointId) {
-            const targetPrice = result.resistance 
-              ? result.resistance + (result.resistance - (result.stopLoss || result.price * 0.93))
-              : result.price * 1.05;
+            // For webhook: entry at current price, target based on risk (entry - stop)
+            const entryPrice = result.price;
+            const stopLoss = result.stopLoss || entryPrice * 0.93;
+            const riskAmount = entryPrice - stopLoss;
+            const targetPrice = entryPrice + (riskAmount * 2); // 2R target
             
             const webhookResult = await sendWebhookToEndpoint(
               rule.automationEndpointId,
               result.ticker,
-              result.resistance || result.price,
+              entryPrice,
               targetPrice,
-              result.stopLoss || result.price * 0.93
+              stopLoss
             );
             
             if (webhookResult.success) {
@@ -378,14 +380,19 @@ export async function processAlertRules(
           console.log(`[AlertEngine] Event created: ${rule.symbol} ${result.fromState || "N/A"} -> ${result.toState}`);
           
           // Send webhook if enabled and endpoint configured
-          if (rule.sendWebhook && rule.automationEndpointId) {
-            const targetPrice = classification.resistance * 1.03;
+          if (rule.sendWebhook && rule.automationEndpointId && rule.symbol) {
+            // For webhook: entry at current price, target based on risk (entry - stop)
+            const entryPrice = result.price;
+            const stopLoss = classification.stopLoss || entryPrice * 0.93;
+            const riskAmount = entryPrice - stopLoss;
+            const targetPrice = entryPrice + (riskAmount * 2); // 2R target
+            
             const webhookResult = await sendWebhookToEndpoint(
               rule.automationEndpointId,
               rule.symbol,
-              result.price,
+              entryPrice,
               targetPrice,
-              classification.stopLoss
+              stopLoss
             );
             
             if (webhookResult.success) {
