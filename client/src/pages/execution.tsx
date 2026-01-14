@@ -164,7 +164,7 @@ export default function ExecutionCockpit() {
           <div>
             <h1 className="text-2xl font-semibold" data-testid="text-page-title">Execution Cockpit</h1>
             <p className="text-muted-foreground">
-              Connect VCP Trader to AlgoPilotX for trade execution
+              Connect VCP Trader to AlgoPilotX for self-directed automated trade execution
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -179,11 +179,16 @@ export default function ExecutionCockpit() {
 
         <Alert className="border-primary/20 bg-primary/5">
           <Shield className="h-4 w-4" />
-          <AlertTitle>Educational & Informational Only</AlertTitle>
-          <AlertDescription>
-            VCP Trader provides market intelligence and educational alerts only. 
-            Trade execution occurs in AlgoPilotX after you confirm and configure your settings. 
-            VCP Trader does not place trades and does not have access to brokerage accounts.
+          <AlertTitle>Market Intelligence & User-Controlled Automation</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              VCP Trader delivers real-time market intelligence, strategy signals, and alert-driven trade ideas.
+              When you choose, these signals can be forwarded to AlgoPilotX, where you control how trades are executed through your own automation rules, risk limits, and brokerage connections.
+            </p>
+            <p className="font-medium">
+              VCP Trader does not place trades, manage accounts, or access brokerage credentials.
+              All execution decisions, sizing, and risk management are configured and approved by you inside AlgoPilotX.
+            </p>
           </AlertDescription>
         </Alert>
 
