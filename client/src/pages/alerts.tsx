@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationProfile } from "@shared/schema";
+import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationEndpoint } from "@shared/schema";
 import { RuleConditionType, PatternStage } from "@shared/schema";
 import { Zap } from "lucide-react";
 
@@ -47,19 +47,19 @@ function AlertRuleCard({
   rule, 
   onToggle, 
   onDelete,
-  profiles,
-  onUpdateProfile,
+  endpoints,
+  onUpdateEndpoint,
 }: { 
   rule: AlertRule; 
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
-  profiles?: AutomationProfile[];
-  onUpdateProfile?: (id: string, profileId: string | null) => void;
+  endpoints?: AutomationEndpoint[];
+  onUpdateEndpoint?: (id: string, endpointId: string | null) => void;
 }) {
   const payload = rule.conditionPayload as { targetStage?: string } | null;
   const targetStage = payload?.targetStage || "BREAKOUT";
   const lastState = rule.lastState as { stage?: string; price?: number } | null;
-  const assignedProfile = profiles?.find(p => p.id === rule.automationProfileId);
+  const assignedEndpoint = endpoints?.find(e => e.id === rule.automationEndpointId);
   
   return (
     <Card 
@@ -74,10 +74,10 @@ function AlertRuleCard({
               <TrendingUp className="h-3 w-3" />
               {targetStage}
             </Badge>
-            {assignedProfile && (
+            {assignedEndpoint && (
               <Badge variant="secondary" className="gap-1">
                 <Zap className="h-3 w-3" />
-                {assignedProfile.name}
+                {assignedEndpoint.name}
               </Badge>
             )}
           </div>
@@ -102,21 +102,21 @@ function AlertRuleCard({
           Alert when {rule.symbol} enters {targetStage} stage
         </div>
 
-        {profiles && profiles.length > 0 && onUpdateProfile && (
+        {endpoints && endpoints.length > 0 && onUpdateEndpoint && (
           <div className="mt-3">
             <Select
-              value={rule.automationProfileId || "none"}
-              onValueChange={(value) => onUpdateProfile(rule.id, value === "none" ? null : value)}
+              value={rule.automationEndpointId || "none"}
+              onValueChange={(value) => onUpdateEndpoint(rule.id, value === "none" ? null : value)}
             >
-              <SelectTrigger className="h-8 text-xs" data-testid={`select-profile-${rule.id}`}>
+              <SelectTrigger className="h-8 text-xs" data-testid={`select-endpoint-${rule.id}`}>
                 <Zap className="h-3 w-3 mr-1" />
-                <SelectValue placeholder="No automation profile" />
+                <SelectValue placeholder="No automation endpoint" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No automation profile</SelectItem>
-                {profiles.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    {profile.name} ({profile.mode})
+                <SelectItem value="none">No automation endpoint</SelectItem>
+                {endpoints.filter(e => e.isActive).map((endpoint) => (
+                  <SelectItem key={endpoint.id} value={endpoint.id}>
+                    {endpoint.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -230,7 +230,7 @@ export default function Alerts() {
   const [newRule, setNewRule] = useState({
     symbol: "",
     targetStage: "BREAKOUT" as string,
-    automationProfileId: "none" as string,
+    automationEndpointId: "none" as string,
   });
   const { toast } = useToast();
 
@@ -246,8 +246,8 @@ export default function Alerts() {
     queryKey: ["/api/watchlists"],
   });
 
-  const { data: automationProfiles = [] } = useQuery<AutomationProfile[]>({
-    queryKey: ["/api/automation-profiles"],
+  const { data: automationEndpoints = [] } = useQuery<AutomationEndpoint[]>({
+    queryKey: ["/api/automation-endpoints"],
   });
 
   const selectedWatchlistData = watchlists?.find(w => w.id === selectedWatchlist);
@@ -266,7 +266,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationProfileId: "none" });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none" });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -301,13 +301,13 @@ export default function Alerts() {
     },
   });
 
-  const updateRuleProfileMutation = useMutation({
-    mutationFn: async ({ id, profileId }: { id: string; profileId: string | null }) => {
-      await apiRequest("PATCH", `/api/alert-rules/${id}`, { automationProfileId: profileId });
+  const updateRuleEndpointMutation = useMutation({
+    mutationFn: async ({ id, endpointId }: { id: string; endpointId: string | null }) => {
+      await apiRequest("PATCH", `/api/alert-rules/${id}`, { automationEndpointId: endpointId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
-      toast({ title: "Automation profile updated" });
+      toast({ title: "Automation endpoint updated" });
     },
   });
 
@@ -339,7 +339,7 @@ export default function Alerts() {
         strategy: "VCP",
         timeframe: "1d",
         isEnabled: true,
-        automationProfileId: newRule.automationProfileId === "none" || !newRule.automationProfileId ? null : newRule.automationProfileId,
+        automationEndpointId: newRule.automationEndpointId === "none" || !newRule.automationEndpointId ? null : newRule.automationEndpointId,
         watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
       });
     }
@@ -475,31 +475,26 @@ export default function Alerts() {
               </div>
 
               <div className="space-y-2">
-                <Label>Automation Profile (optional)</Label>
+                <Label>Automation Endpoint (optional)</Label>
                 <Select
-                  value={newRule.automationProfileId}
-                  onValueChange={(value) => setNewRule(prev => ({ ...prev, automationProfileId: value }))}
+                  value={newRule.automationEndpointId}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, automationEndpointId: value }))}
                 >
-                  <SelectTrigger data-testid="select-rule-automation-profile">
+                  <SelectTrigger data-testid="select-rule-automation-endpoint">
                     <Zap className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Select automation profile" />
+                    <SelectValue placeholder="Select automation endpoint" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None - use default</SelectItem>
-                    {automationProfiles.map((profile) => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">{profile.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            Mode: {profile.mode}
-                          </span>
-                        </div>
+                    {automationEndpoints.filter(e => e.isActive).map((endpoint) => (
+                      <SelectItem key={endpoint.id} value={endpoint.id}>
+                        <span className="font-medium">{endpoint.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Link this alert to a specific automation profile for webhook delivery
+                  Link this alert to an automation endpoint for webhook delivery
                 </p>
               </div>
 
@@ -553,8 +548,8 @@ export default function Alerts() {
                   rule={rule}
                   onToggle={(id, enabled) => toggleRuleMutation.mutate({ id, enabled })}
                   onDelete={(id) => deleteRuleMutation.mutate(id)}
-                  profiles={automationProfiles}
-                  onUpdateProfile={(id, profileId) => updateRuleProfileMutation.mutate({ id, profileId })}
+                  endpoints={automationEndpoints}
+                  onUpdateEndpoint={(id, endpointId) => updateRuleEndpointMutation.mutate({ id, endpointId })}
                 />
               ))}
             </div>

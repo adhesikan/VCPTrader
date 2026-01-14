@@ -160,6 +160,7 @@ export const alertRules = pgTable("alert_rules", {
   scoreThreshold: integer("score_threshold"),
   minStrategies: integer("min_strategies"),
   automationProfileId: varchar("automation_profile_id"),
+  automationEndpointId: varchar("automation_endpoint_id"),
   watchlistId: varchar("watchlist_id"),
   isEnabled: boolean("is_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
