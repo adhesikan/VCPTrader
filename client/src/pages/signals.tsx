@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings, List, LayoutGrid, Search, ArrowUpDown } from "lucide-react";
+import { TrendingUp, Target, AlertTriangle, Activity, X, ChevronRight, Plug, Settings, List, LayoutGrid, Search, ArrowUpDown, Zap, Clock } from "lucide-react";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -378,6 +378,8 @@ const vcpDescriptions: Record<VCPTimeframe, { label: string; description: string
   },
 };
 
+type StageFilter = "BREAKOUT" | "READY" | "FORMING";
+
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("card");
@@ -385,7 +387,22 @@ export default function Signals() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("type");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [stageFilters, setStageFilters] = useState<Set<StageFilter>>(new Set<StageFilter>(["BREAKOUT", "READY", "FORMING"]));
   const { isConnected } = useBrokerStatus();
+
+  const toggleStageFilter = (stage: StageFilter) => {
+    setStageFilters(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stage)) {
+        if (newSet.size > 1) {
+          newSet.delete(stage);
+        }
+      } else {
+        newSet.add(stage);
+      }
+      return newSet;
+    });
+  };
 
   const { data: scanResults, isLoading } = useQuery<any[]>({
     queryKey: ["/api/scan/results"],
@@ -410,10 +427,13 @@ export default function Signals() {
       strategy: result.strategy || "VCP",
     }));
 
+    // Filter by stage
+    const stageFiltered = mapped.filter(s => stageFilters.has(s.type as StageFilter));
+
     // Filter by search query
     const filtered = searchQuery
-      ? mapped.filter(s => s.ticker.toLowerCase().includes(searchQuery.toLowerCase()))
-      : mapped;
+      ? stageFiltered.filter(s => s.ticker.toLowerCase().includes(searchQuery.toLowerCase()))
+      : stageFiltered;
 
     // Sort - custom order for stage: BREAKOUT first, then READY, then FORMING
     const stageOrder: Record<string, number> = { BREAKOUT: 0, READY: 1, FORMING: 2 };
@@ -442,7 +462,7 @@ export default function Signals() {
     });
 
     return sorted;
-  }, [scanResults, searchQuery, sortField, sortDirection, vcpTimeframe]);
+  }, [scanResults, searchQuery, sortField, sortDirection, vcpTimeframe, stageFilters]);
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
@@ -492,6 +512,38 @@ export default function Signals() {
               className="pl-8 w-48"
               data-testid="input-signals-search"
             />
+          </div>
+          <div className="flex items-center gap-1 border rounded-md p-0.5">
+            <Button
+              variant={stageFilters.has("BREAKOUT") ? "default" : "ghost"}
+              size="sm"
+              onClick={() => toggleStageFilter("BREAKOUT")}
+              className="gap-1"
+              data-testid="button-filter-breakout"
+            >
+              <Zap className="h-3 w-3" />
+              Breakout
+            </Button>
+            <Button
+              variant={stageFilters.has("READY") ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => toggleStageFilter("READY")}
+              className="gap-1"
+              data-testid="button-filter-ready"
+            >
+              <Target className="h-3 w-3" />
+              Ready
+            </Button>
+            <Button
+              variant={stageFilters.has("FORMING") ? "outline" : "ghost"}
+              size="sm"
+              onClick={() => toggleStageFilter("FORMING")}
+              className="gap-1"
+              data-testid="button-filter-forming"
+            >
+              <Clock className="h-3 w-3" />
+              Forming
+            </Button>
           </div>
           <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
             <SelectTrigger className="w-32" data-testid="select-signals-sort-field">
