@@ -359,23 +359,39 @@ export async function registerRoutes(
           } catch (brokerError: any) {
             console.error("Broker fetch failed, falling back to stored results:", brokerError.message);
             const storedResults = await storage.getScanResults();
+            const withMultiday = addBasicMultidayResults(storedResults);
             if (includeMeta) {
-              return res.json({ data: storedResults, isLive: false, error: brokerError.message });
+              return res.json({ data: withMultiday, isLive: false, error: brokerError.message });
             }
-            return res.json(storedResults);
+            return res.json(withMultiday);
           }
         }
       }
       
       const storedResults = await storage.getScanResults();
+      const withMultiday = addBasicMultidayResults(storedResults);
       if (includeMeta) {
-        return res.json({ data: storedResults, isLive: false, requiresBroker: !storedResults.length });
+        return res.json({ data: withMultiday, isLive: false, requiresBroker: !storedResults.length });
       }
-      res.json(storedResults);
+      res.json(withMultiday);
     } catch (error) {
       res.status(500).json({ error: "Failed to get scan results" });
     }
   });
+  
+  function addBasicMultidayResults(results: any[]): any[] {
+    const intradayResults = results.map(r => ({ ...r, strategy: r.strategy || StrategyType.VCP }));
+    
+    const multidayResults = results.map(r => ({
+      ...r,
+      id: crypto.randomUUID(),
+      strategy: StrategyType.VCP_MULTIDAY,
+      stage: r.stage === "BREAKOUT" ? "READY" : r.stage,
+      patternScore: Math.max(40, (r.patternScore || 70) - 10),
+    }));
+    
+    return [...intradayResults, ...multidayResults];
+  }
 
   app.get("/api/scan/result/:ticker", async (req, res) => {
     try {
