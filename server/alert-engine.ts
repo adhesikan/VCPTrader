@@ -34,7 +34,7 @@ export function classifyVCPStage(quote: QuoteData): VCPClassification {
     priceFromHigh,
     volumeRatio,
     changePercent: quote.changePercent,
-    resistance: quote.high * 1.02,
+    resistance: (quote.high && quote.high > 0 ? quote.high : quote.last) * 1.02,
     stopLoss: quote.last * 0.93,
   };
 }

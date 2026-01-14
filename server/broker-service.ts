@@ -585,7 +585,9 @@ export function quotesToScanResults(quotes: QuoteData[], strategy: string = Stra
   return quotes.map((quote) => {
     const stage = calculateStageForStrategy(quote, strategy);
     
-    const resistance = quote.high * 1.02;
+    // Use quote.high if available, otherwise fallback to current price * 1.02
+    const highPrice = quote.high && quote.high > 0 ? quote.high : quote.last;
+    const resistance = highPrice * 1.02;
     const stopLoss = quote.last * 0.93;
     const patternScore = Math.min(100, Math.max(50, 
       70 + (quote.changePercent > 0 ? 10 : -10) + 

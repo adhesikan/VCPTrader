@@ -85,8 +85,10 @@ function classifyFromQuote(quote: QuoteData, cfg: Required<StrategyConfig>): Str
     explanation = "Pattern forming. Need price above EMAs in uptrend.";
   }
   
-  const resistance = quote.high;
-  const stopLevel = quote.low * 0.995;
+  const highPrice = quote.high && quote.high > 0 ? quote.high : quote.last;
+  const lowPrice = quote.low && quote.low > 0 ? quote.low : quote.last;
+  const resistance = highPrice;
+  const stopLevel = lowPrice * 0.995;
   
   return {
     stage,
@@ -260,8 +262,10 @@ export const classicPullbackStrategy: Strategy = {
   },
 
   computeLevels(quote: QuoteData, _candles?: Candle[]): StrategyLevels {
-    const resistance = quote.high;
-    const stopLevel = quote.low * 0.995;
+    const highPrice = quote.high && quote.high > 0 ? quote.high : quote.last;
+    const lowPrice = quote.low && quote.low > 0 ? quote.low : quote.last;
+    const resistance = highPrice;
+    const stopLevel = lowPrice * 0.995;
     
     return {
       resistance: Number(resistance.toFixed(2)),

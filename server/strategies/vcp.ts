@@ -46,7 +46,8 @@ export const vcpStrategy: Strategy = {
   },
 
   computeLevels(quote: QuoteData): StrategyLevels {
-    const resistance = quote.high * 1.02;
+    const highPrice = quote.high && quote.high > 0 ? quote.high : quote.last;
+    const resistance = highPrice * 1.02;
     const stopLevel = quote.last * 0.93;
     
     return {

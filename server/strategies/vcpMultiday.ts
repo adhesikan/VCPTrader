@@ -91,7 +91,8 @@ function computeMultidayLevels(quote: QuoteData, candles?: Candle[]): StrategyLe
     const recentLows = candles.slice(-10).map(c => c.low);
     stopLevel = Math.min(...recentLows) * 0.98;
   } else {
-    resistance = quote.high * 1.02;
+    const highPrice = quote.high && quote.high > 0 ? quote.high : quote.last;
+    resistance = highPrice * 1.02;
     stopLevel = quote.last * 0.93;
   }
 
