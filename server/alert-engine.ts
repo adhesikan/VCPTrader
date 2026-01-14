@@ -145,6 +145,39 @@ export async function evaluateRule(
   return null;
 }
 
+async function sendWebhookToEndpoint(
+  endpointId: string,
+  symbol: string,
+  price: number,
+  targetPrice: number,
+  stopLoss: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const endpoint = await storage.getAutomationEndpointWithSecret(endpointId);
+    if (!endpoint || !endpoint.webhookUrl) {
+      return { success: false, error: "Endpoint not found" };
+    }
+    
+    // AlgoPilotX format: enter sym=SYMBOL lp=limitPrice tp=takeProfit sl=stopLoss
+    const webhookMessage = `enter sym=${symbol} lp=${price.toFixed(2)} tp=${targetPrice.toFixed(2)} sl=${stopLoss.toFixed(2)}`;
+    
+    const response = await fetch(endpoint.webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: webhookMessage,
+    });
+    
+    if (response.ok) {
+      console.log(`[AlertEngine] Webhook sent to ${endpoint.name}: ${webhookMessage}`);
+      return { success: true };
+    } else {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function processAlertRules(
   connection: BrokerConnection
 ): Promise<AlertEvent[]> {
@@ -154,159 +187,289 @@ export async function processAlertRules(
     return [];
   }
   
-  const symbols = Array.from(new Set(enabledRules.map(r => r.symbol)));
+  // Separate global rules from symbol-specific rules
+  const globalRules = enabledRules.filter(r => r.isGlobal);
+  const symbolRules = enabledRules.filter(r => !r.isGlobal && r.symbol);
   
-  let quotes: QuoteData[];
-  try {
-    quotes = await fetchQuotesFromBroker(connection, symbols);
-  } catch (error) {
-    console.error("[AlertEngine] Failed to fetch quotes:", error);
-    return [];
-  }
-  
-  const quoteMap = new Map(quotes.map(q => [q.symbol.toUpperCase(), q]));
   const createdEvents: AlertEvent[] = [];
   const now = new Date();
   
-  for (const rule of enabledRules) {
-    const quote = quoteMap.get(rule.symbol.toUpperCase());
-    if (!quote) {
-      continue;
+  // Process global rules against scan results
+  if (globalRules.length > 0) {
+    const scanResults = await storage.getScanResults();
+    
+    for (const rule of globalRules) {
+      try {
+        const payload = rule.conditionPayload as { targetStage?: string } | null;
+        const targetStage = payload?.targetStage || PatternStage.BREAKOUT;
+        
+        // Get previously triggered symbols for this rule
+        const previouslyTriggered = new Set(rule.triggeredSymbols || []);
+        const newlyTriggered: string[] = [];
+        
+        // Find scan results that match the target stage
+        const matchingResults = scanResults.filter(result => 
+          result.stage === targetStage && !previouslyTriggered.has(result.ticker)
+        );
+        
+        for (const result of matchingResults) {
+          const eventKey = generateEventKey(rule.id, `${result.ticker}:${targetStage}`, now);
+          
+          const existingEvent = await storage.getAlertEventByKey(eventKey);
+          if (existingEvent) {
+            continue;
+          }
+          
+          const eventData: InsertAlertEvent = {
+            ruleId: rule.id,
+            userId: rule.userId,
+            symbol: result.ticker,
+            eventKey,
+            fromState: null,
+            toState: targetStage,
+            price: result.price,
+            payload: {
+              resistance: result.resistance,
+              stopLoss: result.stopLoss,
+              volumeRatio: result.rvol,
+              changePercent: result.changePercent,
+              patternScore: result.patternScore,
+              message: generateAlertMessage(result.ticker, null, targetStage, result.price),
+            },
+            deliveryStatus: { push: false, webhook: false },
+            isRead: false,
+          };
+          
+          const event = await storage.createAlertEvent(eventData);
+          createdEvents.push(event);
+          newlyTriggered.push(result.ticker);
+          
+          // Send push notification if enabled
+          if (rule.sendPushNotification !== false) {
+            try {
+              const { sendAlertPushNotification } = await import("./push-service");
+              await sendAlertPushNotification(event);
+              console.log(`[AlertEngine] Push sent for global alert: ${result.ticker} ${targetStage}`);
+            } catch (pushError) {
+              console.log(`[AlertEngine] Push notification error: ${pushError}`);
+            }
+          }
+          
+          // Send webhook if enabled and endpoint configured
+          if (rule.sendWebhook && rule.automationEndpointId) {
+            const targetPrice = result.resistance 
+              ? result.resistance + (result.resistance - (result.stopLoss || result.price * 0.93))
+              : result.price * 1.05;
+            
+            const webhookResult = await sendWebhookToEndpoint(
+              rule.automationEndpointId,
+              result.ticker,
+              result.resistance || result.price,
+              targetPrice,
+              result.stopLoss || result.price * 0.93
+            );
+            
+            if (webhookResult.success) {
+              console.log(`[AlertEngine] Webhook sent for ${result.ticker}`);
+            } else {
+              console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+            }
+          }
+          
+          console.log(`[AlertEngine] Global alert triggered: ${result.ticker} entered ${targetStage}`);
+        }
+        
+        // Update rule with newly triggered symbols
+        if (newlyTriggered.length > 0) {
+          await storage.updateAlertRule(rule.id, {
+            lastEvaluatedAt: now,
+            triggeredSymbols: [...Array.from(previouslyTriggered), ...newlyTriggered],
+          });
+        }
+      } catch (error) {
+        console.error(`[AlertEngine] Error processing global rule ${rule.id}:`, error);
+      }
+    }
+  }
+  
+  // Process symbol-specific rules
+  if (symbolRules.length > 0) {
+    const symbols = Array.from(new Set(symbolRules.map(r => r.symbol).filter((s): s is string => s !== null)));
+    
+    let quotes: QuoteData[] = [];
+    if (symbols.length > 0) {
+      try {
+        quotes = await fetchQuotesFromBroker(connection, symbols);
+      } catch (error) {
+        console.error("[AlertEngine] Failed to fetch quotes:", error);
+      }
     }
     
-    try {
-      const result = await evaluateRule(rule, quote);
+    const quoteMap = new Map(quotes.map(q => [q.symbol.toUpperCase(), q]));
+    
+    for (const rule of symbolRules) {
+      if (!rule.symbol) continue;
       
-      if (result && result.triggered) {
-        const eventKey = generateEventKey(rule.id, result.toState, now);
+      const quote = quoteMap.get(rule.symbol.toUpperCase());
+      if (!quote) {
+        continue;
+      }
+      
+      try {
+        const result = await evaluateRule(rule, quote);
         
-        const existingEvent = await storage.getAlertEventByKey(eventKey);
-        if (existingEvent) {
-          continue;
-        }
-        
-        const classification = result.classification;
-        
-        const eventData: InsertAlertEvent = {
-          ruleId: rule.id,
-          userId: rule.userId,
-          symbol: rule.symbol,
-          eventKey,
-          fromState: result.fromState,
-          toState: result.toState,
-          price: result.price,
-          payload: {
-            resistance: classification.resistance,
-            stopLoss: classification.stopLoss,
-            volumeRatio: classification.volumeRatio,
-            changePercent: classification.changePercent,
-            message: generateAlertMessage(
-              rule.symbol,
-              result.fromState,
-              result.toState,
-              result.price
-            ),
-          },
-          deliveryStatus: { push: false, email: false },
-          isRead: false,
-        };
-        
-        const event = await storage.createAlertEvent(eventData);
-        createdEvents.push(event);
-        
-        // Send push notification for the alert
-        try {
-          const { sendAlertPushNotification } = await import("./push-service");
-          await sendAlertPushNotification(event);
-        } catch (pushError) {
-          console.log(`[AlertEngine] Push notification error: ${pushError}`);
-        }
-        
-        await storage.updateAlertRule(rule.id, {
-          lastEvaluatedAt: now,
-          lastState: {
-            stage: result.toState,
+        if (result && result.triggered) {
+          const eventKey = generateEventKey(rule.id, result.toState, now);
+          
+          const existingEvent = await storage.getAlertEventByKey(eventKey);
+          if (existingEvent) {
+            continue;
+          }
+          
+          const classification = result.classification;
+          
+          const eventData: InsertAlertEvent = {
+            ruleId: rule.id,
+            userId: rule.userId,
+            symbol: rule.symbol,
+            eventKey,
+            fromState: result.fromState,
+            toState: result.toState,
             price: result.price,
-            volumeRatio: classification.volumeRatio,
-            timestamp: now.toISOString(),
-          },
-        });
-        
-        console.log(`[AlertEngine] Event created: ${rule.symbol} ${result.fromState || "N/A"} -> ${result.toState}`);
-        
-        if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
-          try {
-            const alertScore = (eventData.payload as any)?.score || 75;
+            payload: {
+              resistance: classification.resistance,
+              stopLoss: classification.stopLoss,
+              volumeRatio: classification.volumeRatio,
+              changePercent: classification.changePercent,
+              message: generateAlertMessage(
+                rule.symbol,
+                result.fromState,
+                result.toState,
+                result.price
+              ),
+            },
+            deliveryStatus: { push: false, email: false },
+            isRead: false,
+          };
+          
+          const event = await storage.createAlertEvent(eventData);
+          createdEvents.push(event);
+          
+          // Send push notification for the alert
+          if (rule.sendPushNotification !== false) {
+            try {
+              const { sendAlertPushNotification } = await import("./push-service");
+              await sendAlertPushNotification(event);
+            } catch (pushError) {
+              console.log(`[AlertEngine] Push notification error: ${pushError}`);
+            }
+          }
+          
+          await storage.updateAlertRule(rule.id, {
+            lastEvaluatedAt: now,
+            lastState: {
+              stage: result.toState,
+              price: result.price,
+              volumeRatio: classification.volumeRatio,
+              timestamp: now.toISOString(),
+            },
+          });
+          
+          console.log(`[AlertEngine] Event created: ${rule.symbol} ${result.fromState || "N/A"} -> ${result.toState}`);
+          
+          // Send webhook if enabled and endpoint configured
+          if (rule.sendWebhook && rule.automationEndpointId) {
             const targetPrice = classification.resistance * 1.03;
+            const webhookResult = await sendWebhookToEndpoint(
+              rule.automationEndpointId,
+              rule.symbol,
+              result.price,
+              targetPrice,
+              classification.stopLoss
+            );
             
-            const signalContext: AutomationSignalContext = {
-              userId: rule.userId,
-              symbol: rule.symbol,
-              strategy: rule.strategy || "VCP",
-              alertRuleId: rule.id,
-              alertRuleProfileId: rule.automationProfileId || undefined,
-              watchlistId: rule.watchlistId || undefined,
-              lastPrice: result.price,
-              targetPrice: Number(targetPrice.toFixed(2)),
-              stopLoss: Number(classification.stopLoss.toFixed(2)),
-              score: alertScore,
-            };
-            
-            const decision = await resolveAutomationProfileForSignal(signalContext);
-            console.log(`[AlertEngine] Automation decision for ${rule.symbol}: ${decision.action} - ${decision.reason}`);
-            
-            await createAutomationEvent(signalContext, decision);
-            
-            if (decision.action === "SEND" && decision.profile) {
-              const entrySignal: EntrySignal = {
+            if (webhookResult.success) {
+              console.log(`[AlertEngine] Webhook sent for ${rule.symbol}`);
+            } else {
+              console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+            }
+          }
+          
+          // Legacy automation profile handling
+          if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
+            try {
+              const alertScore = (eventData.payload as any)?.score || 75;
+              const targetPrice = classification.resistance * 1.03;
+              
+              const signalContext: AutomationSignalContext = {
+                userId: rule.userId,
                 symbol: rule.symbol,
+                strategy: rule.strategy || "VCP",
+                alertRuleId: rule.id,
+                alertRuleProfileId: rule.automationProfileId || undefined,
+                watchlistId: rule.watchlistId || undefined,
                 lastPrice: result.price,
-                targetPrice: signalContext.targetPrice,
-                stopLoss: signalContext.stopLoss,
+                targetPrice: Number(targetPrice.toFixed(2)),
+                stopLoss: Number(classification.stopLoss.toFixed(2)),
+                score: alertScore,
               };
               
-              const webhookResult = await sendEntrySignalToProfile(
-                decision.profile.webhookUrl,
-                entrySignal,
-                decision.profile.apiKey
-              );
+              const decision = await resolveAutomationProfileForSignal(signalContext);
+              console.log(`[AlertEngine] Automation decision for ${rule.symbol}: ${decision.action} - ${decision.reason}`);
               
-              const logEntry = createAutomationLogEntry(
-                rule.userId,
-                "entry",
-                rule.symbol,
-                webhookResult.message,
-                webhookResult
-              );
-              await storage.createAutomationLog(logEntry);
+              await createAutomationEvent(signalContext, decision);
               
-              if (webhookResult.success) {
-                console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
-              } else {
-                console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+              if (decision.action === "SEND" && decision.profile) {
+                const entrySignal: EntrySignal = {
+                  symbol: rule.symbol,
+                  lastPrice: result.price,
+                  targetPrice: signalContext.targetPrice,
+                  stopLoss: signalContext.stopLoss,
+                };
+                
+                const webhookResult = await sendEntrySignalToProfile(
+                  decision.profile.webhookUrl,
+                  entrySignal,
+                  decision.profile.apiKey
+                );
+                
+                const logEntry = createAutomationLogEntry(
+                  rule.userId,
+                  "entry",
+                  rule.symbol,
+                  webhookResult.message,
+                  webhookResult
+                );
+                await storage.createAutomationLog(logEntry);
+                
+                if (webhookResult.success) {
+                  console.log(`[AlertEngine] Webhook sent for ${rule.symbol}: ${webhookResult.message}`);
+                } else {
+                  console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+                }
+              } else if (decision.action === "QUEUE") {
+                console.log(`[AlertEngine] Signal queued for approval: ${rule.symbol}`);
+              } else if (decision.action === "BLOCKED") {
+                console.log(`[AlertEngine] Signal blocked: ${rule.symbol} - ${decision.blockedReason}`);
               }
-            } else if (decision.action === "QUEUE") {
-              console.log(`[AlertEngine] Signal queued for approval: ${rule.symbol}`);
-            } else if (decision.action === "BLOCKED") {
-              console.log(`[AlertEngine] Signal blocked: ${rule.symbol} - ${decision.blockedReason}`);
+            } catch (webhookError) {
+              console.error(`[AlertEngine] Error in automation for ${rule.symbol}:`, webhookError);
             }
-          } catch (webhookError) {
-            console.error(`[AlertEngine] Error in automation for ${rule.symbol}:`, webhookError);
           }
+        } else {
+          await storage.updateAlertRule(rule.id, {
+            lastEvaluatedAt: now,
+            lastState: {
+              stage: classifyVCPStage(quote).stage,
+              price: quote.last,
+              volumeRatio: quote.avgVolume ? quote.volume / quote.avgVolume : 1,
+              timestamp: now.toISOString(),
+            },
+          });
         }
-      } else {
-        await storage.updateAlertRule(rule.id, {
-          lastEvaluatedAt: now,
-          lastState: {
-            stage: classifyVCPStage(quote).stage,
-            price: quote.last,
-            volumeRatio: quote.avgVolume ? quote.volume / quote.avgVolume : 1,
-            timestamp: now.toISOString(),
-          },
-        });
+      } catch (error) {
+        console.error(`[AlertEngine] Error evaluating rule ${rule.id}:`, error);
       }
-    } catch (error) {
-      console.error(`[AlertEngine] Error evaluating rule ${rule.id}:`, error);
     }
   }
   

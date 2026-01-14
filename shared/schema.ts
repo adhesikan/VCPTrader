@@ -151,7 +151,8 @@ export type AlertTimeframeValue = typeof AlertTimeframe[keyof typeof AlertTimefr
 export const alertRules = pgTable("alert_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  symbol: text("symbol").notNull(),
+  symbol: text("symbol"),
+  isGlobal: boolean("is_global").default(false),
   strategy: text("strategy").notNull().default("VCP"),
   strategies: text("strategies").array(),
   timeframe: text("timeframe").notNull().default("1d"),
@@ -162,11 +163,14 @@ export const alertRules = pgTable("alert_rules", {
   automationProfileId: varchar("automation_profile_id"),
   automationEndpointId: varchar("automation_endpoint_id"),
   watchlistId: varchar("watchlist_id"),
+  sendPushNotification: boolean("send_push_notification").default(true),
+  sendWebhook: boolean("send_webhook").default(false),
   isEnabled: boolean("is_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   lastEvaluatedAt: timestamp("last_evaluated_at"),
   lastState: jsonb("last_state"),
+  triggeredSymbols: text("triggered_symbols").array(),
 });
 
 export const insertAlertRuleSchema = createInsertSchema(alertRules).omit({ 
