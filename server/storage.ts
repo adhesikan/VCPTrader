@@ -91,6 +91,7 @@ export interface IStorage {
   clearBrokerConnection(userId: string): Promise<void>;
 
   getPushSubscriptions(): Promise<PushSubscription[]>;
+  getPushSubscriptionsByUserId(userId: string): Promise<PushSubscription[]>;
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
 
   getMarketStats(): Promise<MarketStats>;
@@ -770,6 +771,10 @@ export class MemStorage implements IStorage {
 
   async getPushSubscriptions(): Promise<PushSubscription[]> {
     return Array.from(this.pushSubscriptions.values());
+  }
+
+  async getPushSubscriptionsByUserId(userId: string): Promise<PushSubscription[]> {
+    return Array.from(this.pushSubscriptions.values()).filter(s => s.userId === userId);
   }
 
   async createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {

@@ -24,11 +24,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Loader2 } from "lucide-react";
+import { LogOut, User, Loader2, Bell } from "lucide-react";
 import { BrokerStatusProvider } from "@/hooks/use-broker-status";
 import { TooltipVisibilityProvider } from "@/hooks/use-tooltips";
 import { StatusBanner } from "@/components/status-banner";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
+import type { AlertEvent } from "@shared/schema";
 
 import Scanner from "@/pages/scanner";
 import Charts from "@/pages/charts";
@@ -121,6 +124,36 @@ function UserMenu() {
   );
 }
 
+function AlertBell() {
+  const { data: alertEvents } = useReactQuery<AlertEvent[]>({
+    queryKey: ["/api/alert-events"],
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = alertEvents?.filter(e => !e.isRead).length || 0;
+
+  return (
+    <Link href="/alerts" data-testid="link-alerts-bell">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="relative"
+        data-testid="button-alert-bell"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span 
+            className="absolute -top-1 -right-1 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-xs font-medium flex items-center justify-center px-1"
+            data-testid="badge-unread-alerts"
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </Button>
+    </Link>
+  );
+}
+
 function AppHeader() {
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
@@ -128,6 +161,7 @@ function AppHeader() {
         <SidebarTrigger data-testid="button-sidebar-toggle" />
       </div>
       <div className="flex items-center gap-2">
+        <AlertBell />
         <ThemeToggle />
         <UserMenu />
       </div>

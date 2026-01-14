@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { db } from "./db";
 import { brokerConnections } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { configurePushService } from "./push-service";
 
 const app = express();
 const httpServer = createServer(app);
@@ -90,6 +91,7 @@ async function restoreBrokerConnections() {
 }
 
 (async () => {
+  configurePushService();
   await restoreBrokerConnections();
   await registerRoutes(httpServer, app);
 

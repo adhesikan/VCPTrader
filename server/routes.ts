@@ -1009,11 +1009,17 @@ export async function registerRoutes(
 
   app.post("/api/push/subscribe", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
       const { endpoint, keys } = req.body;
       if (!endpoint || !keys?.p256dh || !keys?.auth) {
         return res.status(400).json({ error: "Invalid subscription data" });
       }
       const subscription = await storage.createPushSubscription({
+        userId,
         endpoint,
         p256dh: keys.p256dh,
         auth: keys.auth,

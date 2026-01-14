@@ -214,6 +214,14 @@ export async function processAlertRules(
         const event = await storage.createAlertEvent(eventData);
         createdEvents.push(event);
         
+        // Send push notification for the alert
+        try {
+          const { sendAlertPushNotification } = await import("./push-service");
+          await sendAlertPushNotification(event);
+        } catch (pushError) {
+          console.log(`[AlertEngine] Push notification error: ${pushError}`);
+        }
+        
         await storage.updateAlertRule(rule.id, {
           lastEvaluatedAt: now,
           lastState: {
