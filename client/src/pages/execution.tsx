@@ -363,7 +363,7 @@ export default function ExecutionCockpit() {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => window.open("https://app.algopilotx.com/broker-settings", "_blank")}
+                  onClick={() => window.open("https://app.algopilotx.com/brokerage-settings", "_blank")}
                   data-testid="button-broker-connections"
                 >
                   <Wallet className="h-4 w-4 mr-2" />
