@@ -2517,10 +2517,13 @@ export async function registerRoutes(
       });
 
       try {
+        // AlgoPilotX has a 200 character limit - send minimal TradingView-style message
+        const webhookMessage = `${symbol} BUY`;
+        
         const response = await fetch(endpointWithSecret.webhookUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...entryPayload, executionRequestId: executionRequest.id }),
+          headers: { "Content-Type": "text/plain" },
+          body: webhookMessage,
         });
 
         if (response.ok) {
@@ -2627,10 +2630,13 @@ export async function registerRoutes(
       });
 
       try {
+        // AlgoPilotX has a 200 character limit - send minimal TradingView-style message
+        const webhookMessage = `${trade.symbol} SELL`;
+        
         const response = await fetch(endpointWithSecret.webhookUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...exitPayload, executionRequestId: executionRequest.id }),
+          headers: { "Content-Type": "text/plain" },
+          body: webhookMessage,
         });
 
         if (response.ok) {
