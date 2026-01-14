@@ -365,9 +365,23 @@ function SignalDetailDialog({ open, onClose, ticker }: SignalDetailDialogProps) 
 type SortField = "ticker" | "type" | "price" | "rvol";
 type SortDirection = "asc" | "desc";
 
+type VCPTimeframe = "intraday" | "multiday";
+
+const vcpDescriptions: Record<VCPTimeframe, { label: string; description: string }> = {
+  intraday: {
+    label: "Intraday VCP",
+    description: "Same-day VCP detection using real-time quote data - identifies momentum breakouts with volume confirmation for day trading.",
+  },
+  multiday: {
+    label: "Multiday VCP",
+    description: "Multi-day VCP patterns using daily charts - identifies swing trade setups with volatility contraction over multiple sessions.",
+  },
+};
+
 export default function Signals() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("card");
+  const [vcpTimeframe, setVcpTimeframe] = useState<VCPTimeframe>("intraday");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("type");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -378,7 +392,13 @@ export default function Signals() {
   });
 
   const signalData = useMemo(() => {
-    const mapped = scanResults?.map(result => ({
+    // Filter by strategy based on timeframe selection
+    const strategyFilter = vcpTimeframe === "intraday" ? "VCP" : "VCP_MULTIDAY";
+    
+    const mapped = (scanResults ?? []).filter(result => {
+      const resultStrategy = result.strategy || "VCP";
+      return resultStrategy === strategyFilter;
+    }).map(result => ({
       id: result.ticker,
       ticker: result.ticker,
       type: result.stage,
@@ -388,7 +408,7 @@ export default function Signals() {
       rvol: result.rvol || 1.0,
       atr: result.atr || result.price * 0.02,
       strategy: result.strategy || "VCP",
-    })) || [];
+    }));
 
     // Filter by search query
     const filtered = searchQuery
@@ -422,21 +442,41 @@ export default function Signals() {
     });
 
     return sorted;
-  }, [scanResults, searchQuery, sortField, sortDirection]);
+  }, [scanResults, searchQuery, sortField, sortDirection, vcpTimeframe]);
 
   return (
     <div className="p-4 lg:p-6 space-y-6" data-testid="signals-page">
       <div className="space-y-3">
-        <div>
-          <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Pattern alerts - click for detailed analysis
-          </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Pattern alerts - click for detailed analysis
+            </p>
+          </div>
+          <div className="flex items-center gap-1 border rounded-md p-0.5">
+            <Button
+              variant={vcpTimeframe === "intraday" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setVcpTimeframe("intraday")}
+              data-testid="button-vcp-intraday"
+            >
+              Intraday
+            </Button>
+            <Button
+              variant={vcpTimeframe === "multiday" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setVcpTimeframe("multiday")}
+              data-testid="button-vcp-multiday"
+            >
+              Multiday
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <Badge variant="outline" className="font-medium">VCP</Badge>
+          <Badge variant="outline" className="font-medium">{vcpDescriptions[vcpTimeframe].label}</Badge>
           <span className="text-muted-foreground">
-            Volatility Contraction Pattern - Identifies stocks with tightening price ranges and declining volume, signaling potential breakouts
+            {vcpDescriptions[vcpTimeframe].description}
           </span>
         </div>
       </div>
