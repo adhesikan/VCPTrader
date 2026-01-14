@@ -625,49 +625,9 @@ export default function Settings() {
                 />
               </div>
 
-              <div className="space-y-4 pt-4 border-t">
-                <h4 className="text-sm font-medium">Alert Types</h4>
-                
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="breakout-alerts">Breakout Alerts</Label>
-                  <Switch 
-                    id="breakout-alerts" 
-                    checked={localSettings.breakoutAlertsEnabled}
-                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, breakoutAlertsEnabled: checked }))}
-                    data-testid="switch-breakout-alerts" 
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="stop-alerts">Stop Loss Alerts</Label>
-                  <Switch 
-                    id="stop-alerts" 
-                    checked={localSettings.stopAlertsEnabled}
-                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, stopAlertsEnabled: checked }))}
-                    data-testid="switch-stop-alerts" 
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="ema-alerts">EMA Exit Alerts</Label>
-                  <Switch 
-                    id="ema-alerts" 
-                    checked={localSettings.emaAlertsEnabled}
-                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, emaAlertsEnabled: checked }))}
-                    data-testid="switch-ema-alerts" 
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="approaching-alerts">Approaching Breakout</Label>
-                  <Switch 
-                    id="approaching-alerts" 
-                    checked={localSettings.approachingAlertsEnabled}
-                    onCheckedChange={(checked) => setLocalSettings(prev => ({ ...prev, approachingAlertsEnabled: checked }))}
-                    data-testid="switch-approaching-alerts" 
-                  />
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                Configure specific alert rules on the Alerts page
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
