@@ -611,8 +611,70 @@ export function quotesToScanResults(quotes: QuoteData[], strategy: string = Stra
       ema21: Number((quote.last * 0.97).toFixed(2)),
       atr: Number((quote.last * 0.02).toFixed(2)),
       createdAt: new Date(),
+      strategy: strategy,
     };
   });
+}
+
+import { vcpMultidayStrategy } from "./strategies/vcpMultiday";
+import { Candle } from "./strategies/types";
+
+export async function runMultidayScan(
+  connection: DecryptedBrokerConnection,
+  quotes: QuoteData[]
+): Promise<ScanResult[]> {
+  const CONCURRENCY = 5;
+  const results: ScanResult[] = [];
+  
+  async function processQuote(quote: QuoteData): Promise<ScanResult | null> {
+    try {
+      const candles = await fetchHistoryFromBroker(connection, quote.symbol, "3M");
+      
+      const strategyCandles: Candle[] = candles.map(c => ({
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+        timestamp: new Date(c.time),
+      }));
+      
+      const classification = vcpMultidayStrategy.classify(quote, strategyCandles);
+      
+      return {
+        id: randomUUID(),
+        scanRunId: null,
+        ticker: quote.symbol,
+        name: quote.symbol,
+        price: Number(quote.last.toFixed(2)),
+        change: Number(quote.change.toFixed(2)),
+        changePercent: Number(quote.changePercent.toFixed(2)),
+        volume: quote.volume,
+        avgVolume: quote.avgVolume !== undefined ? quote.avgVolume : null,
+        rvol: classification.rvol != null ? Number(classification.rvol.toFixed(2)) : null,
+        stage: classification.stage,
+        resistance: classification.levels.resistance,
+        stopLoss: classification.levels.stopLevel,
+        patternScore: classification.score,
+        ema9: classification.ema9 ? Number(classification.ema9.toFixed(2)) : Number((quote.last * 0.99).toFixed(2)),
+        ema21: classification.ema21 ? Number(classification.ema21.toFixed(2)) : Number((quote.last * 0.97).toFixed(2)),
+        atr: Number((quote.last * 0.02).toFixed(2)),
+        createdAt: new Date(),
+        strategy: StrategyType.VCP_MULTIDAY,
+      };
+    } catch (error) {
+      console.error(`Failed to run multiday scan for ${quote.symbol}:`, error);
+      return null;
+    }
+  }
+  
+  for (let i = 0; i < quotes.length; i += CONCURRENCY) {
+    const batch = quotes.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(processQuote));
+    results.push(...batchResults.filter((r): r is ScanResult => r !== null));
+  }
+  
+  return results;
 }
 
 // Re-export symbol universes

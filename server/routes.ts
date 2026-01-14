@@ -13,6 +13,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./r
 import { 
   fetchQuotesFromBroker, 
   quotesToScanResults, 
+  runMultidayScan,
   fetchHistoryFromBroker,
   fetchHistoryWithDateRange,
   processChartData,
@@ -345,11 +346,16 @@ export async function registerRoutes(
         if (connection?.accessToken && connection?.isConnected) {
           try {
             const quotes = await fetchQuotesFromBroker(connection, DEFAULT_SCAN_SYMBOLS);
-            const liveResults = quotesToScanResults(quotes);
+            const intradayResults = quotesToScanResults(quotes);
+            
+            const multidayResults = await runMultidayScan(connection, quotes);
+            
+            const allResults = [...intradayResults, ...multidayResults];
+            
             if (includeMeta) {
-              return res.json({ data: liveResults, isLive: true, provider: connection.provider });
+              return res.json({ data: allResults, isLive: true, provider: connection.provider });
             }
-            return res.json(liveResults);
+            return res.json(allResults);
           } catch (brokerError: any) {
             console.error("Broker fetch failed, falling back to stored results:", brokerError.message);
             const storedResults = await storage.getScanResults();
