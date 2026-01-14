@@ -158,8 +158,12 @@ async function sendWebhookToEndpoint(
       return { success: false, error: "Endpoint not found" };
     }
     
-    // AlgoPilotX format: enter sym=SYMBOL lp=limitPrice tp=takeProfit sl=stopLoss
-    const webhookMessage = `enter sym=${symbol} lp=${price.toFixed(2)} tp=${targetPrice.toFixed(2)} sl=${stopLoss.toFixed(2)}`;
+    // AlgoPilotX stop-limit format for breakout entries
+    // stop = trigger price (resistance/breakout level)
+    // lp = limit price (slightly above stop to ensure fill after breakout)
+    const stopPrice = price;
+    const limitPrice = stopPrice * 1.005; // 0.5% above stop for slippage buffer
+    const webhookMessage = `enter sym=${symbol} type=STOP_LIMIT stop=${stopPrice.toFixed(2)} lp=${limitPrice.toFixed(2)} sl=${stopLoss.toFixed(2)} tp=${targetPrice.toFixed(2)}`;
     
     const response = await fetch(endpoint.webhookUrl, {
       method: "POST",

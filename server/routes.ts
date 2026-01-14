@@ -2517,13 +2517,17 @@ export async function registerRoutes(
       });
 
       try {
-        // AlgoPilotX format: enter sym=SYMBOL lp=limitPrice tp=takeProfit sl=stopLoss
+        // AlgoPilotX stop-limit format for breakout entries
+        // stop = trigger price (resistance/breakout level)
+        // lp = limit price (slightly above stop to ensure fill after breakout)
         const entryPrice = setupPayload?.resistance || setupPayload?.entryTrigger || setupPayload?.price;
         const stopLoss = setupPayload?.stopLoss;
         const riskAmount = entryPrice && stopLoss ? entryPrice - stopLoss : 0;
         const targetPrice = entryPrice && riskAmount > 0 ? entryPrice + riskAmount : entryPrice;
+        const stopPrice = entryPrice || 0;
+        const limitPrice = stopPrice * 1.005; // 0.5% above stop for slippage buffer
         
-        const webhookMessage = `enter sym=${symbol} lp=${entryPrice?.toFixed(2) || 0} tp=${targetPrice?.toFixed(2) || 0} sl=${stopLoss?.toFixed(2) || 0}`;
+        const webhookMessage = `enter sym=${symbol} type=STOP_LIMIT stop=${stopPrice.toFixed(2)} lp=${limitPrice.toFixed(2)} sl=${stopLoss?.toFixed(2) || 0} tp=${targetPrice?.toFixed(2) || 0}`;
         
         const response = await fetch(endpointWithSecret.webhookUrl, {
           method: "POST",

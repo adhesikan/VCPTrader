@@ -14,7 +14,12 @@ export interface ExitSignal {
 }
 
 export function formatEntryMessage(signal: EntrySignal): string {
-  return `enter sym=${signal.symbol} lp=${signal.lastPrice.toFixed(2)} tp=${signal.targetPrice.toFixed(2)} sl=${signal.stopLoss.toFixed(2)}`;
+  // Use stop-limit order for breakout entries
+  // stop = trigger price (resistance/breakout level)
+  // lp = limit price (slightly above stop to ensure fill after breakout)
+  const stopPrice = signal.lastPrice;
+  const limitPrice = stopPrice * 1.005; // 0.5% above stop for slippage buffer
+  return `enter sym=${signal.symbol} type=STOP_LIMIT stop=${stopPrice.toFixed(2)} lp=${limitPrice.toFixed(2)} sl=${signal.stopLoss.toFixed(2)} tp=${signal.targetPrice.toFixed(2)}`;
 }
 
 export function formatExitMessage(signal: ExitSignal): string {
