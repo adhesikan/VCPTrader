@@ -103,17 +103,11 @@ export function SetupDetailDrawer({
   });
 
   const handleInstaTrade = () => {
-    if (!hasEndpoints) {
-      setShowConnectPrompt(true);
-      return;
-    }
-    
-    if (endpoints!.length === 1) {
-      instatradeMutation.mutate(endpoints![0].id);
-    } else {
+    // Always show the dialog so users can see trade details and calculators
+    if (hasEndpoints) {
       setSelectedEndpoint(endpoints![0]);
-      setShowEndpointDialog(true);
     }
+    setShowEndpointDialog(true);
   };
 
   const handleConfirmInstaTrade = () => {
@@ -523,49 +517,19 @@ export function SetupDetailDrawer({
       </Sheet>
 
       <Dialog open={showEndpointDialog} onOpenChange={setShowEndpointDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Select Endpoint</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              InstaTrade™ {result.ticker}
+            </DialogTitle>
             <DialogDescription>
-              Choose which automation endpoint to send this setup to.
+              {hasEndpoints 
+                ? "Review trade details and select an endpoint to execute."
+                : "Review trade details below. Connect an endpoint to execute trades."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              {endpoints?.map((endpoint) => (
-                <div
-                  key={endpoint.id}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover-elevate",
-                    selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
-                  )}
-                  onClick={() => setSelectedEndpoint(endpoint)}
-                  data-testid={`endpoint-option-${endpoint.id}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "h-8 w-8 rounded-full flex items-center justify-center",
-                      endpoint.lastTestSuccess ? "bg-green-500/10" : "bg-muted"
-                    )}>
-                      <Zap className={cn(
-                        "h-4 w-4",
-                        endpoint.lastTestSuccess ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                      )} />
-                    </div>
-                    <div>
-                      <p className="font-medium">{endpoint.name}</p>
-                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {endpoint.webhookUrl}
-                      </p>
-                    </div>
-                  </div>
-                  {selectedEndpoint?.id === endpoint.id && (
-                    <Check className="h-4 w-4 text-primary" />
-                  )}
-                </div>
-              ))}
-            </div>
-
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-sm font-medium mb-1">Setup Summary</p>
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -589,20 +553,106 @@ export function SetupDetailDrawer({
                     <span className="font-medium text-red-600">${result.stopLoss.toFixed(2)}</span>
                   </div>
                 )}
+                {positionCalc && (
+                  <>
+                    <div>
+                      <span className="text-muted-foreground">Shares:</span>{" "}
+                      <span className="font-medium">{positionCalc.shares.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Position:</span>{" "}
+                      <span className="font-medium">${positionCalc.positionValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </>
+                )}
+                {priceTargets && (
+                  <>
+                    <div>
+                      <span className="text-muted-foreground">Target 1R:</span>{" "}
+                      <span className="font-medium text-green-600">${priceTargets.target1R.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Target 2R:</span>{" "}
+                      <span className="font-medium text-green-600">${priceTargets.target2R.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+
+            {hasEndpoints ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Select Endpoint</p>
+                {endpoints?.map((endpoint) => (
+                  <div
+                    key={endpoint.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover-elevate",
+                      selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
+                    )}
+                    onClick={() => setSelectedEndpoint(endpoint)}
+                    data-testid={`endpoint-option-${endpoint.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-8 w-8 rounded-full flex items-center justify-center",
+                        endpoint.lastTestSuccess ? "bg-green-500/10" : "bg-muted"
+                      )}>
+                        <Zap className={cn(
+                          "h-4 w-4",
+                          endpoint.lastTestSuccess ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                        )} />
+                      </div>
+                      <div>
+                        <p className="font-medium">{endpoint.name}</p>
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {endpoint.webhookUrl}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedEndpoint?.id === endpoint.id && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Zap className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium">Connect AlgoPilotX</p>
+                      <p className="text-sm text-muted-foreground">
+                        Create an automation endpoint to execute trades with InstaTrade™.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEndpointDialog(false)}>
-              Cancel
+              Close
             </Button>
-            <Button
-              onClick={handleConfirmInstaTrade}
-              disabled={!selectedEndpoint || instatradeMutation.isPending}
-              data-testid="button-confirm-instatrade"
-            >
-              {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
-            </Button>
+            {hasEndpoints ? (
+              <Button
+                onClick={handleConfirmInstaTrade}
+                disabled={!selectedEndpoint || instatradeMutation.isPending}
+                data-testid="button-confirm-instatrade"
+              >
+                {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => window.location.href = "/automation"}
+                data-testid="button-goto-automation"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Create Endpoint
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
