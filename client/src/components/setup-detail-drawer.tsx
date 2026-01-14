@@ -22,6 +22,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ScanResult } from "@shared/schema";
@@ -541,9 +548,15 @@ export function SetupDetailDrawer({
                   <span className="text-muted-foreground">Strategy:</span>{" "}
                   <span className="font-medium">{strategyName}</span>
                 </div>
+                {result.price && (
+                  <div>
+                    <span className="text-muted-foreground">Current:</span>{" "}
+                    <span className="font-medium">${result.price.toFixed(2)}</span>
+                  </div>
+                )}
                 {result.resistance && (
                   <div>
-                    <span className="text-muted-foreground">Entry:</span>{" "}
+                    <span className="text-muted-foreground">Entry (Breakout):</span>{" "}
                     <span className="font-medium text-green-600">${result.resistance.toFixed(2)}</span>
                   </div>
                 )}
@@ -582,39 +595,26 @@ export function SetupDetailDrawer({
 
             {hasEndpoints ? (
               <div className="space-y-2">
-                <p className="text-sm font-medium">Select Endpoint</p>
-                {endpoints?.map((endpoint) => (
-                  <div
-                    key={endpoint.id}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover-elevate",
-                      selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
-                    )}
-                    onClick={() => setSelectedEndpoint(endpoint)}
-                    data-testid={`endpoint-option-${endpoint.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "h-8 w-8 rounded-full flex items-center justify-center",
-                        endpoint.lastTestSuccess ? "bg-green-500/10" : "bg-muted"
-                      )}>
-                        <Zap className={cn(
-                          "h-4 w-4",
-                          endpoint.lastTestSuccess ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div>
-                        <p className="font-medium">{endpoint.name}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {endpoint.webhookUrl}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedEndpoint?.id === endpoint.id && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                ))}
+                <Label className="text-sm font-medium">Select Endpoint</Label>
+                <Select
+                  value={selectedEndpoint?.id || ""}
+                  onValueChange={(value) => {
+                    const endpoint = endpoints?.find(e => e.id === value);
+                    if (endpoint) setSelectedEndpoint(endpoint);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-drawer-endpoint">
+                    <Zap className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Choose an endpoint" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {endpoints?.map((endpoint) => (
+                      <SelectItem key={endpoint.id} value={endpoint.id}>
+                        {endpoint.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ) : (
               <Card className="border-primary/20 bg-primary/5">
@@ -633,7 +633,7 @@ export function SetupDetailDrawer({
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEndpointDialog(false)}>
+            <Button variant="outline" onClick={() => setShowEndpointDialog(false)} data-testid="button-close-instatrade-dialog">
               Close
             </Button>
             {hasEndpoints ? (

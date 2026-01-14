@@ -10,6 +10,7 @@ import {
   WifiOff,
   Zap,
   BookOpen,
+  Rocket,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const mainNavItems = [
 const toolsNavItems = [
   { title: "Backtest", url: "/backtest", icon: FlaskConical },
   { title: "Strategy Guide", url: "/strategy-guide", icon: BookOpen },
+  { title: "Execution Cockpit", url: "/execution", icon: Rocket },
   { title: "Automation", url: "/automation", icon: Zap },
   { title: "Settings", url: "/settings", icon: Settings },
 ];

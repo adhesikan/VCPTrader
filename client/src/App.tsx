@@ -48,6 +48,7 @@ import PrivacyPage from "@/pages/privacy";
 import OpenSourcePage from "@/pages/open-source";
 import StrategyGuide from "@/pages/strategy-guide";
 import AutomationPage from "@/pages/automation";
+import ExecutionCockpit from "@/pages/execution";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -63,6 +64,7 @@ function AppRouter() {
       <Route path="/backtest" component={Backtest} />
       <Route path="/strategy-guide" component={StrategyGuide} />
       <Route path="/automation" component={AutomationPage} />
+      <Route path="/execution" component={ExecutionCockpit} />
       <Route path="/settings" component={Settings} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/disclaimer" component={DisclaimerPage} />
