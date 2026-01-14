@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { 
   Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
   TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
-  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen
+  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen, ExternalLink
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -213,22 +213,12 @@ export default function Scanner() {
 
   const handleInstaTrade = (result: ScanResult, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!hasEndpoints) {
-      toast({
-        title: "No Automation Endpoints",
-        description: "Create an endpoint on the Automation page first",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setInstaTradeResult(result);
-    if (automationEndpoints!.length === 1) {
-      instatradeMutation.mutate({ endpointId: automationEndpoints![0].id, result });
-    } else {
+    // Always show the dialog so users can see trade details and calculators
+    if (hasEndpoints) {
       setSelectedEndpoint(automationEndpoints![0]);
-      setShowEndpointDialog(true);
     }
+    setShowEndpointDialog(true);
   };
 
   const handleConfirmInstaTrade = () => {
@@ -1342,49 +1332,125 @@ export default function Scanner() {
       )}
 
       <Dialog open={showEndpointDialog} onOpenChange={setShowEndpointDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Select Endpoint</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              InstaTrade™ {instaTradeResult?.ticker}
+            </DialogTitle>
             <DialogDescription>
-              Choose which automation endpoint to send the InstaTrade signal for {instaTradeResult?.ticker}.
+              {hasEndpoints 
+                ? "Review trade details and select an endpoint to execute."
+                : "Review trade details below. Connect an endpoint to execute trades."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {automationEndpoints?.map((endpoint) => (
-              <div
-                key={endpoint.id}
-                className={cn(
-                  "p-3 rounded-lg border cursor-pointer hover-elevate",
-                  selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
-                )}
-                onClick={() => setSelectedEndpoint(endpoint)}
-                data-testid={`endpoint-option-${endpoint.id}`}
-              >
-                <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            {instaTradeResult && (
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm font-medium mb-2">Trade Details</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="font-medium">{endpoint.name}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-xs">
-                      {endpoint.webhookUrl}
-                    </p>
+                    <span className="text-muted-foreground">Symbol:</span>{" "}
+                    <span className="font-medium">{instaTradeResult.ticker}</span>
                   </div>
-                  {selectedEndpoint?.id === endpoint.id && (
-                    <Badge variant="default" className="text-xs">Selected</Badge>
+                  <div>
+                    <span className="text-muted-foreground">Stage:</span>{" "}
+                    <span className="font-medium">{instaTradeResult.stage}</span>
+                  </div>
+                  {instaTradeResult.resistance && (
+                    <div>
+                      <span className="text-muted-foreground">Entry:</span>{" "}
+                      <span className="font-medium text-green-600">${instaTradeResult.resistance.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {instaTradeResult.stopLoss && (
+                    <div>
+                      <span className="text-muted-foreground">Stop:</span>{" "}
+                      <span className="font-medium text-red-600">${instaTradeResult.stopLoss.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {instaTradeResult.resistance && instaTradeResult.stopLoss && (
+                    <>
+                      <div>
+                        <span className="text-muted-foreground">Risk/Share:</span>{" "}
+                        <span className="font-medium">${(instaTradeResult.resistance - instaTradeResult.stopLoss).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Target 1R:</span>{" "}
+                        <span className="font-medium text-green-600">${(instaTradeResult.resistance + (instaTradeResult.resistance - instaTradeResult.stopLoss)).toFixed(2)}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
-            ))}
+            )}
+
+            {hasEndpoints ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Select Endpoint</p>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {automationEndpoints?.map((endpoint) => (
+                    <div
+                      key={endpoint.id}
+                      className={cn(
+                        "p-3 rounded-lg border cursor-pointer hover-elevate",
+                        selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
+                      )}
+                      onClick={() => setSelectedEndpoint(endpoint)}
+                      data-testid={`endpoint-option-${endpoint.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{endpoint.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-xs">
+                            {endpoint.webhookUrl}
+                          </p>
+                        </div>
+                        {selectedEndpoint?.id === endpoint.id && (
+                          <Badge variant="default" className="text-xs">Selected</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Zap className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium">Connect AlgoPilotX</p>
+                      <p className="text-sm text-muted-foreground">
+                        Create an automation endpoint to execute trades with InstaTrade™.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEndpointDialog(false)}>
-              Cancel
+              Close
             </Button>
-            <Button
-              onClick={handleConfirmInstaTrade}
-              disabled={!selectedEndpoint || instatradeMutation.isPending}
-              data-testid="button-confirm-instatrade"
-            >
-              {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
-            </Button>
+            {hasEndpoints ? (
+              <Button
+                onClick={handleConfirmInstaTrade}
+                disabled={!selectedEndpoint || instatradeMutation.isPending}
+                data-testid="button-confirm-instatrade"
+              >
+                {instatradeMutation.isPending ? "Sending..." : "Send InstaTrade"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => window.location.href = "/automation"}
+                data-testid="button-goto-automation"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Create Endpoint
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
