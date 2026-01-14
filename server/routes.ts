@@ -2512,6 +2512,8 @@ export async function registerRoutes(
         setupPayload: entryPayload,
         automationProfileId: endpointId,
         endpointId,
+        action: "BUY",
+        type: "entry",
         status: "CREATED",
       });
 
@@ -2621,6 +2623,8 @@ export async function registerRoutes(
         setupPayload: exitPayload,
         automationProfileId: trade.endpointId,
         endpointId: trade.endpointId,
+        action: "SELL",
+        type: "exit",
         status: "CREATED",
       });
 
