@@ -1359,8 +1359,14 @@ export default function Scanner() {
                   </div>
                   {instaTradeResult.resistance && (
                     <div>
-                      <span className="text-muted-foreground">Entry:</span>{" "}
+                      <span className="text-muted-foreground">Entry (Breakout):</span>{" "}
                       <span className="font-medium text-green-600">${instaTradeResult.resistance.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {instaTradeResult.price && (
+                    <div>
+                      <span className="text-muted-foreground">Current:</span>{" "}
+                      <span className="font-medium">${instaTradeResult.price.toFixed(2)}</span>
                     </div>
                   )}
                   {instaTradeResult.stopLoss && (
@@ -1387,32 +1393,26 @@ export default function Scanner() {
 
             {hasEndpoints ? (
               <div className="space-y-2">
-                <p className="text-sm font-medium">Select Endpoint</p>
-                <div className="max-h-48 overflow-y-auto space-y-2">
-                  {automationEndpoints?.map((endpoint) => (
-                    <div
-                      key={endpoint.id}
-                      className={cn(
-                        "p-3 rounded-lg border cursor-pointer hover-elevate",
-                        selectedEndpoint?.id === endpoint.id && "border-primary bg-primary/5"
-                      )}
-                      onClick={() => setSelectedEndpoint(endpoint)}
-                      data-testid={`endpoint-option-${endpoint.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{endpoint.name}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-xs">
-                            {endpoint.webhookUrl}
-                          </p>
-                        </div>
-                        {selectedEndpoint?.id === endpoint.id && (
-                          <Badge variant="default" className="text-xs">Selected</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Label className="text-sm font-medium">Select Endpoint</Label>
+                <Select
+                  value={selectedEndpoint?.id || ""}
+                  onValueChange={(value) => {
+                    const endpoint = automationEndpoints?.find(e => e.id === value);
+                    if (endpoint) setSelectedEndpoint(endpoint);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-instatrade-endpoint">
+                    <Zap className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Choose an endpoint" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {automationEndpoints?.map((endpoint) => (
+                      <SelectItem key={endpoint.id} value={endpoint.id}>
+                        {endpoint.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ) : (
               <Card className="border-primary/20 bg-primary/5">
