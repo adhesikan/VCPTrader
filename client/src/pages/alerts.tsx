@@ -69,12 +69,19 @@ function AlertRuleCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
+            {rule.isGlobal ? (
+              <Badge variant="outline" className="gap-1 text-sm font-semibold">
+                <Bell className="h-3 w-3" />
+                Any Symbol
+              </Badge>
+            ) : (
+              <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
+            )}
             <Badge variant={getStageBadgeVariant(targetStage)} className="gap-1">
               <TrendingUp className="h-3 w-3" />
               {targetStage}
             </Badge>
-            {assignedEndpoint && (
+            {rule.sendWebhook && assignedEndpoint && (
               <Badge variant="secondary" className="gap-1">
                 <Zap className="h-3 w-3" />
                 {assignedEndpoint.name}
@@ -99,7 +106,9 @@ function AlertRuleCard({
         </div>
 
         <div className="mt-2 text-sm text-muted-foreground">
-          Alert when {rule.symbol} enters {targetStage} stage
+          {rule.isGlobal 
+            ? `Alert when any symbol enters ${targetStage} stage`
+            : `Alert when ${rule.symbol} enters ${targetStage} stage`}
         </div>
 
         {endpoints && endpoints.length > 0 && onUpdateEndpoint && (
@@ -231,6 +240,9 @@ export default function Alerts() {
     symbol: "",
     targetStage: "BREAKOUT" as string,
     automationEndpointId: "none" as string,
+    isGlobal: true,
+    sendPushNotification: true,
+    sendWebhook: false,
   });
   const { toast } = useToast();
 
@@ -266,7 +278,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none" });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -331,14 +343,18 @@ export default function Alerts() {
   });
 
   const handleCreateRule = () => {
-    if (newRule.symbol) {
+    // For global alerts, symbol is optional
+    if (newRule.isGlobal || newRule.symbol) {
       createRuleMutation.mutate({
-        symbol: newRule.symbol.toUpperCase(),
+        symbol: newRule.isGlobal ? null : newRule.symbol.toUpperCase(),
+        isGlobal: newRule.isGlobal,
         conditionType: RuleConditionType.STAGE_ENTERED,
         conditionPayload: { targetStage: newRule.targetStage },
         strategy: "VCP",
         timeframe: "1d",
         isEnabled: true,
+        sendPushNotification: newRule.sendPushNotification,
+        sendWebhook: newRule.sendWebhook,
         automationEndpointId: newRule.automationEndpointId === "none" || !newRule.automationEndpointId ? null : newRule.automationEndpointId,
         watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
       });
@@ -389,55 +405,73 @@ export default function Alerts() {
               <DialogTitle>Create VCP Stage Alert</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
-              {watchlists && watchlists.length > 0 && (
-                <div className="space-y-2">
-                  <Label>From Watchlist (optional)</Label>
-                  <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
-                    <SelectTrigger data-testid="select-rule-watchlist">
-                      <List className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Select a watchlist" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None - enter manually</SelectItem>
-                      {watchlists.map((wl) => (
-                        <SelectItem key={wl.id} value={wl.id}>
-                          {wl.name} ({wl.symbols?.length || 0} symbols)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div>
+                  <Label className="font-medium">Alert for Any Symbol</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Trigger when any symbol in scan results matches the target stage
+                  </p>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="symbol">Symbol</Label>
-                {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
-                  <Select
-                    value={newRule.symbol}
-                    onValueChange={(value) => setNewRule(prev => ({ ...prev, symbol: value }))}
-                  >
-                    <SelectTrigger className="font-mono" data-testid="input-rule-symbol">
-                      <SelectValue placeholder="Select symbol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectedWatchlistData.symbols.map((symbol) => (
-                        <SelectItem key={symbol} value={symbol}>
-                          {symbol}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    id="symbol"
-                    placeholder="AAPL"
-                    value={newRule.symbol}
-                    onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
-                    className="font-mono uppercase"
-                    data-testid="input-rule-symbol"
-                  />
-                )}
+                <Switch
+                  checked={newRule.isGlobal}
+                  onCheckedChange={(checked) => setNewRule(prev => ({ ...prev, isGlobal: checked }))}
+                  data-testid="switch-global-alert"
+                />
               </div>
+
+              {!newRule.isGlobal && (
+                <>
+                  {watchlists && watchlists.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>From Watchlist (optional)</Label>
+                      <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
+                        <SelectTrigger data-testid="select-rule-watchlist">
+                          <List className="h-4 w-4 mr-2" />
+                          <SelectValue placeholder="Select a watchlist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None - enter manually</SelectItem>
+                          {watchlists.map((wl) => (
+                            <SelectItem key={wl.id} value={wl.id}>
+                              {wl.name} ({wl.symbols?.length || 0} symbols)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="symbol">Symbol</Label>
+                    {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
+                      <Select
+                        value={newRule.symbol}
+                        onValueChange={(value) => setNewRule(prev => ({ ...prev, symbol: value }))}
+                      >
+                        <SelectTrigger className="font-mono" data-testid="input-rule-symbol">
+                          <SelectValue placeholder="Select symbol" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedWatchlistData.symbols.map((symbol) => (
+                            <SelectItem key={symbol} value={symbol}>
+                              {symbol}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="symbol"
+                        placeholder="AAPL"
+                        value={newRule.symbol}
+                        onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                        className="font-mono uppercase"
+                        data-testid="input-rule-symbol"
+                      />
+                    )}
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="stage">Target VCP Stage</Label>
@@ -474,33 +508,57 @@ export default function Alerts() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label>Automation Endpoint (optional)</Label>
-                <Select
-                  value={newRule.automationEndpointId}
-                  onValueChange={(value) => setNewRule(prev => ({ ...prev, automationEndpointId: value }))}
-                >
-                  <SelectTrigger data-testid="select-rule-automation-endpoint">
-                    <Zap className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Select automation endpoint" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None - use default</SelectItem>
-                    {automationEndpoints.filter(e => e.isActive).map((endpoint) => (
-                      <SelectItem key={endpoint.id} value={endpoint.id}>
-                        <span className="font-medium">{endpoint.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Link this alert to an automation endpoint for webhook delivery
-                </p>
+              <div className="space-y-3 p-3 rounded-lg border">
+                <Label className="font-medium">Notification Settings</Label>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm">Push Notification</span>
+                    <p className="text-xs text-muted-foreground">Send to browser/mobile</p>
+                  </div>
+                  <Switch
+                    checked={newRule.sendPushNotification}
+                    onCheckedChange={(checked) => setNewRule(prev => ({ ...prev, sendPushNotification: checked }))}
+                    data-testid="switch-push-notification"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm">Send Webhook</span>
+                    <p className="text-xs text-muted-foreground">Execute InstaTrade entry</p>
+                  </div>
+                  <Switch
+                    checked={newRule.sendWebhook}
+                    onCheckedChange={(checked) => setNewRule(prev => ({ ...prev, sendWebhook: checked }))}
+                    data-testid="switch-send-webhook"
+                  />
+                </div>
+
+                {newRule.sendWebhook && (
+                  <Select
+                    value={newRule.automationEndpointId}
+                    onValueChange={(value) => setNewRule(prev => ({ ...prev, automationEndpointId: value }))}
+                  >
+                    <SelectTrigger data-testid="select-rule-automation-endpoint">
+                      <Zap className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Select automation endpoint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {automationEndpoints.filter(e => e.isActive).map((endpoint) => (
+                        <SelectItem key={endpoint.id} value={endpoint.id}>
+                          <span className="font-medium">{endpoint.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <Button
                 onClick={handleCreateRule}
-                disabled={!newRule.symbol || createRuleMutation.isPending}
+                disabled={(!newRule.isGlobal && !newRule.symbol) || createRuleMutation.isPending}
                 className="w-full"
                 data-testid="button-submit-rule"
               >
