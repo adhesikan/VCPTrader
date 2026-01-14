@@ -1,0 +1,229 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+CONTEXT (CURRENT BEHAVIOR)
+AlgoPilotX is a separate app at https://app.algopilotx.com.
+Users login/signup there, create Automations, and each Automation provides a unique webhook URL.
+That webhook URL is copied into VCP Trader to create an “Automation Endpoint”.
+Users can create multiple Automations in AlgoPilotX and multiple Automation Endpoints in VCP Trader.
+VCP Trader uses the selected Automation Endpoint webhook URL as the bridge to send alerts/setups for InstaTrade and/or automated trading.
+
+GOAL
+Build an “Execution Cockpit” experience inside VCP Trader that makes this workflow:
+- easy,
+- organized,
+- fast,
+- and compliant,
+WITHOUT embedding AlgoPilotX in an iframe.
+
+Execution Cockpit must guide users through:
+1) Login to AlgoPilotX (new tab/window)
+2) Create Automation in AlgoPilotX (new tab/window)
+3) Copy webhook URL from AlgoPilotX automation
+4) Paste webhook URL to create a VCP Trader Automation Endpoint
+5) Select an endpoint for:
+   - InstaTrade (one-click send-to-execution request)
+   - Auto Trading (rule-based forwarding of triggers)
+6) Provide quick access buttons to open AlgoPilotX dashboard for:
+   - broker connections
+   - monitoring orders/positions
+   - modifying exits/risk settings
+
+COMPLIANCE REQUIREMENTS (NON-NEGOTIABLE)
+- VCP Trader provides market intelligence + educational alerts only.
+- VCP Trader does NOT place trades and does NOT have access to brokerage accounts.
+- Execution occurs in AlgoPilotX and is user-directed and user-authorized.
+- UI language must use: “Send to AlgoPilotX”, “Automation Endpoint”, “Open AlgoPilotX Dashboard”.
+- Add disclaimer text in the cockpit:
+  “Educational & informational only. Not investment advice. Trade execution occurs in AlgoPilotX after you confirm and configure your settings.”
+
+UX REQUIREMENTS (BEST EXPERIENCE)
+Create a new page: /execution (Execution Cockpit)
+Layout:
+- Left sidebar: Steps / Status
+- Main panel: Setup + Endpoints + Actions
+- Right panel (optional): “Selected Endpoint” details + tips
+
+SECTION A: Guided Setup Wizard (top of cockpit)
+Show a 4-step progress UI with checkmarks:
+
+Step 1: “Open AlgoPilotX”
+- Button: “Open AlgoPilotX Login”
+- Opens https://app.algopilotx.com in a new tab/window
+- Help text: “Login or create your AlgoPilotX account.”
+
+Step 2: “Create an Automation”
+- Button: “Open Automations in AlgoPilotX”
+- Opens https://app.algopilotx.com (deep link if you have it; otherwise home)
+- Help text: “Create a new Automation. Copy its webhook URL.”
+
+Step 3: “Add Endpoint in VCP Trader”
+- Inline form in VCP Trader:
+  Fields:
+    - Endpoint Name (required, e.g., ‘Conservative Breakouts’)
+    - Webhook URL (required; validate format)
+    - Optional Notes
+  Buttons:
+    - “Save Endpoint”
+    - “Test Endpoint”
+- “Test Endpoint” sends a signed test payload to the webhook URL and marks status:
+  - Connected / Failed, with last tested timestamp
+
+Step 4: “Select Endpoint for Execution”
+- Dropdown: “Default Endpoint for InstaTrade”
+- Toggle: “Enable Auto Trading forwarding” (off by default)
+- If enabled: choose which triggers send automatically (breakout stage entered, exit signal, etc.)
+
+SECTION B: Automation Endpoints Manager (main list)
+Create an “Automation Endpoints” table/card list with:
+- Name
+- Webhook URL (masked, with “Copy” button)
+- Status (Connected/Unknown/Failed)
+- Last Tested
+- Actions:
+  - Select
+  - Edit
+  - Disable/Enable
+  - Delete
+
+Add “Endpoint Groups” (optional small enhancement):
+- Tag endpoints like “Day Trading”, “Swing”, “Options”, “Conservative”, “Aggressive”.
+
+SECTION C: InstaTrade Send Flow (from setup detail + cockpit)
+Wherever you show an opportunity (setup detail drawer) add:
+
+Button: “Send to AlgoPilotX”
+Click opens a small modal:
+- Select Endpoint (dropdown of saved endpoints)
+- Select Mode:
+  - “InstaTrade (manual confirmation in AlgoPilotX)”
+  - “Auto Trading (if enabled on endpoint)”
+- Show summary:
+  - Symbol, Strategy, Timeframe, Key Levels
+- Checkbox (required):
+  “I understand execution occurs in AlgoPilotX and I am responsible for my trading decisions.”
+- Button: “Send”
+
+On send:
+- Create a server-side execution_request record
+- POST signed payload to the selected webhook URL
+- Show result:
+  - Sent / Failed (with retry)
+- Show button:
+  “Open AlgoPilotX Dashboard” (new tab)
+
+SECTION D: Quick Links to AlgoPilotX (monitoring)
+In Execution Cockpit add a “Quick Links” section:
+- “Open AlgoPilotX Dashboard”
+- “Open Broker Connections”
+- “Open Automations”
+- “Open Trade Activity”
+If specific routes aren’t known, all buttons open https://app.algopilotx.com and label that these links may vary.
+
+BACKEND IMPLEMENTATION
+
+1) Database tables (multi-tenant safe)
+Create table: automation_endpoints
+- id uuid
+- tenant_id uuid
+- user_id uuid
+- name text
+- webhook_url_encrypted text (encrypt at rest)
+- notes text nullable
+- is_enabled boolean default true
+- last_tested_at timestamptz nullable
+- last_test_status enum('unknown','ok','failed') default 'unknown'
+- created_at, updated_at
+
+Create table: execution_requests (if not already)
+- id uuid
+- tenant_id uuid
+- user_id uuid
+- symbol text
+- strategy_id text
+- timeframe text
+- setup_payload jsonb
+- endpoint_id uuid
+- mode enum('INSTATRRADE','AUTO_TRADING')
+- status enum('created','sent','failed','delivered')  (delivered only if webhook ack is supported)
+- error text nullable
+- created_at, updated_at
+
+Optional: webhook_outbox (recommended for reliability)
+- id uuid
+- execution_request_id uuid
+- endpoint_id uuid
+- status enum('pending','sent','failed')
+- attempts int
+- next_attempt_at timestamptz
+- last_error text
+
+2) Encryption
+- Encrypt webhook URLs at rest using your existing BROKER_TOKEN_KEY or ENCRYPTION_KEY.
+- Decrypt only when sending.
+- Never log the raw webhook URL.
+
+3) Endpoints (API)
+- POST /api/automation-endpoints
+- GET /api/automation-endpoints
+- PUT /api/automation-endpoints/:id
+- DELETE /api/automation-endpoints/:id
+- POST /api/automation-endpoints/:id/test
+  Sends a signed “test” payload to the webhook URL. Store status.
+
+- POST /api/execution/send
+  Input: { symbol, strategyId, timeframe, endpointId, mode }
+  Server:
+   - builds setup_payload from latest scan result (server-side truth)
+   - creates execution_request
+   - enqueues webhook_outbox (or sends immediately)
+   - returns success/failure + execution_request_id
+
+4) Webhook signing
+Sign payload with HMAC SHA256 using a per-tenant or per-user shared secret:
+- Include timestamp + nonce
+- Include execution_request_id
+Add headers:
+- X-VCP-Signature
+- X-VCP-Timestamp
+AlgoPilotX verifies signature.
+
+If you don’t have a shared secret today, add it now:
+- store a generated secret per user in automation_endpoints or connection settings
+- show “Regenerate Secret” (optional)
+
+5) Reliability
+Use an outbox worker:
+- runs every minute
+- sends pending webhooks
+- retries with exponential backoff
+This prevents missing events if AlgoPilotX is temporarily down.
+
+UI COPY UPDATES (IMPORTANT)
+Replace “webhook” wording where possible with trader-friendly phrasing:
+- “Automation Endpoint (AlgoPilotX webhook URL)”
+Help text:
+- “This endpoint connects VCP Trader alerts to a specific AlgoPilotX Automation.”
+
+Add always-visible note:
+- “VCP Trader does not execute trades. AlgoPilotX executes trades based on your configuration.”
+
+MOBILE UX
+- Execution Cockpit becomes a single-column flow with accordion steps.
+- Buttons open AlgoPilotX in a new tab.
+
+TESTING / QA
+- Creating endpoint validates URL, stores encrypted.
+- Test endpoint posts test payload, updates status.
+- Selecting endpoint persists as default for InstaTrade.
+- Sending a setup creates execution_request and posts to webhook/outbox.
+- Works with multiple endpoints and multiple strategies.
+- Multi-tenant scoping enforced (tenant_id on all queries).
+
+DELIVERABLE
+Implement a new Execution Cockpit page in VCP Trader with:
+- Guided steps to open AlgoPilotX, create automations, and copy/paste webhook URLs
+- Endpoint manager with create/test/select
+- Send-to-AlgoPilotX flow with endpoint selection for InstaTrade and auto trading
+- Quick links to AlgoPilotX dashboard for broker connections and trade monitoring
+- Secure, encrypted storage + signed webhooks + execution history
+All without iframes and without VCP Trader placing trades directly.
