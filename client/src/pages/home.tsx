@@ -202,7 +202,7 @@ function HeroSection() {
     <section className="py-16 md:py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-4xl mx-auto" data-testid="text-hero-headline">
-          Institutional-Grade Multi-Strategy Intelligence for Self-Directed Traders
+          Institutional-Grade Multi-Strategy Intelligence & User-Controlled Automation for Everyday Traders
         </h1>
         <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto" data-testid="text-hero-subheadline">
           Scan the entire market, detect tightening bases, and get real-time alerts when momentum ignites — with full control over every trade.
