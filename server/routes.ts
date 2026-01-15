@@ -1164,20 +1164,26 @@ export async function registerRoutes(
             
             shouldEnter = volatilityContracting && breakingOut && volumeConfirm && inUptrend;
           } else {
-            const lookback = 20;
-            const recentHigh = Math.max(...highs.slice(i - lookback, i));
-            
-            const priorRanges = highs.slice(i - 10, i - 1).map((h, idx) => h - lows.slice(i - 10, i - 1)[idx]);
-            const avgPriorRange = priorRanges.length > 0 ? priorRanges.reduce((s, r) => s + r, 0) / priorRanges.length : 1;
-            const recentRangeMin = Math.min(...priorRanges.slice(-3));
-            
-            const hadTightConsolidation = recentRangeMin < avgPriorRange * 0.7;
-            const breakingOut = candle.close > recentHigh;
-            const volumeConfirm = candle.volume > avgVol20 * 1.2;
-            const inUptrend = ema9[i] > ema21[i];
-            const priceNearResistance = candle.close >= recentHigh * 0.98;
-            
-            shouldEnter = hadTightConsolidation && breakingOut && volumeConfirm && inUptrend;
+            if (i < 15) {
+              shouldEnter = false;
+            } else {
+              const lookback = 20;
+              const effectiveLookback = Math.min(lookback, i);
+              const recentHigh = Math.max(...highs.slice(i - effectiveLookback, i));
+              
+              const rangeStartIdx = Math.max(0, i - 10);
+              const priorRanges = highs.slice(rangeStartIdx, i - 1).map((h, idx) => h - lows.slice(rangeStartIdx, i - 1)[idx]);
+              const avgPriorRange = priorRanges.length > 0 ? priorRanges.reduce((s, r) => s + r, 0) / priorRanges.length : candle.high - candle.low;
+              const last3Ranges = priorRanges.slice(-3);
+              const recentRangeMin = last3Ranges.length > 0 ? Math.min(...last3Ranges) : avgPriorRange;
+              
+              const hadTightConsolidation = recentRangeMin < avgPriorRange * 0.8;
+              const breakingOut = candle.close > recentHigh * 0.995;
+              const volumeConfirm = candle.volume > avgVol20 * 1.1;
+              const inUptrend = ema9[i] > ema21[i];
+              
+              shouldEnter = hadTightConsolidation && breakingOut && volumeConfirm && inUptrend;
+            }
           }
           
           if (shouldEnter) {
