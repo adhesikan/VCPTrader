@@ -440,6 +440,12 @@ export async function registerRoutes(
       const results = quotesToScanResults(allQuotes, strategy);
       const scanTime = Date.now() - startTime;
       
+      // Store results in storage so chart page can access them
+      await storage.clearScanResults();
+      for (const result of results) {
+        await storage.createScanResult(result);
+      }
+      
       res.json({
         results,
         metadata: {
