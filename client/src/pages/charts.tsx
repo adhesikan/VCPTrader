@@ -237,8 +237,8 @@ export default function Charts() {
                   ema9={showEMA9 ? chartData.ema9 : undefined}
                   ema21={showEMA21 ? chartData.ema21 : undefined}
                   ema50={showEMA50 ? chartData.ema50 : undefined}
-                  resistanceLevel={showLevels ? chartData.resistance : undefined}
-                  stopLevel={showLevels ? chartData.stopLoss : undefined}
+                  resistanceLevel={showLevels ? (scanResult?.resistance || chartData.resistance) : undefined}
+                  stopLevel={showLevels ? (scanResult?.stopLoss || chartData.stopLoss) : undefined}
                   ticker={selectedTicker}
                   showVCPOverlay={showVCPOverlay}
                   showVolume={showVolume}
@@ -263,11 +263,11 @@ export default function Charts() {
                 </CardHeader>
                 <CardContent>
                   <span className="text-lg font-mono font-semibold text-chart-2">
-                    ${chartData.resistance?.toFixed(2) || scanResult?.resistance?.toFixed(2) || "-"}
+                    ${(scanResult?.resistance || chartData.resistance)?.toFixed(2) || "-"}
                   </span>
-                  {chartData.resistance && chartData.price && (
+                  {(scanResult?.resistance || chartData.resistance) && chartData.price && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {((chartData.resistance - chartData.price) / chartData.price * 100).toFixed(1)}% upside
+                      {(((scanResult?.resistance || chartData.resistance)! - chartData.price) / chartData.price * 100).toFixed(1)}% upside
                     </p>
                   )}
                 </CardContent>
@@ -281,11 +281,11 @@ export default function Charts() {
                 </CardHeader>
                 <CardContent>
                   <span className="text-lg font-mono font-semibold text-destructive">
-                    ${chartData.stopLoss?.toFixed(2) || scanResult?.stopLoss?.toFixed(2) || "-"}
+                    ${(scanResult?.stopLoss || chartData.stopLoss)?.toFixed(2) || "-"}
                   </span>
-                  {chartData.stopLoss && chartData.price && (
+                  {(scanResult?.stopLoss || chartData.stopLoss) && chartData.price && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {((chartData.price - chartData.stopLoss) / chartData.price * 100).toFixed(1)}% risk
+                      {((chartData.price - (scanResult?.stopLoss || chartData.stopLoss)!) / chartData.price * 100).toFixed(1)}% risk
                     </p>
                   )}
                 </CardContent>
@@ -380,12 +380,12 @@ export default function Charts() {
               ema9={chartData.ema9?.[chartData.ema9.length - 1]}
               ema21={chartData.ema21?.[chartData.ema21.length - 1]}
               ema50={chartData.ema50?.[chartData.ema50?.length - 1]}
-              resistance={chartData.resistance}
-              stopLoss={chartData.stopLoss}
+              resistance={scanResult?.resistance || chartData.resistance}
+              stopLoss={scanResult?.stopLoss || chartData.stopLoss}
               atr={chartData.atr}
-              rvol={chartData.rvol}
-              patternScore={chartData.patternScore}
-              stage={chartData.stage || scanResult?.stage}
+              rvol={scanResult?.rvol || chartData.rvol}
+              patternScore={scanResult?.patternScore || chartData.patternScore}
+              stage={scanResult?.stage || chartData.stage}
               volume={chartData.volume}
               avgVolume={chartData.avgVolume}
             />
