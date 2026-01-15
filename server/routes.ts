@@ -1166,16 +1166,18 @@ export async function registerRoutes(
           } else {
             const lookback = 20;
             const recentHigh = Math.max(...highs.slice(i - lookback, i));
-            const recentRange = highs.slice(i - 10, i).map((h, idx) => h - lows.slice(i - 10, i)[idx]);
-            const avgRange = recentRange.reduce((s, r) => s + r, 0) / 10;
-            const currentRange = candle.high - candle.low;
             
-            const tightConsolidation = currentRange < avgRange * 0.8;
+            const priorRanges = highs.slice(i - 10, i - 1).map((h, idx) => h - lows.slice(i - 10, i - 1)[idx]);
+            const avgPriorRange = priorRanges.length > 0 ? priorRanges.reduce((s, r) => s + r, 0) / priorRanges.length : 1;
+            const recentRangeMin = Math.min(...priorRanges.slice(-3));
+            
+            const hadTightConsolidation = recentRangeMin < avgPriorRange * 0.7;
             const breakingOut = candle.close > recentHigh;
             const volumeConfirm = candle.volume > avgVol20 * 1.2;
             const inUptrend = ema9[i] > ema21[i];
+            const priceNearResistance = candle.close >= recentHigh * 0.98;
             
-            shouldEnter = tightConsolidation && breakingOut && volumeConfirm && inUptrend;
+            shouldEnter = hadTightConsolidation && breakingOut && volumeConfirm && inUptrend;
           }
           
           if (shouldEnter) {
