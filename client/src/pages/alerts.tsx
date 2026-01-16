@@ -32,7 +32,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationEndpoint } from "@shared/schema";
-import { RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { RuleConditionType, PatternStage, StrategyType, ScanInterval } from "@shared/schema";
 import { STRATEGY_CONFIGS } from "@shared/strategies";
 import { Zap } from "lucide-react";
 
@@ -175,11 +175,14 @@ function AlertRuleCard({
             {lastState?.price && (
               <span className="font-mono">${lastState.price.toFixed(2)}</span>
             )}
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {rule.scanInterval || "5m"}
+            </span>
           </div>
           {rule.lastEvaluatedAt && (
             <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(rule.lastEvaluatedAt), { addSuffix: true })}
+              Checked {formatDistanceToNow(new Date(rule.lastEvaluatedAt), { addSuffix: true })}
             </span>
           )}
         </div>
@@ -279,6 +282,7 @@ export default function Alerts() {
     minPatternScore: null as number | null,
     minResistancePercent: null as number | null,
     maxResistancePercent: null as number | null,
+    scanInterval: "5m" as string,
   });
   const { toast } = useToast();
 
@@ -314,7 +318,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, minResistancePercent: null, maxResistancePercent: null });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, minResistancePercent: null, maxResistancePercent: null, scanInterval: "5m" });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -401,6 +405,7 @@ export default function Alerts() {
         conditionPayload,
         strategy: newRule.strategy,
         timeframe: "1d",
+        scanInterval: newRule.scanInterval,
         isEnabled: true,
         sendPushNotification: newRule.sendPushNotification,
         sendWebhook: newRule.sendWebhook,
@@ -671,6 +676,36 @@ export default function Alerts() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-3 p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <Label className="font-medium">Scan Interval</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[250px]">
+                      <p>How often to check for pattern changes and evaluate this alert rule during market hours.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={newRule.scanInterval}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, scanInterval: value }))}
+                >
+                  <SelectTrigger data-testid="select-scan-interval">
+                    <SelectValue placeholder="Select interval" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1m">Every 1 minute</SelectItem>
+                    <SelectItem value="5m">Every 5 minutes (default)</SelectItem>
+                    <SelectItem value="15m">Every 15 minutes</SelectItem>
+                    <SelectItem value="30m">Every 30 minutes</SelectItem>
+                    <SelectItem value="1h">Every hour</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-3 p-3 rounded-lg border">

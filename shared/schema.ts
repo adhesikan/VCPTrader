@@ -147,6 +147,16 @@ export const AlertTimeframe = {
 
 export type AlertTimeframeValue = typeof AlertTimeframe[keyof typeof AlertTimeframe];
 
+export const ScanInterval = {
+  "1m": "1m",
+  "5m": "5m",
+  "15m": "15m",
+  "30m": "30m",
+  "1h": "1h",
+} as const;
+
+export type ScanIntervalValue = typeof ScanInterval[keyof typeof ScanInterval];
+
 export const alertRules = pgTable("alert_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -155,6 +165,7 @@ export const alertRules = pgTable("alert_rules", {
   strategy: text("strategy").notNull().default("VCP"),
   strategies: text("strategies").array(),
   timeframe: text("timeframe").notNull().default("1d"),
+  scanInterval: text("scan_interval").notNull().default("5m"),
   conditionType: text("condition_type").notNull(),
   conditionPayload: jsonb("condition_payload"),
   scoreThreshold: integer("score_threshold"),
