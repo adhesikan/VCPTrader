@@ -362,6 +362,94 @@ async function migrate() {
           ALTER TABLE alert_rules ADD COLUMN watchlist_id VARCHAR;
           RAISE NOTICE 'Added watchlist_id column to alert_rules';
         END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'automation_profile_id'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN automation_profile_id VARCHAR;
+          RAISE NOTICE 'Added automation_profile_id column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'is_enabled'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN is_enabled BOOLEAN DEFAULT true;
+          RAISE NOTICE 'Added is_enabled column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'created_at'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW();
+          RAISE NOTICE 'Added created_at column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'updated_at'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+          RAISE NOTICE 'Added updated_at column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'last_evaluated_at'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN last_evaluated_at TIMESTAMP;
+          RAISE NOTICE 'Added last_evaluated_at column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'last_state'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN last_state JSONB;
+          RAISE NOTICE 'Added last_state column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'timeframe'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN timeframe TEXT DEFAULT '1d';
+          RAISE NOTICE 'Added timeframe column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'condition_type'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN condition_type TEXT DEFAULT 'STAGE_ENTERED';
+          RAISE NOTICE 'Added condition_type column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'condition_payload'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN condition_payload JSONB;
+          RAISE NOTICE 'Added condition_payload column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'strategy'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN strategy TEXT DEFAULT 'VCP';
+          RAISE NOTICE 'Added strategy column to alert_rules';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'alert_rules' AND column_name = 'symbol'
+        ) THEN
+          ALTER TABLE alert_rules ADD COLUMN symbol TEXT;
+          RAISE NOTICE 'Added symbol column to alert_rules';
+        END IF;
       END $$;
     `);
     console.log('Verified all columns exist in alert_rules');
