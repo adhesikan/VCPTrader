@@ -459,18 +459,21 @@ export async function registerRoutes(
         await storage.createScanResult(result);
       }
       
-      // Track first-seen timestamps for BREAKOUT opportunities
-      const breakoutResults = results.filter(r => r.stage === "BREAKOUT");
-      const breakoutTickers = breakoutResults.map(r => r.ticker);
-      
-      // Cleanup stale opportunities (those not seen in the last hour)
-      await storage.cleanupStaleOpportunities();
-      
-      // Upsert first-seen records for current breakouts
+      // Track first-seen timestamps for BREAKOUT opportunities (gracefully handle if table doesn't exist)
       const firstSeenMap: Record<string, Date> = {};
-      for (const result of breakoutResults) {
-        const record = await storage.upsertOpportunityFirstSeen(result.ticker, result.stage, strategy);
-        firstSeenMap[result.ticker] = record.firstSeenAt;
+      try {
+        const breakoutResults = results.filter(r => r.stage === "BREAKOUT");
+        
+        // Cleanup stale opportunities (those not seen in the last hour)
+        await storage.cleanupStaleOpportunities();
+        
+        // Upsert first-seen records for current breakouts
+        for (const result of breakoutResults) {
+          const record = await storage.upsertOpportunityFirstSeen(result.ticker, result.stage, strategy);
+          firstSeenMap[result.ticker] = record.firstSeenAt;
+        }
+      } catch (firstSeenError: any) {
+        console.warn("First-seen tracking unavailable:", firstSeenError.message);
       }
       
       // Add firstSeenAt to results
