@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
@@ -882,101 +882,95 @@ export class MemStorage implements IStorage {
     this.backtestResults.delete(id);
   }
 
-  private alertRules: Map<string, AlertRule> = new Map();
-  private alertEvents: Map<string, AlertEvent> = new Map();
-
+  // Alert rules - database-backed storage
   async getAlertRules(userId?: string): Promise<AlertRule[]> {
-    const rules = Array.from(this.alertRules.values());
     if (userId) {
-      return rules.filter(r => r.userId === userId).sort((a, b) => 
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
+      return db.select().from(alertRulesTable).where(eq(alertRulesTable.userId, userId)).orderBy(desc(alertRulesTable.createdAt));
     }
-    return rules.sort((a, b) => 
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
+    return db.select().from(alertRulesTable).orderBy(desc(alertRulesTable.createdAt));
   }
 
   async getAlertRule(id: string): Promise<AlertRule | undefined> {
-    return this.alertRules.get(id);
+    const results = await db.select().from(alertRulesTable).where(eq(alertRulesTable.id, id));
+    return results[0];
   }
 
   async getEnabledAlertRules(): Promise<AlertRule[]> {
-    return Array.from(this.alertRules.values()).filter(r => r.isEnabled);
+    return db.select().from(alertRulesTable).where(eq(alertRulesTable.isEnabled, true));
   }
 
   async createAlertRule(rule: InsertAlertRule): Promise<AlertRule> {
-    const now = new Date();
-    const newRule: AlertRule = {
+    const results = await db.insert(alertRulesTable).values({
       ...rule,
-      id: randomUUID(),
       strategy: rule.strategy || "VCP",
       timeframe: rule.timeframe || "1d",
+      scanInterval: rule.scanInterval || "5m",
       isEnabled: rule.isEnabled ?? true,
       conditionPayload: rule.conditionPayload ?? null,
-      createdAt: now,
-      updatedAt: now,
-      lastEvaluatedAt: null,
-      lastState: null,
-    };
-    this.alertRules.set(newRule.id, newRule);
-    return newRule;
+    }).returning();
+    return results[0];
   }
 
   async updateAlertRule(id: string, data: Partial<AlertRule>): Promise<AlertRule | undefined> {
-    const rule = this.alertRules.get(id);
-    if (!rule) return undefined;
-    const updated = { ...rule, ...data, updatedAt: new Date() };
-    this.alertRules.set(id, updated);
-    return updated;
+    const results = await db.update(alertRulesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(alertRulesTable.id, id))
+      .returning();
+    return results[0];
   }
 
   async deleteAlertRule(id: string): Promise<void> {
-    this.alertRules.delete(id);
+    await db.delete(alertRulesTable).where(eq(alertRulesTable.id, id));
   }
 
+  // Alert events - database-backed storage
   async getAlertEvents(userId?: string, ruleId?: string): Promise<AlertEvent[]> {
-    let events = Array.from(this.alertEvents.values());
+    if (userId && ruleId) {
+      return db.select().from(alertEventsTable)
+        .where(and(eq(alertEventsTable.userId, userId), eq(alertEventsTable.ruleId, ruleId)))
+        .orderBy(desc(alertEventsTable.triggeredAt));
+    }
     if (userId) {
-      events = events.filter(e => e.userId === userId);
+      return db.select().from(alertEventsTable)
+        .where(eq(alertEventsTable.userId, userId))
+        .orderBy(desc(alertEventsTable.triggeredAt));
     }
     if (ruleId) {
-      events = events.filter(e => e.ruleId === ruleId);
+      return db.select().from(alertEventsTable)
+        .where(eq(alertEventsTable.ruleId, ruleId))
+        .orderBy(desc(alertEventsTable.triggeredAt));
     }
-    return events.sort((a, b) => 
-      new Date(b.triggeredAt || 0).getTime() - new Date(a.triggeredAt || 0).getTime()
-    );
+    return db.select().from(alertEventsTable).orderBy(desc(alertEventsTable.triggeredAt));
   }
 
   async getAlertEvent(id: string): Promise<AlertEvent | undefined> {
-    return this.alertEvents.get(id);
+    const results = await db.select().from(alertEventsTable).where(eq(alertEventsTable.id, id));
+    return results[0];
   }
 
   async getAlertEventByKey(eventKey: string): Promise<AlertEvent | undefined> {
-    return Array.from(this.alertEvents.values()).find(e => e.eventKey === eventKey);
+    const results = await db.select().from(alertEventsTable).where(eq(alertEventsTable.eventKey, eventKey));
+    return results[0];
   }
 
   async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
-    const newEvent: AlertEvent = {
+    const results = await db.insert(alertEventsTable).values({
       ...event,
-      id: randomUUID(),
-      triggeredAt: new Date(),
       fromState: event.fromState ?? null,
       price: event.price ?? null,
       payload: event.payload ?? null,
       deliveryStatus: event.deliveryStatus ?? null,
       isRead: event.isRead ?? false,
-    };
-    this.alertEvents.set(newEvent.id, newEvent);
-    return newEvent;
+    }).returning();
+    return results[0];
   }
 
   async updateAlertEvent(id: string, data: Partial<AlertEvent>): Promise<AlertEvent | undefined> {
-    const event = this.alertEvents.get(id);
-    if (!event) return undefined;
-    const updated = { ...event, ...data };
-    this.alertEvents.set(id, updated);
-    return updated;
+    const results = await db.update(alertEventsTable)
+      .set(data)
+      .where(eq(alertEventsTable.id, id))
+      .returning();
+    return results[0];
   }
 
   async markAlertEventRead(id: string): Promise<AlertEvent | undefined> {
@@ -984,11 +978,9 @@ export class MemStorage implements IStorage {
   }
 
   async markAllAlertEventsRead(userId: string): Promise<void> {
-    this.alertEvents.forEach((event, id) => {
-      if (event.userId === userId) {
-        this.alertEvents.set(id, { ...event, isRead: true });
-      }
-    });
+    await db.update(alertEventsTable)
+      .set({ isRead: true })
+      .where(eq(alertEventsTable.userId, userId));
   }
 
   private automationSettings = new Map<string, AutomationSettings>();
