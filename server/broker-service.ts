@@ -479,7 +479,7 @@ function calculateClassicPullbackStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
   if (quote.changePercent > 1.5 && rvol >= 1.5) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (quote.changePercent >= -2.5 && quote.changePercent <= 0.5 && quote.change >= 0) {
     return PullbackStage.READY;
   }
@@ -490,7 +490,7 @@ function calculateVWAPReclaimStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
   if (quote.changePercent > 0.5 && quote.changePercent < 3 && rvol >= 1.3) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (quote.changePercent >= -1 && quote.changePercent <= 0.5) {
     return PullbackStage.READY;
   }
@@ -502,7 +502,7 @@ function calculateORBStage(quote: QuoteData, minutes: number): string {
   const threshold = minutes === 5 ? 1.5 : 2.0;
   
   if (quote.changePercent > threshold && rvol >= 1.5) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (quote.changePercent > 0 && quote.changePercent <= threshold) {
     return PullbackStage.READY;
   }
@@ -513,7 +513,7 @@ function calculateHighRVOLStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
   if (rvol >= 3.0 && quote.changePercent > 2) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (rvol >= 2.0 && quote.changePercent > 0) {
     return PullbackStage.READY;
   }
@@ -524,7 +524,7 @@ function calculateGapAndGoStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
   if (quote.changePercent > 5 && rvol >= 2.0) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (quote.changePercent > 3 && rvol >= 1.5) {
     return PullbackStage.READY;
   }
@@ -535,7 +535,7 @@ function calculateTrendContinuationStage(quote: QuoteData): string {
   const rvol = quote.avgVolume ? quote.volume / quote.avgVolume : 1;
   
   if (quote.changePercent > 1.5 && rvol >= 1.2 && quote.change > 0) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (quote.changePercent >= 0 && quote.changePercent <= 1.5) {
     return PullbackStage.READY;
   }
@@ -547,7 +547,7 @@ function calculateVolatilitySqueezeStage(quote: QuoteData): string {
   const priceFromHigh = ((quote.high - quote.last) / quote.high) * 100;
   
   if (quote.changePercent > 2.5 && rvol >= 2.0) {
-    return PullbackStage.TRIGGERED;
+    return PullbackStage.BREAKOUT;
   } else if (priceFromHigh < 3 && Math.abs(quote.changePercent) < 1) {
     return PullbackStage.READY;
   }

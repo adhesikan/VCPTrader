@@ -20,7 +20,6 @@ export const PatternStage = {
   FORMING: "FORMING",
   READY: "READY",
   BREAKOUT: "BREAKOUT",
-  TRIGGERED: "TRIGGERED",
 } as const;
 
 export type PatternStageType = typeof PatternStage[keyof typeof PatternStage];
@@ -28,7 +27,7 @@ export type PatternStageType = typeof PatternStage[keyof typeof PatternStage];
 export const PullbackStage = {
   FORMING: "FORMING",
   READY: "READY",
-  TRIGGERED: "TRIGGERED",
+  BREAKOUT: "BREAKOUT",
 } as const;
 
 export type PullbackStageType = typeof PullbackStage[keyof typeof PullbackStage];

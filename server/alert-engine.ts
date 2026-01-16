@@ -462,7 +462,7 @@ export async function processAlertRules(
           }
           
           // Legacy automation profile handling
-          if (result.toState === PatternStage.BREAKOUT || result.toState === PatternStage.TRIGGERED) {
+          if (result.toState === PatternStage.BREAKOUT) {
             try {
               const alertScore = (eventData.payload as any)?.score || 75;
               const targetPrice = classification.resistance * 1.03;

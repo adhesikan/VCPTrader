@@ -47,7 +47,7 @@ function createORBStrategy(minutes: 5 | 15): StrategyPlugin {
       const nearBreakout = currentPrice > orHigh * 0.995 && currentPrice <= orHigh;
       
       if (breakoutAbove && hasVolume) {
-        stage = PatternStage.TRIGGERED;
+        stage = PatternStage.BREAKOUT;
         score = 70 + Math.min(30, (rvol - 1.5) * 15);
       } else if (breakoutAbove) {
         stage = PatternStage.READY;
@@ -89,8 +89,8 @@ function createORBStrategy(minutes: 5 | 15): StrategyPlugin {
           return { label: "Forming", description: "Price within opening range, watching for breakout" };
         case PatternStage.READY:
           return { label: "Ready", description: "Price broke opening range, awaiting volume confirmation" };
-        case PatternStage.TRIGGERED:
-          return { label: "Triggered", description: "Opening range breakout confirmed with volume" };
+        case PatternStage.BREAKOUT:
+          return { label: "Breakout", description: "Opening range breakout confirmed with volume" };
         default:
           return { label: stage, description: "" };
       }

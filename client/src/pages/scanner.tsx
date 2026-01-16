@@ -596,7 +596,7 @@ export default function Scanner() {
     // Stage filter
     if (stageFilter !== "all") {
       const stage = r.stage?.toUpperCase();
-      if (stageFilter === "breakout" && stage !== "BREAKOUT" && stage !== "TRIGGERED") return false;
+      if (stageFilter === "breakout" && stage !== "BREAKOUT") return false;
       if (stageFilter === "ready" && stage !== "READY") return false;
       if (stageFilter === "forming" && stage !== "FORMING") return false;
     }
@@ -650,7 +650,7 @@ export default function Scanner() {
 
   const triggeredCount = filteredResults?.filter(r => {
     const stage = r.stage?.toUpperCase();
-    return stage === "BREAKOUT" || stage === "TRIGGERED";
+    return stage === "BREAKOUT";
   }).length || 0;
   const readyCount = filteredResults?.filter(r => r.stage?.toUpperCase() === "READY").length || 0;
   const formingCount = filteredResults?.filter(r => r.stage?.toUpperCase() === "FORMING").length || 0;
@@ -711,7 +711,7 @@ export default function Scanner() {
       </div>
 
       {/* Featured Opportunities - Breakout & Triggered Symbols */}
-      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length > 0 && (
+      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT").length > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -719,7 +719,7 @@ export default function Scanner() {
                 <Flame className="h-5 w-5 text-orange-500" />
                 <CardTitle className="text-lg">Active Opportunities</CardTitle>
                 <Badge variant="secondary" className="text-xs">
-                  {liveResults.filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED").length} signals
+                  {liveResults.filter(r => r.stage === "BREAKOUT").length} signals
                 </Badge>
               </div>
               <div className="flex items-center gap-1">
@@ -746,7 +746,7 @@ export default function Scanner() {
             {featuredViewMode === "cards" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {liveResults
-                  .filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED")
+                  .filter(r => r.stage === "BREAKOUT")
                   .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
                   .map((result) => (
                     <Card 
@@ -764,7 +764,6 @@ export default function Scanner() {
                               className={cn(
                                 "shrink-0 text-xs",
                                 result.stage === "BREAKOUT" && "bg-green-500/10 text-green-600 dark:text-green-400",
-                                result.stage === "TRIGGERED" && "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                               )}
                             >
                               {result.stage}
@@ -860,7 +859,7 @@ export default function Scanner() {
             ) : (
               <div className="space-y-1">
                 {liveResults
-                  .filter(r => r.stage === "BREAKOUT" || r.stage === "TRIGGERED")
+                  .filter(r => r.stage === "BREAKOUT")
                   .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
                   .map((result) => (
                     <div
@@ -875,7 +874,6 @@ export default function Scanner() {
                           className={cn(
                             "shrink-0 text-xs w-20 justify-center",
                             result.stage === "BREAKOUT" && "bg-green-500/10 text-green-600 dark:text-green-400",
-                            result.stage === "TRIGGERED" && "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                           )}
                         >
                           {result.stage}

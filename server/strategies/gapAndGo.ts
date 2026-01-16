@@ -50,7 +50,7 @@ export const gapAndGoStrategy: StrategyPlugin = {
     let score = 30;
     
     if (breakoutAboveOR && holdsAboveVwap && hasVolume) {
-      stage = PatternStage.TRIGGERED;
+      stage = PatternStage.BREAKOUT;
       score = 70 + Math.min(30, gapPercent * 3 + (rvol - 1.5) * 10);
     } else if (breakoutAboveOR && holdsAboveVwap) {
       stage = PatternStage.READY;
@@ -105,8 +105,8 @@ export const gapAndGoStrategy: StrategyPlugin = {
         return { label: "Forming", description: "Gap up detected, holding above VWAP" };
       case PatternStage.READY:
         return { label: "Ready", description: "Holding above VWAP, near opening range breakout" };
-      case PatternStage.TRIGGERED:
-        return { label: "Triggered", description: "Gap & Go confirmed: OR breakout with volume" };
+      case PatternStage.BREAKOUT:
+        return { label: "Breakout", description: "Gap & Go confirmed: OR breakout with volume" };
       default:
         return { label: stage, description: "" };
     }

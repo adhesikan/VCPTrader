@@ -72,7 +72,7 @@ function classifyFromQuote(quote: QuoteData, cfg: Required<StrategyConfig>): Str
   let explanation: string;
   
   if (priceAboveEMAs && isBreakingOut) {
-    stage = PullbackStage.TRIGGERED;
+    stage = PullbackStage.BREAKOUT;
     score = Math.min(100, 80 + Math.floor(rvol * 5));
     explanation = `Potential breakout with ${rvol.toFixed(1)}x relative volume.`;
   } else if (priceAboveEMAs && quote.changePercent > -1) {
@@ -230,7 +230,7 @@ export const classicPullbackStrategy: Strategy = {
     if (isBreakout || isHighBreak) {
       const stopLevel = currentCandle.low * 0.995;
       return {
-        stage: PullbackStage.TRIGGERED,
+        stage: PullbackStage.BREAKOUT,
         levels: {
           resistance: Number(resistance.toFixed(2)),
           entryTrigger: Number(resistance.toFixed(2)),

@@ -61,7 +61,7 @@ export const vwapReclaimStrategy: StrategyPlugin = {
     
     if (reclaimIdx > 0 && isAboveVwap) {
       if (hasVolume) {
-        stage = PatternStage.TRIGGERED;
+        stage = PatternStage.BREAKOUT;
         score = 75 + Math.min(25, (rvol - 1.5) * 10);
       } else {
         stage = PatternStage.READY;
@@ -114,8 +114,8 @@ export const vwapReclaimStrategy: StrategyPlugin = {
         return { label: "Forming", description: "Price below VWAP, watching for reclaim" };
       case PatternStage.READY:
         return { label: "Ready", description: "Price reclaimed VWAP, waiting for volume confirmation" };
-      case PatternStage.TRIGGERED:
-        return { label: "Triggered", description: "VWAP reclaim confirmed with volume expansion" };
+      case PatternStage.BREAKOUT:
+        return { label: "Breakout", description: "VWAP reclaim confirmed with volume expansion" };
       default:
         return { label: stage, description: "" };
     }

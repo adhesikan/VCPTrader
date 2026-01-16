@@ -286,15 +286,8 @@ const STAGE_EXPLANATIONS = [
     stage: "BREAKOUT",
     color: "bg-green-500/10 text-green-600 dark:text-green-400",
     icon: ArrowUpRight,
-    description: "Price is breaking above resistance with volume confirmation. This is a potential entry signal.",
-    action: "Evaluate entry based on your rules. Check volume and price action quality.",
-  },
-  {
-    stage: "TRIGGERED",
-    color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-    icon: CheckCircle2,
-    description: "Breakout confirmed with follow-through. The pattern has activated.",
-    action: "If in position, manage the trade. If not, wait for a pullback entry.",
+    description: "Price is breaking above resistance with volume confirmation. Breakout confirmed with follow-through.",
+    action: "Evaluate entry based on your rules. Check volume and price action quality. If already in position, manage the trade.",
   },
 ];
 
@@ -470,7 +463,7 @@ export default function StrategyGuide() {
                 ))}
               </div>
               <p className="text-sm text-muted-foreground mt-4">
-                Patterns progress through these stages as they develop. Not all patterns will reach BREAKOUT or TRIGGERED stages - many will fail and return to FORMING or break down entirely.
+                Patterns progress through these stages as they develop. Not all patterns will reach the BREAKOUT stage - many will fail and return to FORMING or break down entirely.
               </p>
             </CardContent>
           </Card>
@@ -509,7 +502,7 @@ export default function StrategyGuide() {
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">4</div>
                   <div>
                     <p className="font-medium">Run and Review</p>
-                    <p className="text-sm text-muted-foreground">Click the scan button and review results. Active Opportunities (BREAKOUT/TRIGGERED) appear at the top. Click any row to see the chart.</p>
+                    <p className="text-sm text-muted-foreground">Click the scan button and review results. Active Opportunities (BREAKOUT) appear at the top. Click any row to see the chart.</p>
                   </div>
                 </li>
               </ol>

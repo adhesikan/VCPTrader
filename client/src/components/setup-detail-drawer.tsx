@@ -177,7 +177,6 @@ export function SetupDetailDrawer({
     "FORMING": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
     "READY": "bg-blue-500/10 text-blue-600 dark:text-blue-400",
     "BREAKOUT": "bg-green-500/10 text-green-600 dark:text-green-400",
-    "TRIGGERED": "bg-purple-500/10 text-purple-600 dark:text-purple-400",
   }[result.stage?.toUpperCase() || "FORMING"] || "bg-muted text-muted-foreground";
 
   return (
@@ -454,7 +453,7 @@ export function SetupDetailDrawer({
                 Setup Explanation
               </h3>
               <p className="text-sm text-muted-foreground">
-                {result.stage === "BREAKOUT" || result.stage === "TRIGGERED"
+                {result.stage === "BREAKOUT"
                   ? `${result.ticker} has broken above resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""} with ${result.rvol && result.rvol >= 1.5 ? "strong" : "moderate"} volume confirmation.${result.stopLoss ? ` Consider entries with stop at $${result.stopLoss.toFixed(2)}.` : ""}`
                   : result.stage === "READY"
                   ? `${result.ticker} is approaching resistance${result.resistance ? ` at $${result.resistance.toFixed(2)}` : ""}. Watch for a breakout with volume above 1.5x average.`

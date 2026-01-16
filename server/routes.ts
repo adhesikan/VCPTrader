@@ -74,7 +74,7 @@ export async function registerRoutes(
       ...s,
       stages: s.id === StrategyId.VCP 
         ? [PatternStage.FORMING, PatternStage.READY, PatternStage.BREAKOUT]
-        : [PullbackStage.FORMING, PullbackStage.READY, PullbackStage.TRIGGERED],
+        : [PullbackStage.FORMING, PullbackStage.READY, PullbackStage.BREAKOUT],
     }));
     res.json(strategies);
   });

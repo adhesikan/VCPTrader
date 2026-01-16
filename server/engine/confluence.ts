@@ -25,7 +25,7 @@ export function aggregateConfluence(
   regime?: MarketRegimeType
 ): ConfluenceResult | null {
   const activeResults = results.filter(r => 
-    r.stage === "READY" || r.stage === "TRIGGERED" || r.stage === "BREAKOUT"
+    r.stage === "READY" || r.stage === "BREAKOUT"
   );
 
   if (activeResults.length === 0) return null;

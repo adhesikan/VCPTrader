@@ -41,7 +41,7 @@ export const highRvolStrategy: StrategyPlugin = {
     let score = 30;
     
     if (breakoutAbove && hasHighVolume) {
-      stage = PatternStage.TRIGGERED;
+      stage = PatternStage.BREAKOUT;
       score = 75 + Math.min(25, (rvol - 2) * 10);
     } else if (breakoutAbove) {
       stage = PatternStage.READY;
@@ -92,8 +92,8 @@ export const highRvolStrategy: StrategyPlugin = {
         return { label: "Forming", description: "Tight consolidation detected with building volume" };
       case PatternStage.READY:
         return { label: "Ready", description: "High RVOL detected, near or at breakout level" };
-      case PatternStage.TRIGGERED:
-        return { label: "Triggered", description: "Breakout confirmed with RVOL > 2.0x" };
+      case PatternStage.BREAKOUT:
+        return { label: "Breakout", description: "Breakout confirmed with RVOL > 2.0x" };
       default:
         return { label: stage, description: "" };
     }

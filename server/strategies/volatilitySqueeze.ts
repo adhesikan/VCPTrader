@@ -52,7 +52,7 @@ export const volatilitySqueezeStrategy: StrategyPlugin = {
     let score = 30;
     
     if ((breakoutAboveBB || breakoutAboveRange) && hasVolume) {
-      stage = PatternStage.TRIGGERED;
+      stage = PatternStage.BREAKOUT;
       score = 70 + Math.min(30, squeeze.squeezeCount * 3 + (rvol - 1.3) * 10);
     } else if (breakoutAboveBB || breakoutAboveRange) {
       stage = PatternStage.READY;
@@ -104,8 +104,8 @@ export const volatilitySqueezeStrategy: StrategyPlugin = {
         return { label: "Squeeze On", description: "Bollinger Bands inside Keltner Channels - volatility contracting" };
       case PatternStage.READY:
         return { label: "Squeeze Firing", description: "Near breakout level, squeeze about to fire" };
-      case PatternStage.TRIGGERED:
-        return { label: "Squeeze Fired", description: "Breakout from squeeze with volume expansion" };
+      case PatternStage.BREAKOUT:
+        return { label: "Breakout", description: "Breakout from squeeze with volume expansion" };
       default:
         return { label: stage, description: "" };
     }

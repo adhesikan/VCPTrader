@@ -86,7 +86,7 @@ export const trendContinuationStrategy: StrategyPlugin = {
     let score = 30;
     
     if (breakoutAbovePullback && hasVolume) {
-      stage = PatternStage.TRIGGERED;
+      stage = PatternStage.BREAKOUT;
       score = 70 + Math.min(30, (rvol - 1.3) * 15 + barsInPullback * 2);
     } else if (breakoutAbovePullback) {
       stage = PatternStage.READY;
@@ -139,8 +139,8 @@ export const trendContinuationStrategy: StrategyPlugin = {
         return { label: "Forming", description: "In uptrend, pulling back to EMA zone" };
       case PatternStage.READY:
         return { label: "Ready", description: "Pullback complete, near breakout level" };
-      case PatternStage.TRIGGERED:
-        return { label: "Triggered", description: "Trend continuation confirmed with volume" };
+      case PatternStage.BREAKOUT:
+        return { label: "Breakout", description: "Trend continuation confirmed with volume" };
       default:
         return { label: stage, description: "" };
     }
