@@ -81,10 +81,34 @@ export async function evaluateRule(
   
   switch (rule.conditionType) {
     case RuleConditionType.STAGE_ENTERED: {
-      const payload = rule.conditionPayload as { targetStage: string } | null;
+      const payload = rule.conditionPayload as { 
+        targetStage: string;
+        minPatternScore?: number;
+        minResistancePercent?: number;
+        maxResistancePercent?: number;
+      } | null;
       const targetStage = payload?.targetStage || PatternStage.BREAKOUT;
       
       if (currentState === targetStage && previousStage !== targetStage) {
+        // Check optional filter conditions
+        // Note: patternScore comes from scan results, not live quotes
+        // For now, resistance percent is calculated from priceFromHigh
+        const resistancePercent = classification.priceFromHigh;
+        
+        // Check minResistancePercent filter (for stocks with more upside potential)
+        if (payload?.minResistancePercent !== undefined && payload.minResistancePercent !== null) {
+          if (resistancePercent < payload.minResistancePercent) {
+            break; // Stock is too close to resistance, skip
+          }
+        }
+        
+        // Check maxResistancePercent filter (for stocks near breakout)
+        if (payload?.maxResistancePercent !== undefined && payload.maxResistancePercent !== null) {
+          if (resistancePercent > payload.maxResistancePercent) {
+            break; // Stock is too far from resistance, skip
+          }
+        }
+        
         triggered = true;
       }
       break;
@@ -204,17 +228,48 @@ export async function processAlertRules(
     
     for (const rule of globalRules) {
       try {
-        const payload = rule.conditionPayload as { targetStage?: string } | null;
+        const payload = rule.conditionPayload as { 
+          targetStage?: string;
+          minPatternScore?: number;
+          minResistancePercent?: number;
+          maxResistancePercent?: number;
+        } | null;
         const targetStage = payload?.targetStage || PatternStage.BREAKOUT;
         
         // Get previously triggered symbols for this rule
         const previouslyTriggered = new Set(rule.triggeredSymbols || []);
         const newlyTriggered: string[] = [];
         
-        // Find scan results that match the target stage
-        const matchingResults = scanResults.filter(result => 
-          result.stage === targetStage && !previouslyTriggered.has(result.ticker)
-        );
+        // Find scan results that match the target stage and optional filters
+        const matchingResults = scanResults.filter(result => {
+          // Stage check
+          if (result.stage !== targetStage) return false;
+          
+          // Already triggered check
+          if (previouslyTriggered.has(result.ticker)) return false;
+          
+          // Min pattern score filter
+          if (payload?.minPatternScore !== undefined && payload.minPatternScore !== null) {
+            if ((result.patternScore ?? 0) < payload.minPatternScore) return false;
+          }
+          
+          // Calculate % to resistance for this scan result
+          const resistancePercent = result.resistance && result.price 
+            ? ((result.resistance - result.price) / result.price) * 100 
+            : null;
+          
+          // Min % to resistance filter (for stocks with more upside potential)
+          if (payload?.minResistancePercent !== undefined && payload.minResistancePercent !== null) {
+            if (resistancePercent === null || resistancePercent < payload.minResistancePercent) return false;
+          }
+          
+          // Max % to resistance filter (for stocks near breakout)
+          if (payload?.maxResistancePercent !== undefined && payload.maxResistancePercent !== null) {
+            if (resistancePercent === null || resistancePercent > payload.maxResistancePercent) return false;
+          }
+          
+          return true;
+        });
         
         for (const result of matchingResults) {
           const eventKey = generateEventKey(rule.id, `${result.ticker}:${targetStage}`, now);

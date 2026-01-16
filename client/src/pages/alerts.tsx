@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Plus, Check, Trash2, List, Power, PowerOff, Clock, AlertCircle, TrendingUp, ExternalLink } from "lucide-react";
+import { Bell, Plus, Check, Trash2, List, Power, PowerOff, Clock, AlertCircle, TrendingUp, ExternalLink, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationEndpoint } from "@shared/schema";
@@ -60,6 +65,7 @@ function AlertRuleCard({
   const payload = rule.conditionPayload as { 
     targetStage?: string; 
     minPatternScore?: number;
+    minResistancePercent?: number;
     maxResistancePercent?: number;
   } | null;
   const targetStage = payload?.targetStage || "BREAKOUT";
@@ -95,6 +101,11 @@ function AlertRuleCard({
             {payload?.minPatternScore && (
               <Badge variant="outline" className="gap-1 text-xs">
                 Score ≥ {payload.minPatternScore}
+              </Badge>
+            )}
+            {payload?.minResistancePercent && (
+              <Badge variant="outline" className="gap-1 text-xs">
+                ≥ {payload.minResistancePercent}% to R
               </Badge>
             )}
             {payload?.maxResistancePercent && (
@@ -266,6 +277,7 @@ export default function Alerts() {
     sendWebhook: false,
     strategy: "VCP" as string,
     minPatternScore: null as number | null,
+    minResistancePercent: null as number | null,
     maxResistancePercent: null as number | null,
   });
   const { toast } = useToast();
@@ -302,7 +314,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, maxResistancePercent: null });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, minResistancePercent: null, maxResistancePercent: null });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -374,6 +386,9 @@ export default function Alerts() {
       };
       if (newRule.minPatternScore !== null) {
         conditionPayload.minPatternScore = newRule.minPatternScore;
+      }
+      if (newRule.minResistancePercent !== null) {
+        conditionPayload.minResistancePercent = newRule.minResistancePercent;
       }
       if (newRule.maxResistancePercent !== null) {
         conditionPayload.maxResistancePercent = newRule.maxResistancePercent;
@@ -570,9 +585,19 @@ export default function Alerts() {
                   Only trigger alert when these conditions are met
                 </p>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label htmlFor="minScore" className="text-xs">Min Pattern Score</Label>
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="minScore" className="text-xs">Min Pattern Score</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px]">
+                          <p>Only alert for stocks with pattern score at or above this value. Higher scores indicate stronger pattern quality.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="minScore"
                       type="number"
@@ -588,22 +613,62 @@ export default function Alerts() {
                       data-testid="input-min-score"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="maxResist" className="text-xs">Max % to Resistance</Label>
-                    <Input
-                      id="maxResist"
-                      type="number"
-                      placeholder="Any"
-                      value={newRule.maxResistancePercent ?? ""}
-                      onChange={(e) => setNewRule(prev => ({ 
-                        ...prev, 
-                        maxResistancePercent: e.target.value ? parseFloat(e.target.value) : null 
-                      }))}
-                      min={0}
-                      step={0.5}
-                      className="h-8"
-                      data-testid="input-max-resistance"
-                    />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <Label htmlFor="minResist" className="text-xs">Min % to R</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[250px]">
+                            <p>Only alert for stocks that are at least this far from resistance. Use this to find stocks with more upside potential.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="minResist"
+                        type="number"
+                        placeholder="Any"
+                        value={newRule.minResistancePercent ?? ""}
+                        onChange={(e) => setNewRule(prev => ({ 
+                          ...prev, 
+                          minResistancePercent: e.target.value ? parseFloat(e.target.value) : null 
+                        }))}
+                        min={0}
+                        step={0.5}
+                        className="h-8"
+                        data-testid="input-min-resistance"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <Label htmlFor="maxResist" className="text-xs">Max % to R</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[250px]">
+                            <p>Only alert for stocks within this distance of resistance. Use this to catch stocks near breakout points.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="maxResist"
+                        type="number"
+                        placeholder="Any"
+                        value={newRule.maxResistancePercent ?? ""}
+                        onChange={(e) => setNewRule(prev => ({ 
+                          ...prev, 
+                          maxResistancePercent: e.target.value ? parseFloat(e.target.value) : null 
+                        }))}
+                        min={0}
+                        step={0.5}
+                        className="h-8"
+                        data-testid="input-max-resistance"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
