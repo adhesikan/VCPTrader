@@ -199,9 +199,22 @@ function AlertEventCard({
   onMarkRead?: (id: string) => void;
 }) {
   const payload = event.payload as { message?: string; resistance?: number; stopLoss?: number } | null;
+  const deliveryStatus = event.deliveryStatus as { 
+    push?: boolean; 
+    pushSentAt?: string; 
+    webhook?: boolean; 
+    webhookSentAt?: string;
+    endpointName?: string;
+  } | null;
   const timeAgo = event.triggeredAt
     ? formatDistanceToNow(new Date(event.triggeredAt), { addSuffix: true })
     : "";
+  
+  const formatDeliveryTime = (isoString?: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
   
   return (
     <Card 
@@ -253,6 +266,25 @@ function AlertEventCard({
             {payload.message}
           </p>
         )}
+
+        {/* Delivery Status */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {deliveryStatus?.push && (
+            <Badge variant="outline" className="gap-1 text-xs">
+              <Bell className="h-3 w-3" />
+              Push {deliveryStatus.pushSentAt && `@ ${formatDeliveryTime(deliveryStatus.pushSentAt)}`}
+            </Badge>
+          )}
+          {deliveryStatus?.webhook && (
+            <Badge variant="secondary" className="gap-1 text-xs">
+              <Zap className="h-3 w-3" />
+              {deliveryStatus.endpointName || "AlgoPilotX"} {deliveryStatus.webhookSentAt && `@ ${formatDeliveryTime(deliveryStatus.webhookSentAt)}`}
+            </Badge>
+          )}
+          {!deliveryStatus?.push && !deliveryStatus?.webhook && (
+            <span className="text-xs text-muted-foreground">No delivery configured</span>
+          )}
+        </div>
 
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{timeAgo}</span>

@@ -308,11 +308,16 @@ export async function processAlertRules(
           createdEvents.push(event);
           newlyTriggered.push(result.ticker);
           
+          // Track delivery status
+          const deliveryStatus: { push?: boolean; pushSentAt?: string; webhook?: boolean; webhookSentAt?: string; endpointName?: string } = { push: false, webhook: false };
+          
           // Send push notification if enabled
           if (rule.sendPushNotification !== false) {
             try {
               const { sendAlertPushNotification } = await import("./push-service");
               await sendAlertPushNotification(event);
+              deliveryStatus.push = true;
+              deliveryStatus.pushSentAt = new Date().toISOString();
               console.log(`[AlertEngine] Push sent for global alert: ${result.ticker} ${targetStage}`);
             } catch (pushError) {
               console.log(`[AlertEngine] Push notification error: ${pushError}`);
@@ -327,6 +332,9 @@ export async function processAlertRules(
             const riskAmount = entryPrice - stopLoss;
             const targetPrice = entryPrice + (riskAmount * 2); // 2R target
             
+            // Get endpoint name for display
+            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+            
             const webhookResult = await sendWebhookToEndpoint(
               rule.automationEndpointId,
               result.ticker,
@@ -336,11 +344,17 @@ export async function processAlertRules(
             );
             
             if (webhookResult.success) {
+              deliveryStatus.webhook = true;
+              deliveryStatus.webhookSentAt = new Date().toISOString();
+              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
               console.log(`[AlertEngine] Webhook sent for ${result.ticker}`);
             } else {
               console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
             }
           }
+          
+          // Update event with delivery status
+          await storage.updateAlertEvent(event.id, { deliveryStatus });
           
           console.log(`[AlertEngine] Global alert triggered: ${result.ticker} entered ${targetStage}`);
         }
@@ -421,11 +435,16 @@ export async function processAlertRules(
           const event = await storage.createAlertEvent(eventData);
           createdEvents.push(event);
           
+          // Track delivery status
+          const deliveryStatus: { push?: boolean; pushSentAt?: string; webhook?: boolean; webhookSentAt?: string; endpointName?: string } = { push: false, webhook: false };
+          
           // Send push notification for the alert
           if (rule.sendPushNotification !== false) {
             try {
               const { sendAlertPushNotification } = await import("./push-service");
               await sendAlertPushNotification(event);
+              deliveryStatus.push = true;
+              deliveryStatus.pushSentAt = new Date().toISOString();
             } catch (pushError) {
               console.log(`[AlertEngine] Push notification error: ${pushError}`);
             }
@@ -451,6 +470,9 @@ export async function processAlertRules(
             const riskAmount = entryPrice - stopLoss;
             const targetPrice = entryPrice + (riskAmount * 2); // 2R target
             
+            // Get endpoint name for display
+            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+            
             const webhookResult = await sendWebhookToEndpoint(
               rule.automationEndpointId,
               rule.symbol,
@@ -460,11 +482,17 @@ export async function processAlertRules(
             );
             
             if (webhookResult.success) {
+              deliveryStatus.webhook = true;
+              deliveryStatus.webhookSentAt = new Date().toISOString();
+              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
               console.log(`[AlertEngine] Webhook sent for ${rule.symbol}`);
             } else {
               console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
             }
           }
+          
+          // Update event with delivery status
+          await storage.updateAlertEvent(event.id, { deliveryStatus });
           
           // Legacy automation profile handling
           if (result.toState === PatternStage.BREAKOUT) {
