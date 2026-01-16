@@ -490,7 +490,7 @@ export default function Alerts() {
               New Alert Rule
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create VCP Stage Alert</DialogTitle>
             </DialogHeader>
