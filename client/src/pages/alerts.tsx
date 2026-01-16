@@ -55,12 +55,14 @@ function AlertRuleCard({
   onDelete,
   endpoints,
   onUpdateEndpoint,
+  watchlists,
 }: { 
   rule: AlertRule; 
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
   endpoints?: AutomationEndpoint[];
   onUpdateEndpoint?: (id: string, endpointId: string | null) => void;
+  watchlists?: Watchlist[];
 }) {
   const payload = rule.conditionPayload as { 
     targetStage?: string; 
@@ -72,6 +74,9 @@ function AlertRuleCard({
   const lastState = rule.lastState as { stage?: string; price?: number } | null;
   const assignedEndpoint = endpoints?.find(e => e.id === rule.automationEndpointId);
   const strategyConfig = STRATEGY_CONFIGS.find(s => s.id === rule.strategy);
+  const watchlistName = rule.watchlistId 
+    ? watchlists?.find(w => w.id === rule.watchlistId)?.name 
+    : null;
   
   return (
     <Card 
@@ -85,6 +90,11 @@ function AlertRuleCard({
               <Badge variant="outline" className="gap-1 text-sm font-semibold">
                 <Bell className="h-3 w-3" />
                 Any Symbol
+              </Badge>
+            ) : watchlistName ? (
+              <Badge variant="outline" className="gap-1 text-sm font-semibold">
+                <List className="h-3 w-3" />
+                {watchlistName}
               </Badge>
             ) : (
               <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
@@ -140,7 +150,9 @@ function AlertRuleCard({
         <div className="mt-2 text-sm text-muted-foreground">
           {rule.isGlobal 
             ? `Alert when any symbol enters ${targetStage} stage`
-            : `Alert when ${rule.symbol} enters ${targetStage} stage`}
+            : watchlistName
+              ? `Alert when any symbol in ${watchlistName} enters ${targetStage} stage`
+              : `Alert when ${rule.symbol} enters ${targetStage} stage`}
         </div>
 
         {endpoints && endpoints.length > 0 && onUpdateEndpoint && (
@@ -307,6 +319,7 @@ export default function Alerts() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("none");
+  const [alertType, setAlertType] = useState<"global" | "single" | "watchlist">("global");
   const [newRule, setNewRule] = useState({
     symbol: "",
     targetStage: "BREAKOUT" as string,
@@ -319,6 +332,7 @@ export default function Alerts() {
     minResistancePercent: null as number | null,
     maxResistancePercent: null as number | null,
     scanInterval: "5m" as string,
+    watchlistId: null as string | null,
   });
   const { toast } = useToast();
 
@@ -354,8 +368,9 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, minResistancePercent: null, maxResistancePercent: null, scanInterval: "5m" });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, minResistancePercent: null, maxResistancePercent: null, scanInterval: "5m", watchlistId: null });
       setSelectedWatchlist("none");
+      setAlertType("global");
       toast({
         title: "Alert Rule Created",
         description: "You'll be notified when conditions are met",
@@ -419,8 +434,8 @@ export default function Alerts() {
   });
 
   const handleCreateRule = () => {
-    // For global alerts, symbol is optional
-    if (newRule.isGlobal || newRule.symbol) {
+    // Allow global alerts, watchlist alerts, or single symbol alerts
+    if (newRule.isGlobal || newRule.watchlistId || newRule.symbol) {
       const conditionPayload: Record<string, unknown> = { 
         targetStage: newRule.targetStage,
       };
@@ -435,7 +450,7 @@ export default function Alerts() {
       }
       
       createRuleMutation.mutate({
-        symbol: newRule.isGlobal ? null : newRule.symbol.toUpperCase(),
+        symbol: newRule.isGlobal || newRule.watchlistId ? null : newRule.symbol.toUpperCase(),
         isGlobal: newRule.isGlobal,
         conditionType: RuleConditionType.STAGE_ENTERED,
         conditionPayload,
@@ -446,7 +461,7 @@ export default function Alerts() {
         sendPushNotification: newRule.sendPushNotification,
         sendWebhook: newRule.sendWebhook,
         automationEndpointId: newRule.automationEndpointId === "none" || !newRule.automationEndpointId ? null : newRule.automationEndpointId,
-        watchlistId: selectedWatchlist !== "none" ? selectedWatchlist : null,
+        watchlistId: newRule.watchlistId || null,
       });
     }
   };
@@ -495,72 +510,107 @@ export default function Alerts() {
               <DialogTitle>Create VCP Stage Alert</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div>
-                  <Label className="font-medium">Alert for Any Symbol</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Trigger when any symbol in scan results matches the target stage
-                  </p>
-                </div>
-                <Switch
-                  checked={newRule.isGlobal}
-                  onCheckedChange={(checked) => setNewRule(prev => ({ ...prev, isGlobal: checked }))}
-                  data-testid="switch-global-alert"
-                />
-              </div>
+              <div className="space-y-2">
+                <Label className="font-medium">Alert Scope</Label>
+                <div className="space-y-2">
+                  <div 
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${alertType === "global" ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                    onClick={() => {
+                      setAlertType("global");
+                      setNewRule(prev => ({ ...prev, isGlobal: true, watchlistId: null, symbol: "" }));
+                    }}
+                    data-testid="option-alert-global"
+                  >
+                    <div>
+                      <div className="font-medium flex items-center gap-2">
+                        <Bell className="h-4 w-4" />
+                        Any Symbol
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Alert on any symbol in scan results that matches stage
+                      </p>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border-2 ${alertType === "global" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                  </div>
 
-              {!newRule.isGlobal && (
-                <>
                   {watchlists && watchlists.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>From Watchlist (optional)</Label>
-                      <Select value={selectedWatchlist} onValueChange={setSelectedWatchlist}>
-                        <SelectTrigger data-testid="select-rule-watchlist">
-                          <List className="h-4 w-4 mr-2" />
-                          <SelectValue placeholder="Select a watchlist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None - enter manually</SelectItem>
-                          {watchlists.map((wl) => (
-                            <SelectItem key={wl.id} value={wl.id}>
-                              {wl.name} ({wl.symbols?.length || 0} symbols)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div 
+                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${alertType === "watchlist" ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                      onClick={() => {
+                        setAlertType("watchlist");
+                        setNewRule(prev => ({ ...prev, isGlobal: false, symbol: "" }));
+                      }}
+                      data-testid="option-alert-watchlist"
+                    >
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          <List className="h-4 w-4" />
+                          Entire Watchlist
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Alert on any symbol from a watchlist that matches stage
+                        </p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 ${alertType === "watchlist" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="symbol">Symbol</Label>
-                    {selectedWatchlistData?.symbols && selectedWatchlistData.symbols.length > 0 ? (
-                      <Select
-                        value={newRule.symbol}
-                        onValueChange={(value) => setNewRule(prev => ({ ...prev, symbol: value }))}
-                      >
-                        <SelectTrigger className="font-mono" data-testid="input-rule-symbol">
-                          <SelectValue placeholder="Select symbol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {selectedWatchlistData.symbols.map((symbol) => (
-                            <SelectItem key={symbol} value={symbol}>
-                              {symbol}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id="symbol"
-                        placeholder="AAPL"
-                        value={newRule.symbol}
-                        onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
-                        className="font-mono uppercase"
-                        data-testid="input-rule-symbol"
-                      />
-                    )}
+                  <div 
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${alertType === "single" ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                    onClick={() => {
+                      setAlertType("single");
+                      setNewRule(prev => ({ ...prev, isGlobal: false, watchlistId: null }));
+                    }}
+                    data-testid="option-alert-single"
+                  >
+                    <div>
+                      <div className="font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Single Symbol
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Alert on a specific stock ticker only
+                      </p>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border-2 ${alertType === "single" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
                   </div>
-                </>
+                </div>
+              </div>
+
+              {alertType === "watchlist" && watchlists && watchlists.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Select Watchlist</Label>
+                  <Select 
+                    value={newRule.watchlistId || ""} 
+                    onValueChange={(value) => setNewRule(prev => ({ ...prev, watchlistId: value }))}
+                  >
+                    <SelectTrigger data-testid="select-rule-watchlist">
+                      <List className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Choose a watchlist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {watchlists.map((wl) => (
+                        <SelectItem key={wl.id} value={wl.id}>
+                          {wl.name} ({wl.symbols?.length || 0} symbols)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {alertType === "single" && (
+                <div className="space-y-2">
+                  <Label htmlFor="symbol">Symbol</Label>
+                  <Input
+                    id="symbol"
+                    placeholder="AAPL"
+                    value={newRule.symbol}
+                    onChange={(e) => setNewRule(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                    className="font-mono uppercase"
+                    data-testid="input-rule-symbol"
+                  />
+                </div>
               )}
 
               <div className="space-y-2">
@@ -794,7 +844,7 @@ export default function Alerts() {
 
               <Button
                 onClick={handleCreateRule}
-                disabled={(!newRule.isGlobal && !newRule.symbol) || createRuleMutation.isPending}
+                disabled={(!newRule.isGlobal && !newRule.watchlistId && !newRule.symbol) || createRuleMutation.isPending}
                 className="w-full"
                 data-testid="button-submit-rule"
               >
@@ -844,6 +894,7 @@ export default function Alerts() {
                   onDelete={(id) => deleteRuleMutation.mutate(id)}
                   endpoints={automationEndpoints}
                   onUpdateEndpoint={(id, endpointId) => updateRuleEndpointMutation.mutate({ id, endpointId })}
+                  watchlists={watchlists}
                 />
               ))}
             </div>

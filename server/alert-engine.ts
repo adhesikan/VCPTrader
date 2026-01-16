@@ -215,9 +215,10 @@ export async function processAlertRules(
     return [];
   }
   
-  // Separate global rules from symbol-specific rules
+  // Separate global rules from watchlist rules and symbol-specific rules
   const globalRules = enabledRules.filter(r => r.isGlobal);
-  const symbolRules = enabledRules.filter(r => !r.isGlobal && r.symbol);
+  const watchlistRules = enabledRules.filter(r => !r.isGlobal && r.watchlistId && !r.symbol);
+  const symbolRules = enabledRules.filter(r => !r.isGlobal && r.symbol && !r.watchlistId);
   
   const createdEvents: AlertEvent[] = [];
   const now = new Date();
@@ -368,6 +369,165 @@ export async function processAlertRules(
         }
       } catch (error) {
         console.error(`[AlertEngine] Error processing global rule ${rule.id}:`, error);
+      }
+    }
+  }
+  
+  // Process watchlist rules against scan results (filter by watchlist symbols)
+  if (watchlistRules.length > 0) {
+    const scanResults = await storage.getScanResults();
+    console.log(`[AlertEngine] Processing ${watchlistRules.length} watchlist rule(s) against ${scanResults.length} scan results`);
+    
+    for (const rule of watchlistRules) {
+      try {
+        if (!rule.watchlistId) continue;
+        
+        // Get the watchlist to get its symbols
+        const watchlist = await storage.getWatchlist(rule.watchlistId, rule.userId);
+        if (!watchlist || !watchlist.symbols || watchlist.symbols.length === 0) {
+          console.log(`[AlertEngine] Watchlist ${rule.watchlistId} not found or empty`);
+          continue;
+        }
+        
+        const watchlistSymbols = new Set(watchlist.symbols.map(s => s.toUpperCase()));
+        
+        const payload = rule.conditionPayload as { 
+          targetStage?: string;
+          minPatternScore?: number;
+          minResistancePercent?: number;
+          maxResistancePercent?: number;
+        } | null;
+        const targetStage = payload?.targetStage || PatternStage.BREAKOUT;
+        
+        const previouslyTriggered = new Set(rule.triggeredSymbols || []);
+        const newlyTriggered: string[] = [];
+        
+        console.log(`[AlertEngine] Watchlist rule ${rule.id}: Looking for stage=${targetStage} in watchlist ${watchlist.name} (${watchlist.symbols.length} symbols)`);
+        
+        // Find scan results that are in the watchlist and match the target stage
+        const matchingResults = scanResults.filter(result => {
+          // Must be in watchlist
+          if (!watchlistSymbols.has(result.ticker.toUpperCase())) return false;
+          
+          // Stage check
+          if (result.stage !== targetStage) return false;
+          
+          // Already triggered check
+          if (previouslyTriggered.has(result.ticker)) return false;
+          
+          // Min pattern score filter
+          if (payload?.minPatternScore !== undefined && payload.minPatternScore !== null) {
+            if ((result.patternScore ?? 0) < payload.minPatternScore) return false;
+          }
+          
+          // Calculate % to resistance for this scan result
+          const resistancePercent = result.resistance && result.price 
+            ? ((result.resistance - result.price) / result.price) * 100 
+            : null;
+          
+          // Min % to resistance filter
+          if (payload?.minResistancePercent !== undefined && payload.minResistancePercent !== null) {
+            if (resistancePercent === null || resistancePercent < payload.minResistancePercent) return false;
+          }
+          
+          // Max % to resistance filter
+          if (payload?.maxResistancePercent !== undefined && payload.maxResistancePercent !== null) {
+            if (resistancePercent === null || resistancePercent > payload.maxResistancePercent) return false;
+          }
+          
+          return true;
+        });
+        
+        console.log(`[AlertEngine] Watchlist rule ${rule.id}: Found ${matchingResults.length} matching results`);
+        
+        for (const result of matchingResults) {
+          const eventKey = generateEventKey(rule.id, `${result.ticker}:${targetStage}`, now);
+          
+          const existingEvent = await storage.getAlertEventByKey(eventKey);
+          if (existingEvent) {
+            continue;
+          }
+          
+          const eventData: InsertAlertEvent = {
+            ruleId: rule.id,
+            userId: rule.userId,
+            symbol: result.ticker,
+            eventKey,
+            fromState: null,
+            toState: targetStage,
+            price: result.price,
+            payload: {
+              resistance: result.resistance,
+              stopLoss: result.stopLoss,
+              volumeRatio: result.rvol,
+              changePercent: result.changePercent,
+              patternScore: result.patternScore,
+              watchlistName: watchlist.name,
+              message: generateAlertMessage(result.ticker, null, targetStage, result.price),
+            },
+            deliveryStatus: { push: false, webhook: false },
+            isRead: false,
+          };
+          
+          const event = await storage.createAlertEvent(eventData);
+          createdEvents.push(event);
+          newlyTriggered.push(result.ticker);
+          
+          const deliveryStatus: { push?: boolean; pushSentAt?: string; webhook?: boolean; webhookSentAt?: string; endpointName?: string } = { push: false, webhook: false };
+          
+          // Send push notification if enabled
+          if (rule.sendPushNotification !== false) {
+            try {
+              const { sendAlertPushNotification } = await import("./push-service");
+              await sendAlertPushNotification(event);
+              deliveryStatus.push = true;
+              deliveryStatus.pushSentAt = new Date().toISOString();
+            } catch (pushError) {
+              console.log(`[AlertEngine] Push notification error: ${pushError}`);
+            }
+          }
+          
+          // Send webhook if enabled and endpoint configured
+          if (rule.sendWebhook && rule.automationEndpointId) {
+            const entryPrice = result.price;
+            const stopLoss = result.stopLoss || entryPrice * 0.93;
+            const riskAmount = entryPrice - stopLoss;
+            const targetPrice = entryPrice + (riskAmount * 2);
+            
+            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+            
+            const webhookResult = await sendWebhookToEndpoint(
+              rule.automationEndpointId,
+              result.ticker,
+              entryPrice,
+              targetPrice,
+              stopLoss
+            );
+            
+            if (webhookResult.success) {
+              deliveryStatus.webhook = true;
+              deliveryStatus.webhookSentAt = new Date().toISOString();
+              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
+              console.log(`[AlertEngine] Webhook sent for ${result.ticker} (watchlist: ${watchlist.name})`);
+            } else {
+              console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+            }
+          }
+          
+          await storage.updateAlertEvent(event.id, { deliveryStatus });
+          
+          console.log(`[AlertEngine] Watchlist alert triggered: ${result.ticker} (from ${watchlist.name}) entered ${targetStage}`);
+        }
+        
+        // Update rule with newly triggered symbols
+        if (newlyTriggered.length > 0) {
+          await storage.updateAlertRule(rule.id, {
+            lastEvaluatedAt: now,
+            triggeredSymbols: [...Array.from(previouslyTriggered), ...newlyTriggered],
+          });
+        }
+      } catch (error) {
+        console.error(`[AlertEngine] Error processing watchlist rule ${rule.id}:`, error);
       }
     }
   }
