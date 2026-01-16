@@ -188,7 +188,8 @@ export const insertAlertRuleSchema = createInsertSchema(alertRules).omit({
   createdAt: true, 
   updatedAt: true, 
   lastEvaluatedAt: true,
-  lastState: true 
+  lastState: true,
+  triggeredSymbols: true,
 });
 export type InsertAlertRule = z.infer<typeof insertAlertRuleSchema>;
 export type AlertRule = typeof alertRules.$inferSelect;

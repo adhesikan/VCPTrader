@@ -593,6 +593,7 @@ export async function registerRoutes(
       const rule = await storage.createAlertRule(ruleData);
       res.json(rule);
     } catch (error) {
+      console.error("[alert-rules] Create error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
