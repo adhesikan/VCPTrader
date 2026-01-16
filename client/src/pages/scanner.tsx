@@ -777,6 +777,12 @@ export default function Scanner() {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{result.name || result.ticker}</p>
+                        {result.createdAt && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground/70">
+                            <Clock className="h-3 w-3" />
+                            <span>{format(new Date(result.createdAt), "MMM d, h:mm a")}</span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">${result.price?.toFixed(2)}</span>
                           <span className={cn(
@@ -883,6 +889,12 @@ export default function Scanner() {
                           <span className="font-semibold">{result.ticker}</span>
                           <span className="text-muted-foreground text-sm ml-2 hidden sm:inline">{result.name}</span>
                         </div>
+                        {result.createdAt && (
+                          <span className="hidden lg:flex items-center gap-1 text-xs text-muted-foreground/70">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(result.createdAt), "h:mm a")}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm shrink-0">
                         <span className="font-medium w-16 text-right">${result.price?.toFixed(2)}</span>
