@@ -185,6 +185,11 @@ async function runStartupMigrations() {
         END IF;
       END $$;
     `);
+
+    // Fix: Make symbol column nullable for global alerts
+    await db.execute(sql`
+      ALTER TABLE alert_rules ALTER COLUMN symbol DROP NOT NULL;
+    `);
     
     log("Startup migrations completed successfully", "migrations");
   } catch (error) {

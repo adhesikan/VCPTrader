@@ -452,6 +452,9 @@ async function migrate() {
         END IF;
       END $$;
     `);
+    
+    // Fix: Make symbol column nullable for global alerts
+    await client.query(`ALTER TABLE alert_rules ALTER COLUMN symbol DROP NOT NULL;`);
     console.log('Verified all columns exist in alert_rules');
 
     console.log('Migrations complete!');
