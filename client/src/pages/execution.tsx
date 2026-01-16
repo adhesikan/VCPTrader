@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { 
   Zap, ExternalLink, CheckCircle2, Circle, ArrowRight, Plus,
   Settings, Activity, Link2, Shield, Copy, RefreshCw, XCircle,
-  Wallet, BarChart3, Clock, AlertTriangle
+  Wallet, BarChart3, Clock, AlertTriangle, TrendingUp, TrendingDown, History
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,27 @@ interface AutomationEndpoint {
   updatedAt: string;
 }
 
+interface Trade {
+  id: string;
+  userId: string;
+  symbol: string;
+  strategyId: string;
+  endpointId?: string;
+  side: string;
+  status: string;
+  entryPrice?: number;
+  exitPrice?: number;
+  quantity?: number;
+  stopLoss?: number;
+  target?: number;
+  pnl?: number;
+  pnlPercent?: number;
+  setupPayload?: any;
+  entryTimestamp?: string;
+  exitTimestamp?: string;
+  createdAt: string;
+}
+
 const ALGOPILOTX_URL = "https://app.algopilotx.com";
 
 export default function ExecutionCockpit() {
@@ -51,9 +73,14 @@ export default function ExecutionCockpit() {
   const [formName, setFormName] = useState("");
   const [formWebhookUrl, setFormWebhookUrl] = useState("");
   const [formNotes, setFormNotes] = useState("");
+  const [activeTab, setActiveTab] = useState("setup");
 
   const { data: endpoints, isLoading: endpointsLoading } = useQuery<AutomationEndpoint[]>({
     queryKey: ["/api/automation-endpoints"],
+  });
+
+  const { data: trades, isLoading: tradesLoading } = useQuery<Trade[]>({
+    queryKey: ["/api/trades"],
   });
 
   const hasEndpoints = endpoints && endpoints.length > 0;
@@ -167,17 +194,22 @@ export default function ExecutionCockpit() {
               Connect VCP Trader to AlgoPilotX for self-directed automated trade execution
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/automation" data-testid="link-automation-settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Advanced Settings
-              </Link>
-            </Button>
-          </div>
         </div>
 
-        <Alert className="border-primary/20 bg-primary/5">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList>
+            <TabsTrigger value="setup" data-testid="tab-setup">
+              <Zap className="h-4 w-4 mr-2" />
+              Setup
+            </TabsTrigger>
+            <TabsTrigger value="trades" data-testid="tab-trades">
+              <History className="h-4 w-4 mr-2" />
+              Trades History ({trades?.length || 0})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="setup" className="mt-6 space-y-6">
+            <Alert className="border-primary/20 bg-primary/5">
           <Shield className="h-4 w-4" />
           <AlertTitle>Market Intelligence & User-Controlled Automation</AlertTitle>
           <AlertDescription className="space-y-2">
@@ -454,8 +486,120 @@ export default function ExecutionCockpit() {
                 </CardContent>
               </Card>
             )}
+            </div>
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="trades" className="mt-6">
+            {tradesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : !trades || trades.length === 0 ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <History className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium">No Trades Yet</h3>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                      When you send trades via InstaTrade or automated alerts, they'll appear here.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {trades.map((trade) => (
+                  <Card key={trade.id} data-testid={`trade-card-${trade.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center",
+                            trade.side === "LONG" ? "bg-green-500/10" : "bg-red-500/10"
+                          )}>
+                            {trade.side === "LONG" ? (
+                              <TrendingUp className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <TrendingDown className="h-5 w-5 text-red-500" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold font-mono text-lg">{trade.symbol}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">{trade.strategyId}</Badge>
+                              <span>{trade.side}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge 
+                            variant={trade.status === "OPEN" ? "default" : trade.status === "CLOSED" ? "secondary" : "outline"}
+                            className="mb-1"
+                          >
+                            {trade.status}
+                          </Badge>
+                          {trade.entryTimestamp && (
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(trade.entryTimestamp), "MMM d, h:mm a")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <div className="text-muted-foreground text-xs">Entry</div>
+                          <div className="font-mono font-medium">
+                            {trade.entryPrice ? `$${trade.entryPrice.toFixed(2)}` : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground text-xs">Target</div>
+                          <div className="font-mono font-medium text-green-600">
+                            {trade.target ? `$${trade.target.toFixed(2)}` : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground text-xs">Stop Loss</div>
+                          <div className="font-mono font-medium text-red-600">
+                            {trade.stopLoss ? `$${trade.stopLoss.toFixed(2)}` : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground text-xs">P&L</div>
+                          <div className={cn(
+                            "font-mono font-medium",
+                            trade.pnl && trade.pnl > 0 ? "text-green-600" : 
+                            trade.pnl && trade.pnl < 0 ? "text-red-600" : ""
+                          )}>
+                            {trade.pnl != null ? (
+                              <>
+                                {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
+                                {trade.pnlPercent != null && (
+                                  <span className="text-xs ml-1">
+                                    ({trade.pnlPercent >= 0 ? "+" : ""}{trade.pnlPercent.toFixed(1)}%)
+                                  </span>
+                                )}
+                              </>
+                            ) : "-"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {trade.exitTimestamp && (
+                        <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                          Closed: {format(new Date(trade.exitTimestamp), "MMM d, h:mm a")}
+                          {trade.exitPrice && ` @ $${trade.exitPrice.toFixed(2)}`}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
