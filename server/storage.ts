@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable } from "@shared/schema";
-import { desc } from "drizzle-orm";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable } from "@shared/schema";
+import { desc, inArray, lt } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -49,6 +49,7 @@ import type {
   InsertAutomationEndpoint,
   Trade,
   InsertTrade,
+  OpportunityFirstSeen,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -174,6 +175,11 @@ export interface IStorage {
   getTrade(id: string): Promise<Trade | null>;
   createTrade(trade: InsertTrade): Promise<Trade>;
   updateTrade(id: string, data: Partial<Trade>): Promise<Trade | null>;
+
+  getOpportunityFirstSeen(ticker: string): Promise<OpportunityFirstSeen | null>;
+  upsertOpportunityFirstSeen(ticker: string, stage: string, strategy?: string): Promise<OpportunityFirstSeen>;
+  updateOpportunityLastSeen(tickers: string[]): Promise<void>;
+  cleanupStaleOpportunities(): Promise<void>;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1639,6 +1645,62 @@ export class MemStorage implements IStorage {
       .where(eq(tradesTable.id, id))
       .returning();
     return updated || null;
+  }
+
+  async getOpportunityFirstSeen(ticker: string): Promise<OpportunityFirstSeen | null> {
+    const [record] = await db
+      .select()
+      .from(opportunityFirstSeenTable)
+      .where(eq(opportunityFirstSeenTable.ticker, ticker))
+      .limit(1);
+    return record || null;
+  }
+
+  async upsertOpportunityFirstSeen(ticker: string, stage: string, strategy?: string): Promise<OpportunityFirstSeen> {
+    const existing = await this.getOpportunityFirstSeen(ticker);
+    const now = new Date();
+    
+    if (existing) {
+      const [updated] = await db
+        .update(opportunityFirstSeenTable)
+        .set({ 
+          stage,
+          strategy: strategy || existing.strategy,
+          lastSeenAt: now 
+        })
+        .where(eq(opportunityFirstSeenTable.ticker, ticker))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(opportunityFirstSeenTable)
+        .values({
+          ticker,
+          stage,
+          strategy,
+          firstSeenAt: now,
+          lastSeenAt: now,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async updateOpportunityLastSeen(tickers: string[]): Promise<void> {
+    if (tickers.length === 0) return;
+    
+    const now = new Date();
+    await db
+      .update(opportunityFirstSeenTable)
+      .set({ lastSeenAt: now })
+      .where(inArray(opportunityFirstSeenTable.ticker, tickers));
+  }
+
+  async cleanupStaleOpportunities(): Promise<void> {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    await db
+      .delete(opportunityFirstSeenTable)
+      .where(lt(opportunityFirstSeenTable.lastSeenAt, oneHourAgo));
   }
 }
 

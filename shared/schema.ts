@@ -96,6 +96,17 @@ export const insertScanResultSchema = createInsertSchema(scanResults).omit({ id:
 export type InsertScanResult = z.infer<typeof insertScanResultSchema>;
 export type ScanResult = typeof scanResults.$inferSelect;
 
+export const opportunityFirstSeen = pgTable("opportunity_first_seen", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticker: text("ticker").notNull().unique(),
+  stage: text("stage").notNull(),
+  strategy: text("strategy"),
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+});
+
+export type OpportunityFirstSeen = typeof opportunityFirstSeen.$inferSelect;
+
 export const AlertType = {
   BREAKOUT: "BREAKOUT",
   STOP_HIT: "STOP_HIT",

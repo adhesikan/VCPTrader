@@ -459,8 +459,28 @@ export async function registerRoutes(
         await storage.createScanResult(result);
       }
       
+      // Track first-seen timestamps for BREAKOUT opportunities
+      const breakoutResults = results.filter(r => r.stage === "BREAKOUT");
+      const breakoutTickers = breakoutResults.map(r => r.ticker);
+      
+      // Cleanup stale opportunities (those not seen in the last hour)
+      await storage.cleanupStaleOpportunities();
+      
+      // Upsert first-seen records for current breakouts
+      const firstSeenMap: Record<string, Date> = {};
+      for (const result of breakoutResults) {
+        const record = await storage.upsertOpportunityFirstSeen(result.ticker, result.stage, strategy);
+        firstSeenMap[result.ticker] = record.firstSeenAt;
+      }
+      
+      // Add firstSeenAt to results
+      const resultsWithFirstSeen = results.map(r => ({
+        ...r,
+        firstSeenAt: firstSeenMap[r.ticker] || null,
+      }));
+      
       res.json({
-        results,
+        results: resultsWithFirstSeen,
         metadata: {
           isLive: true,
           provider: connection.provider,
