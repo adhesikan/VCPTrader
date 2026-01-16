@@ -117,6 +117,7 @@ export default function Scanner() {
   const [selectedUniverse, setSelectedUniverse] = useState<string>("sp500");
   const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
     const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showStrategyInfo, setShowStrategyInfo] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [featuredViewMode, setFeaturedViewMode] = useState<"cards" | "list">("cards");
   const [filters, setFilters] = useState<ScannerFilters>({
@@ -911,9 +912,59 @@ export default function Scanner() {
                   </SelectContent>
                 </Select>
                 {currentStrategyConfig && (
-                  <div className="flex-1 p-3 rounded-md bg-muted/50 border" data-testid="strategy-description">
-                    <p className="text-sm font-medium">{currentStrategyConfig.displayName}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{currentStrategyConfig.whatItLooksFor}</p>
+                  <div className="flex-1" data-testid="strategy-description">
+                    <Collapsible open={showStrategyInfo} onOpenChange={setShowStrategyInfo}>
+                      <button
+                        onClick={() => setShowStrategyInfo(!showStrategyInfo)}
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        data-testid="button-toggle-strategy-info"
+                      >
+                        <Info className="h-4 w-4" />
+                        <span>{showStrategyInfo ? "Hide" : "Show"} strategy details</span>
+                        <ChevronDown className={cn("h-3 w-3 transition-transform", showStrategyInfo && "rotate-180")} />
+                      </button>
+                      <CollapsibleContent>
+                        <div className="mt-3 p-4 rounded-md bg-muted/50 border space-y-3">
+                          <div>
+                            <p className="text-sm font-medium">{currentStrategyConfig.displayName}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{currentStrategyConfig.whatItLooksFor}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Core Conditions:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              {currentStrategyConfig.coreConditions.map((condition, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-primary mt-0.5">•</span>
+                                  <span>{condition}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Trigger Alerts:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              {currentStrategyConfig.triggerAlerts.map((alert, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-chart-2 mt-0.5">•</span>
+                                  <span>{alert}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Risk/Exit Reference:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              {currentStrategyConfig.riskExitReference.map((ref, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-destructive mt-0.5">•</span>
+                                  <span>{ref}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )}
               </div>
