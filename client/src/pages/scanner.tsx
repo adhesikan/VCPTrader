@@ -4,7 +4,8 @@ import { Link, useLocation } from "wouter";
 import { 
   Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
   TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
-  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen, ExternalLink
+  AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen, ExternalLink,
+  ArrowUpDown, Filter, SlidersHorizontal
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -119,6 +120,11 @@ export default function Scanner() {
     const [showAdvanced, setShowAdvanced] = useState(false);
   const [showStrategyInfo, setShowStrategyInfo] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("patternScore");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [minPatternScore, setMinPatternScore] = useState<number | null>(null);
+  const [maxResistancePercent, setMaxResistancePercent] = useState<number | null>(null);
+  const [stageFilter, setStageFilter] = useState<string>("all");
   const [featuredViewMode, setFeaturedViewMode] = useState<"cards" | "list">("cards");
   const [filters, setFilters] = useState<ScannerFilters>({
     minPrice: 5,
@@ -574,11 +580,72 @@ export default function Scanner() {
 
   const rawResults = liveResults || storedResults;
   
+  const getResistancePercent = (result: ScanResult) => {
+    if (!result.resistance || !result.price) return null;
+    return ((result.resistance - result.price) / result.price) * 100;
+  };
+  
   const filteredResults = rawResults?.filter(r => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return r.ticker.toLowerCase().includes(query) || 
-           r.name?.toLowerCase().includes(query);
+    // Text search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (!r.ticker.toLowerCase().includes(query) && !r.name?.toLowerCase().includes(query)) {
+        return false;
+      }
+    }
+    // Stage filter
+    if (stageFilter !== "all") {
+      const stage = r.stage?.toUpperCase();
+      if (stageFilter === "breakout" && stage !== "BREAKOUT" && stage !== "TRIGGERED") return false;
+      if (stageFilter === "ready" && stage !== "READY") return false;
+      if (stageFilter === "forming" && stage !== "FORMING") return false;
+    }
+    // Pattern score filter
+    if (minPatternScore !== null && (r.patternScore ?? 0) < minPatternScore) {
+      return false;
+    }
+    // Resistance % filter
+    if (maxResistancePercent !== null) {
+      const resistPct = getResistancePercent(r);
+      if (resistPct === null || resistPct > maxResistancePercent) {
+        return false;
+      }
+    }
+    return true;
+  })?.sort((a, b) => {
+    let aVal: number | null = 0;
+    let bVal: number | null = 0;
+    switch (sortBy) {
+      case "patternScore":
+        aVal = a.patternScore ?? null;
+        bVal = b.patternScore ?? null;
+        break;
+      case "resistancePercent":
+        aVal = getResistancePercent(a);
+        bVal = getResistancePercent(b);
+        break;
+      case "price":
+        aVal = a.price ?? null;
+        bVal = b.price ?? null;
+        break;
+      case "volume":
+        aVal = a.volume ?? null;
+        bVal = b.volume ?? null;
+        break;
+      case "rvol":
+        aVal = a.rvol ?? null;
+        bVal = b.rvol ?? null;
+        break;
+      case "changePercent":
+        aVal = a.changePercent ?? null;
+        bVal = b.changePercent ?? null;
+        break;
+    }
+    // Push nulls to the bottom regardless of sort order
+    if (aVal === null && bVal === null) return 0;
+    if (aVal === null) return 1;
+    if (bVal === null) return -1;
+    return sortOrder === "desc" ? bVal - aVal : aVal - bVal;
   });
 
   const triggeredCount = filteredResults?.filter(r => {
@@ -1264,39 +1331,133 @@ export default function Scanner() {
       </Card>
 
       {filteredResults && filteredResults.length > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2 text-sm flex-wrap">
-            <span className="text-muted-foreground">{filteredResults.length} results</span>
-            {scanMetadata && (
-              <span className="text-xs text-muted-foreground">
-                ({scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols
-                {scanMetadata.batchCount && scanMetadata.batchCount > 1 && `, ${scanMetadata.batchCount} batches`}
-                {" "}in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s)
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filter results..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8 h-9"
-                data-testid="input-search"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                  onClick={() => setSearchQuery("")}
-                  data-testid="button-clear-search"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2 text-sm flex-wrap">
+              <span className="text-muted-foreground">{filteredResults.length} results</span>
+              {scanMetadata && (
+                <span className="text-xs text-muted-foreground">
+                  ({scanMetadata.symbolsReturned}/{scanMetadata.symbolsRequested} symbols
+                  {scanMetadata.batchCount && scanMetadata.batchCount > 1 && `, ${scanMetadata.batchCount} batches`}
+                  {" "}in {(scanMetadata.scanTimeMs / 1000).toFixed(1)}s)
+                </span>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <div className="relative max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter results..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 h-9"
+                  data-testid="input-search"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                    onClick={() => setSearchQuery("")}
+                    data-testid="button-clear-search"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 flex-wrap p-3 rounded-md bg-muted/30 border">
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Sort:</span>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-40 h-8" data-testid="select-sort-by">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="patternScore">Pattern Score</SelectItem>
+                  <SelectItem value="resistancePercent">% to Resistance</SelectItem>
+                  <SelectItem value="price">Price</SelectItem>
+                  <SelectItem value="volume">Volume</SelectItem>
+                  <SelectItem value="rvol">RVOL</SelectItem>
+                  <SelectItem value="changePercent">% Change</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                data-testid="button-toggle-sort-order"
+              >
+                <ArrowUpDown className={cn("h-4 w-4", sortOrder === "asc" && "rotate-180")} />
+              </Button>
+              <span className="text-xs text-muted-foreground">{sortOrder === "desc" ? "High to Low" : "Low to High"}</span>
+            </div>
+            
+            <div className="h-6 w-px bg-border" />
+            
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filter:</span>
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-28 h-8" data-testid="select-stage-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  <SelectItem value="breakout">Breakout</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="forming">Forming</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Min Score:</span>
+              <Input
+                type="number"
+                placeholder="0"
+                value={minPatternScore ?? ""}
+                onChange={(e) => setMinPatternScore(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-16 h-8 text-sm"
+                min={0}
+                max={100}
+                data-testid="input-min-score"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Max % to Resist:</span>
+              <Input
+                type="number"
+                placeholder="Any"
+                value={maxResistancePercent ?? ""}
+                onChange={(e) => setMaxResistancePercent(e.target.value ? parseFloat(e.target.value) : null)}
+                className="w-16 h-8 text-sm"
+                min={0}
+                step={0.5}
+                data-testid="input-max-resistance"
+              />
+            </div>
+            
+            {(stageFilter !== "all" || minPatternScore !== null || maxResistancePercent !== null) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStageFilter("all");
+                  setMinPatternScore(null);
+                  setMaxResistancePercent(null);
+                }}
+                className="h-8 text-xs"
+                data-testid="button-clear-filters"
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
         </div>
       )}

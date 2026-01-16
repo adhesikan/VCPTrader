@@ -27,7 +27,8 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AlertRule, AlertEvent, Watchlist, InsertAlertRule, RuleConditionTypeValue, AutomationEndpoint } from "@shared/schema";
-import { RuleConditionType, PatternStage } from "@shared/schema";
+import { RuleConditionType, PatternStage, StrategyType } from "@shared/schema";
+import { STRATEGY_CONFIGS } from "@shared/strategies";
 import { Zap } from "lucide-react";
 
 function getStageBadgeVariant(stage: string): "default" | "secondary" | "destructive" | "outline" {
@@ -56,10 +57,15 @@ function AlertRuleCard({
   endpoints?: AutomationEndpoint[];
   onUpdateEndpoint?: (id: string, endpointId: string | null) => void;
 }) {
-  const payload = rule.conditionPayload as { targetStage?: string } | null;
+  const payload = rule.conditionPayload as { 
+    targetStage?: string; 
+    minPatternScore?: number;
+    maxResistancePercent?: number;
+  } | null;
   const targetStage = payload?.targetStage || "BREAKOUT";
   const lastState = rule.lastState as { stage?: string; price?: number } | null;
   const assignedEndpoint = endpoints?.find(e => e.id === rule.automationEndpointId);
+  const strategyConfig = STRATEGY_CONFIGS.find(s => s.id === rule.strategy);
   
   return (
     <Card 
@@ -77,10 +83,25 @@ function AlertRuleCard({
             ) : (
               <span className="text-lg font-semibold font-mono">{rule.symbol}</span>
             )}
+            {strategyConfig && (
+              <Badge variant="outline" className="gap-1 text-xs">
+                {strategyConfig.displayName}
+              </Badge>
+            )}
             <Badge variant={getStageBadgeVariant(targetStage)} className="gap-1">
               <TrendingUp className="h-3 w-3" />
               {targetStage}
             </Badge>
+            {payload?.minPatternScore && (
+              <Badge variant="outline" className="gap-1 text-xs">
+                Score ≥ {payload.minPatternScore}
+              </Badge>
+            )}
+            {payload?.maxResistancePercent && (
+              <Badge variant="outline" className="gap-1 text-xs">
+                ≤ {payload.maxResistancePercent}% to R
+              </Badge>
+            )}
             {rule.sendWebhook && assignedEndpoint && (
               <Badge variant="secondary" className="gap-1">
                 <Zap className="h-3 w-3" />
@@ -243,6 +264,9 @@ export default function Alerts() {
     isGlobal: true,
     sendPushNotification: true,
     sendWebhook: false,
+    strategy: "VCP" as string,
+    minPatternScore: null as number | null,
+    maxResistancePercent: null as number | null,
   });
   const { toast } = useToast();
 
@@ -278,7 +302,7 @@ export default function Alerts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alert-rules"] });
       setIsCreateOpen(false);
-      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false });
+      setNewRule({ symbol: "", targetStage: "BREAKOUT", automationEndpointId: "none", isGlobal: true, sendPushNotification: true, sendWebhook: false, strategy: "VCP", minPatternScore: null, maxResistancePercent: null });
       setSelectedWatchlist("none");
       toast({
         title: "Alert Rule Created",
@@ -345,12 +369,22 @@ export default function Alerts() {
   const handleCreateRule = () => {
     // For global alerts, symbol is optional
     if (newRule.isGlobal || newRule.symbol) {
+      const conditionPayload: Record<string, unknown> = { 
+        targetStage: newRule.targetStage,
+      };
+      if (newRule.minPatternScore !== null) {
+        conditionPayload.minPatternScore = newRule.minPatternScore;
+      }
+      if (newRule.maxResistancePercent !== null) {
+        conditionPayload.maxResistancePercent = newRule.maxResistancePercent;
+      }
+      
       createRuleMutation.mutate({
         symbol: newRule.isGlobal ? null : newRule.symbol.toUpperCase(),
         isGlobal: newRule.isGlobal,
         conditionType: RuleConditionType.STAGE_ENTERED,
-        conditionPayload: { targetStage: newRule.targetStage },
-        strategy: "VCP",
+        conditionPayload,
+        strategy: newRule.strategy,
         timeframe: "1d",
         isEnabled: true,
         sendPushNotification: newRule.sendPushNotification,
@@ -474,7 +508,29 @@ export default function Alerts() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="stage">Target VCP Stage</Label>
+                <Label htmlFor="strategy">Strategy</Label>
+                <Select
+                  value={newRule.strategy}
+                  onValueChange={(value) => setNewRule(prev => ({ ...prev, strategy: value }))}
+                >
+                  <SelectTrigger id="strategy" data-testid="select-rule-strategy">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STRATEGY_CONFIGS.map((strategy) => (
+                      <SelectItem key={strategy.id} value={strategy.id}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{strategy.displayName}</span>
+                          <span className="text-xs text-muted-foreground">({strategy.category})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stage">Target Stage</Label>
                 <Select
                   value={newRule.targetStage}
                   onValueChange={(value) => setNewRule(prev => ({ ...prev, targetStage: value }))}
@@ -498,14 +554,58 @@ export default function Alerts() {
                     <SelectItem value="FORMING">
                       <div className="flex flex-col items-start">
                         <span className="font-medium">Forming</span>
-                        <span className="text-xs text-muted-foreground">Alert when VCP pattern starts forming</span>
+                        <span className="text-xs text-muted-foreground">Alert when pattern starts forming</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  You'll be notified when the stock enters this VCP stage
+                  You'll be notified when the stock enters this stage
                 </p>
+              </div>
+
+              <div className="space-y-3 p-3 rounded-lg border">
+                <Label className="font-medium">Optional Filters</Label>
+                <p className="text-xs text-muted-foreground">
+                  Only trigger alert when these conditions are met
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="minScore" className="text-xs">Min Pattern Score</Label>
+                    <Input
+                      id="minScore"
+                      type="number"
+                      placeholder="Any"
+                      value={newRule.minPatternScore ?? ""}
+                      onChange={(e) => setNewRule(prev => ({ 
+                        ...prev, 
+                        minPatternScore: e.target.value ? parseInt(e.target.value) : null 
+                      }))}
+                      min={0}
+                      max={100}
+                      className="h-8"
+                      data-testid="input-min-score"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="maxResist" className="text-xs">Max % to Resistance</Label>
+                    <Input
+                      id="maxResist"
+                      type="number"
+                      placeholder="Any"
+                      value={newRule.maxResistancePercent ?? ""}
+                      onChange={(e) => setNewRule(prev => ({ 
+                        ...prev, 
+                        maxResistancePercent: e.target.value ? parseFloat(e.target.value) : null 
+                      }))}
+                      min={0}
+                      step={0.5}
+                      className="h-8"
+                      data-testid="input-max-resistance"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3 p-3 rounded-lg border">
