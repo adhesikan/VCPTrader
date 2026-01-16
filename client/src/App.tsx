@@ -135,7 +135,7 @@ function AlertBell() {
   const unreadCount = alertEvents?.filter(e => !e.isRead).length || 0;
 
   return (
-    <Link href="/alerts" data-testid="link-alerts-bell">
+    <Link href="/alerts?tab=history" data-testid="link-alerts-bell">
       <Button 
         variant="ghost" 
         size="icon" 

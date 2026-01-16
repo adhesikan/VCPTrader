@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Bell, Plus, Check, Trash2, List, Power, PowerOff, Clock, AlertCircle, TrendingUp, ExternalLink, HelpCircle } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,7 +205,7 @@ function AlertEventCard({
   
   return (
     <Card 
-      className={`relative overflow-visible ${!event.isRead ? "border-primary/30" : ""}`}
+      className={`relative overflow-visible ${!event.isRead ? "border-primary/30" : "bg-muted/50 opacity-75"}`}
       data-testid={`event-card-${event.id}`}
     >
       <CardContent className="p-4">
@@ -269,6 +269,10 @@ function AlertEventCard({
 }
 
 export default function Alerts() {
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const initialTab = urlParams.get("tab") === "history" ? "history" : "rules";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("none");
   const [newRule, setNewRule] = useState({
@@ -783,7 +787,7 @@ export default function Alerts() {
         </Badge>
       </div>
 
-      <Tabs defaultValue="rules" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="rules" data-testid="tab-rules">
             Rules ({rules?.length || 0})
