@@ -151,6 +151,7 @@ export default function Scanner() {
   const [autoRunOnLoad, setAutoRunOnLoad] = useState(false);
   const [shouldAutoRun, setShouldAutoRun] = useState(false);
   const [initialScanDone, setInitialScanDone] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(300000); // Default 5 minutes
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -166,7 +167,7 @@ export default function Scanner() {
 
   const { data: storedResults, isLoading, refetch, dataUpdatedAt } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan/results"],
-    refetchInterval: 60000,
+    refetchInterval: autoRefreshInterval > 0 ? autoRefreshInterval : false,
   });
 
   const { data: universes } = useQuery<UniversesResponse>({
@@ -1302,6 +1303,26 @@ export default function Scanner() {
                 data-testid="switch-auto-run"
               />
               <Label htmlFor="autoRunOnLoad" className="text-sm cursor-pointer whitespace-nowrap">Auto-run on load</Label>
+            </div>
+
+            <div className="flex items-center gap-2 ml-2">
+              <Label htmlFor="autoRefresh" className="text-sm whitespace-nowrap">Auto-refresh:</Label>
+              <Select
+                value={autoRefreshInterval.toString()}
+                onValueChange={(val) => setAutoRefreshInterval(Number(val))}
+              >
+                <SelectTrigger className="w-24 h-8" data-testid="select-auto-refresh">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Off</SelectItem>
+                  <SelectItem value="60000">1 min</SelectItem>
+                  <SelectItem value="120000">2 min</SelectItem>
+                  <SelectItem value="300000">5 min</SelectItem>
+                  <SelectItem value="600000">10 min</SelectItem>
+                  <SelectItem value="1800000">30 min</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {userDefaults && defaultsApplied && (
