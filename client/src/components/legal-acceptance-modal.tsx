@@ -133,6 +133,10 @@ export function LegalAcceptanceModal({ open, onAccepted }: LegalAcceptanceModalP
           </div>
         </div>
 
+        <p className="text-xs text-muted-foreground text-center" data-testid="text-legal-modal-disclaimer">
+          VCP Trader and AlgoPilotX are software tools for self-directed traders. Educational content only. Not investment advice. No guarantees. Users control all trading decisions and automation.
+        </p>
+
         <DialogFooter>
           <Button
             onClick={() => acceptMutation.mutate()}
