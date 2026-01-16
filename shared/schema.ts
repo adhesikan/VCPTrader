@@ -165,7 +165,7 @@ export const alertRules = pgTable("alert_rules", {
   strategy: text("strategy").notNull().default("VCP"),
   strategies: text("strategies").array(),
   timeframe: text("timeframe").notNull().default("1d"),
-  scanInterval: text("scan_interval").notNull().default("5m"),
+  scanInterval: text("scan_interval").default("5m"),
   conditionType: text("condition_type").notNull(),
   conditionPayload: jsonb("condition_payload"),
   scoreThreshold: integer("score_threshold"),
