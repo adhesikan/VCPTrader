@@ -393,7 +393,7 @@ export default function Scanner() {
       const response = await apiRequest("POST", "/api/scan/live", { 
         symbols, 
         strategy: selectedStrategy,
-        ...filters,
+        filters,
       });
       return response.json();
     },

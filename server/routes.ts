@@ -413,6 +413,7 @@ export async function registerRoutes(
 
       const requestedSymbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
       const strategy = req.body.strategy || StrategyType.VCP;
+      const { minPrice, maxPrice, minVolume, minRvol, excludeEtfs, excludeOtc } = req.body.filters || {};
       const startTime = Date.now();
       const BATCH_SIZE = 200;
       
@@ -437,7 +438,19 @@ export async function registerRoutes(
         allQuotes = await fetchQuotesFromBroker(connection, requestedSymbols);
       }
       
-      const results = quotesToScanResults(allQuotes, strategy);
+      // Apply filters to quotes before processing
+      const filteredQuotes = allQuotes.filter(quote => {
+        if (minPrice && quote.last < minPrice) return false;
+        if (maxPrice && quote.last > maxPrice) return false;
+        if (minVolume && quote.volume < minVolume) return false;
+        if (minRvol && quote.avgVolume) {
+          const rvol = quote.volume / quote.avgVolume;
+          if (rvol < minRvol) return false;
+        }
+        return true;
+      });
+      
+      const results = quotesToScanResults(filteredQuotes, strategy);
       const scanTime = Date.now() - startTime;
       
       // Store results in storage so chart page can access them
