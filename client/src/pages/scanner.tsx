@@ -894,21 +894,29 @@ export default function Scanner() {
           {engineMode === "single" ? (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Step 2: Select Strategy</Label>
-              <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-                <SelectTrigger className="w-full max-w-md" data-testid="select-strategy">
-                  <SelectValue placeholder="Select strategy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STRATEGY_CONFIGS.map((strategy) => (
-                    <SelectItem key={strategy.id} value={strategy.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{strategy.displayName}</span>
-                        <span className="text-xs text-muted-foreground">({strategy.category})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col lg:flex-row gap-4">
+                <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
+                  <SelectTrigger className="w-full lg:w-64" data-testid="select-strategy">
+                    <SelectValue placeholder="Select strategy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STRATEGY_CONFIGS.map((strategy) => (
+                      <SelectItem key={strategy.id} value={strategy.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{strategy.displayName}</span>
+                          <span className="text-xs text-muted-foreground">({strategy.category})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentStrategyConfig && (
+                  <div className="flex-1 p-3 rounded-md bg-muted/50 border" data-testid="strategy-description">
+                    <p className="text-sm font-medium">{currentStrategyConfig.displayName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{currentStrategyConfig.whatItLooksFor}</p>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
