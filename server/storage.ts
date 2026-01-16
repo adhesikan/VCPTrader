@@ -85,6 +85,7 @@ export interface IStorage {
 
   getBrokerConnection(userId: string): Promise<BrokerConnection | null>;
   getBrokerConnectionWithToken(userId: string): Promise<(BrokerConnection & { accessToken?: string; refreshToken?: string }) | null>;
+  getAnyActiveBrokerConnection(): Promise<BrokerConnection | null>;
   setBrokerConnection(userId: string, connection: Omit<InsertBrokerConnection, 'userId'>): Promise<BrokerConnection>;
   setBrokerConnectionWithTokens(userId: string, provider: string, accessToken: string, refreshToken?: string, expiresAt?: Date): Promise<BrokerConnection>;
   updateBrokerConnectionStatus(userId: string, isConnected: boolean): Promise<void>;
@@ -648,6 +649,15 @@ export class MemStorage implements IStorage {
       .select()
       .from(brokerConnections)
       .where(eq(brokerConnections.userId, userId))
+      .limit(1);
+    return connection || null;
+  }
+
+  async getAnyActiveBrokerConnection(): Promise<BrokerConnection | null> {
+    const [connection] = await db
+      .select()
+      .from(brokerConnections)
+      .where(eq(brokerConnections.isConnected, true))
       .limit(1);
     return connection || null;
   }

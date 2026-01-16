@@ -6,6 +6,8 @@ import { db } from "./db";
 import { brokerConnections } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { configurePushService } from "./push-service";
+import { startAlertEngine } from "./alert-engine";
+import { storage } from "./storage";
 
 // Run inline migrations on startup (more reliable than separate script)
 async function runStartupMigrations() {
@@ -287,6 +289,13 @@ async function restoreBrokerConnections() {
   configurePushService();
   await restoreBrokerConnections();
   await registerRoutes(httpServer, app);
+  
+  // Start alert engine (runs every 60 seconds)
+  startAlertEngine(
+    async () => storage.getAnyActiveBrokerConnection(),
+    60000
+  );
+  log("Alert engine started");
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

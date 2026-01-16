@@ -207,7 +207,7 @@ async function sendWebhookToEndpoint(
 }
 
 export async function processAlertRules(
-  connection: BrokerConnection
+  connection: BrokerConnection | null
 ): Promise<AlertEvent[]> {
   const enabledRules = await storage.getEnabledAlertRules();
   
@@ -225,6 +225,7 @@ export async function processAlertRules(
   // Process global rules against scan results
   if (globalRules.length > 0) {
     const scanResults = await storage.getScanResults();
+    console.log(`[AlertEngine] Processing ${globalRules.length} global rule(s) against ${scanResults.length} scan results`);
     
     for (const rule of globalRules) {
       try {
@@ -239,6 +240,8 @@ export async function processAlertRules(
         // Get previously triggered symbols for this rule
         const previouslyTriggered = new Set(rule.triggeredSymbols || []);
         const newlyTriggered: string[] = [];
+        
+        console.log(`[AlertEngine] Rule ${rule.id}: Looking for stage=${targetStage}, previouslyTriggered=${Array.from(previouslyTriggered).join(',') || 'none'}`);
         
         // Find scan results that match the target stage and optional filters
         const matchingResults = scanResults.filter(result => {
@@ -270,6 +273,8 @@ export async function processAlertRules(
           
           return true;
         });
+        
+        console.log(`[AlertEngine] Rule ${rule.id}: Found ${matchingResults.length} matching results`);
         
         for (const result of matchingResults) {
           const eventKey = generateEventKey(rule.id, `${result.ticker}:${targetStage}`, now);
@@ -353,8 +358,8 @@ export async function processAlertRules(
     }
   }
   
-  // Process symbol-specific rules
-  if (symbolRules.length > 0) {
+  // Process symbol-specific rules (requires broker connection)
+  if (symbolRules.length > 0 && connection) {
     const symbols = Array.from(new Set(symbolRules.map(r => r.symbol).filter((s): s is string => s !== null)));
     
     let quotes: QuoteData[] = [];
@@ -558,10 +563,7 @@ export function startAlertEngine(
   scheduledJob = setInterval(async () => {
     try {
       const connection = await getConnection();
-      if (!connection) {
-        return;
-      }
-      
+      // Process rules even without connection - global alerts use scan results
       const events = await processAlertRules(connection);
       if (events.length > 0) {
         console.log(`[AlertEngine] Created ${events.length} alert event(s)`);
@@ -571,12 +573,11 @@ export function startAlertEngine(
     }
   }, intervalMs);
   
+  // Run initial evaluation
   (async () => {
     try {
       const connection = await getConnection();
-      if (connection) {
-        await processAlertRules(connection);
-      }
+      await processAlertRules(connection);
     } catch (error) {
       console.error("[AlertEngine] Error in initial evaluation:", error);
     }
