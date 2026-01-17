@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { 
   Zap, ExternalLink, CheckCircle2, Circle, ArrowRight, Plus,
   Settings, Activity, Link2, Shield, Copy, RefreshCw, XCircle,
-  Wallet, BarChart3, Clock, AlertTriangle, TrendingUp, TrendingDown, History
+  Wallet, BarChart3, Clock, AlertTriangle, TrendingUp, TrendingDown, History, Bell
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ interface Trade {
   symbol: string;
   strategyId: string;
   endpointId?: string;
+  alertEventId?: string;
   side: string;
   status: string;
   entryPrice?: number;
@@ -526,9 +527,15 @@ export default function ExecutionCockpit() {
                           </div>
                           <div>
                             <div className="font-semibold font-mono text-lg">{trade.symbol}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                               <Badge variant="outline" className="text-xs">{trade.strategyId}</Badge>
                               <span>{trade.side}</span>
+                              {trade.alertEventId && (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <Bell className="h-3 w-3" />
+                                  From Alert
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>

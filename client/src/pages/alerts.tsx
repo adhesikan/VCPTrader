@@ -205,12 +205,19 @@ function AlertRuleCard({
 
 function AlertEventCard({ 
   event, 
-  onMarkRead 
+  onMarkRead,
+  onInstaTrade,
+  endpoints,
+  isTrading
 }: { 
   event: AlertEvent; 
   onMarkRead?: (id: string) => void;
+  onInstaTrade?: (event: AlertEvent, endpointId: string) => void;
+  endpoints?: AutomationEndpoint[];
+  isTrading?: boolean;
 }) {
-  const payload = event.payload as { message?: string; resistance?: number; stopLoss?: number } | null;
+  const [selectedEndpoint, setSelectedEndpoint] = useState<string>("");
+  const payload = event.payload as { message?: string; resistance?: number; stopLoss?: number; patternScore?: number } | null;
   const deliveryStatus = event.deliveryStatus as { 
     push?: boolean; 
     pushSentAt?: string; 
@@ -297,6 +304,39 @@ function AlertEventCard({
             <span className="text-xs text-muted-foreground">No delivery configured</span>
           )}
         </div>
+
+        {/* InstaTrade Action */}
+        {endpoints && endpoints.length > 0 && onInstaTrade && (
+          <div className="mt-3 pt-3 border-t flex items-center gap-2">
+            <Select 
+              value={selectedEndpoint} 
+              onValueChange={setSelectedEndpoint}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <Zap className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Select endpoint" />
+              </SelectTrigger>
+              <SelectContent>
+                {endpoints.filter(e => e.isActive).map((endpoint) => (
+                  <SelectItem key={endpoint.id} value={endpoint.id}>
+                    {endpoint.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="h-8 gap-1 text-xs"
+              disabled={!selectedEndpoint || isTrading || !event.price || event.price <= 0}
+              onClick={() => selectedEndpoint && onInstaTrade(event, selectedEndpoint)}
+              data-testid={`button-instatrade-${event.id}`}
+              title={!event.price || event.price <= 0 ? "Price data required for trade" : ""}
+            >
+              <Zap className="h-3 w-3" />
+              {isTrading ? "Sending..." : "Trade Now"}
+            </Button>
+          </div>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{timeAgo}</span>
@@ -432,6 +472,52 @@ export default function Alerts() {
       toast({ title: "All events marked as read" });
     },
   });
+
+  const instatradeMutation = useMutation({
+    mutationFn: async ({ event, endpointId }: { event: AlertEvent; endpointId: string }) => {
+      if (!event.price || event.price <= 0) {
+        throw new Error("Valid price required to execute trade");
+      }
+      
+      const payload = event.payload as { resistance?: number; stopLoss?: number; patternScore?: number } | null;
+      const price = event.price;
+      const resistance = payload?.resistance || price * 1.02;
+      const stopLoss = payload?.stopLoss || price * 0.93;
+      
+      const response = await apiRequest("POST", "/api/instatrade/entry", {
+        endpointId,
+        symbol: event.symbol,
+        strategyId: "VCP",
+        alertEventId: event.id,
+        setupPayload: {
+          price,
+          resistance,
+          stopLoss,
+          patternScore: payload?.patternScore || 75,
+          stage: event.toState,
+        },
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Trade Sent",
+        description: "Entry signal sent to endpoint",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Trade Failed",
+        description: error.message || "Could not send entry signal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleInstaTrade = (event: AlertEvent, endpointId: string) => {
+    instatradeMutation.mutate({ event, endpointId });
+  };
 
   const handleCreateRule = () => {
     // Allow global alerts, watchlist alerts, or single symbol alerts
@@ -936,6 +1022,9 @@ export default function Alerts() {
                   key={event.id}
                   event={event}
                   onMarkRead={(id) => markEventReadMutation.mutate(id)}
+                  onInstaTrade={handleInstaTrade}
+                  endpoints={automationEndpoints}
+                  isTrading={instatradeMutation.isPending}
                 />
               ))}
             </div>

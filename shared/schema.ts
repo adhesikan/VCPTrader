@@ -728,6 +728,7 @@ export const trades = pgTable("trades", {
   symbol: text("symbol").notNull(),
   strategyId: text("strategy_id").notNull(),
   endpointId: varchar("endpoint_id"),
+  alertEventId: varchar("alert_event_id"),
   entryExecutionId: varchar("entry_execution_id"),
   exitExecutionId: varchar("exit_execution_id"),
   side: text("side").notNull().default("LONG"),

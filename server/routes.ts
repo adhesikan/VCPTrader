@@ -2476,7 +2476,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { symbol, strategyId, endpointId, entryPrice, quantity, stopLoss, target, setupPayload } = req.body;
+      const { symbol, strategyId, endpointId, alertEventId, entryPrice, quantity, stopLoss, target, setupPayload } = req.body;
       if (!symbol || !strategyId) {
         return res.status(400).json({ error: "Symbol and strategyId are required" });
       }
@@ -2486,6 +2486,7 @@ export async function registerRoutes(
         symbol,
         strategyId,
         endpointId,
+        alertEventId,
         entryPrice,
         quantity,
         stopLoss,
@@ -2530,7 +2531,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { endpointId, symbol, strategyId, setupPayload } = req.body;
+      const { endpointId, symbol, strategyId, setupPayload, alertEventId } = req.body;
       if (!endpointId || !symbol || !strategyId) {
         return res.status(400).json({ error: "Endpoint, symbol, and strategyId are required" });
       }
@@ -2598,6 +2599,7 @@ export async function registerRoutes(
             symbol,
             strategyId,
             endpointId,
+            alertEventId,
             entryExecutionId: executionRequest.id,
             side: "LONG",
             status: "OPEN",
