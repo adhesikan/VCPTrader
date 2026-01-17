@@ -6,6 +6,32 @@ import { sendEntrySignalToProfile, createAutomationLogEntry, type EntrySignal } 
 import { resolveAutomationProfileForSignal, createAutomationEvent, type AutomationSignalContext } from "./automation-resolver";
 import { ALERT_DISCLAIMER, getStrategyDisplayName } from "@shared/strategies";
 
+/**
+ * Check if current time is within US market hours (9:30 AM - 4:00 PM ET)
+ * Webhooks/automation should only execute during market hours
+ */
+export function isWithinMarketHours(): boolean {
+  const now = new Date();
+  
+  // Convert to Eastern Time
+  const etFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
+  
+  const etParts = etFormatter.formatToParts(now);
+  const hour = parseInt(etParts.find(p => p.type === 'hour')?.value || '0');
+  const minute = parseInt(etParts.find(p => p.type === 'minute')?.value || '0');
+  
+  const timeInMinutes = hour * 60 + minute;
+  const marketOpen = 9 * 60 + 30;  // 9:30 AM = 570 minutes
+  const marketClose = 16 * 60;     // 4:00 PM = 960 minutes
+  
+  return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+}
+
 export interface VCPClassification {
   stage: PatternStageType;
   priceFromHigh: number;
@@ -325,32 +351,36 @@ export async function processAlertRules(
             }
           }
           
-          // Send webhook if enabled and endpoint configured
+          // Send webhook if enabled and endpoint configured (only during market hours)
           if (rule.sendWebhook && rule.automationEndpointId) {
-            // For webhook: entry at current price, target based on risk (entry - stop)
-            const entryPrice = result.price;
-            const stopLoss = result.stopLoss || entryPrice * 0.93;
-            const riskAmount = entryPrice - stopLoss;
-            const targetPrice = entryPrice + (riskAmount * 2); // 2R target
-            
-            // Get endpoint name for display
-            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
-            
-            const webhookResult = await sendWebhookToEndpoint(
-              rule.automationEndpointId,
-              result.ticker,
-              entryPrice,
-              targetPrice,
-              stopLoss
-            );
-            
-            if (webhookResult.success) {
-              deliveryStatus.webhook = true;
-              deliveryStatus.webhookSentAt = new Date().toISOString();
-              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
-              console.log(`[AlertEngine] Webhook sent for ${result.ticker}`);
+            if (isWithinMarketHours()) {
+              // For webhook: entry at current price, target based on risk (entry - stop)
+              const entryPrice = result.price;
+              const stopLoss = result.stopLoss || entryPrice * 0.93;
+              const riskAmount = entryPrice - stopLoss;
+              const targetPrice = entryPrice + (riskAmount * 2); // 2R target
+              
+              // Get endpoint name for display
+              const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+              
+              const webhookResult = await sendWebhookToEndpoint(
+                rule.automationEndpointId,
+                result.ticker,
+                entryPrice,
+                targetPrice,
+                stopLoss
+              );
+              
+              if (webhookResult.success) {
+                deliveryStatus.webhook = true;
+                deliveryStatus.webhookSentAt = new Date().toISOString();
+                deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
+                console.log(`[AlertEngine] Webhook sent for ${result.ticker}`);
+              } else {
+                console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+              }
             } else {
-              console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+              console.log(`[AlertEngine] Webhook skipped for ${result.ticker} (outside market hours 9:30 AM - 4:00 PM ET)`);
             }
           }
           
@@ -487,30 +517,34 @@ export async function processAlertRules(
             }
           }
           
-          // Send webhook if enabled and endpoint configured
+          // Send webhook if enabled and endpoint configured (only during market hours)
           if (rule.sendWebhook && rule.automationEndpointId) {
-            const entryPrice = result.price;
-            const stopLoss = result.stopLoss || entryPrice * 0.93;
-            const riskAmount = entryPrice - stopLoss;
-            const targetPrice = entryPrice + (riskAmount * 2);
-            
-            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
-            
-            const webhookResult = await sendWebhookToEndpoint(
-              rule.automationEndpointId,
-              result.ticker,
-              entryPrice,
-              targetPrice,
-              stopLoss
-            );
-            
-            if (webhookResult.success) {
-              deliveryStatus.webhook = true;
-              deliveryStatus.webhookSentAt = new Date().toISOString();
-              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
-              console.log(`[AlertEngine] Webhook sent for ${result.ticker} (watchlist: ${watchlist.name})`);
+            if (isWithinMarketHours()) {
+              const entryPrice = result.price;
+              const stopLoss = result.stopLoss || entryPrice * 0.93;
+              const riskAmount = entryPrice - stopLoss;
+              const targetPrice = entryPrice + (riskAmount * 2);
+              
+              const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+              
+              const webhookResult = await sendWebhookToEndpoint(
+                rule.automationEndpointId,
+                result.ticker,
+                entryPrice,
+                targetPrice,
+                stopLoss
+              );
+              
+              if (webhookResult.success) {
+                deliveryStatus.webhook = true;
+                deliveryStatus.webhookSentAt = new Date().toISOString();
+                deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
+                console.log(`[AlertEngine] Webhook sent for ${result.ticker} (watchlist: ${watchlist.name})`);
+              } else {
+                console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+              }
             } else {
-              console.error(`[AlertEngine] Webhook failed for ${result.ticker}: ${webhookResult.error}`);
+              console.log(`[AlertEngine] Webhook skipped for ${result.ticker} (outside market hours 9:30 AM - 4:00 PM ET)`);
             }
           }
           
@@ -622,40 +656,44 @@ export async function processAlertRules(
           
           console.log(`[AlertEngine] Event created: ${rule.symbol} ${result.fromState || "N/A"} -> ${result.toState}`);
           
-          // Send webhook if enabled and endpoint configured
+          // Send webhook if enabled and endpoint configured (only during market hours)
           if (rule.sendWebhook && rule.automationEndpointId && rule.symbol) {
-            // For webhook: entry at current price, target based on risk (entry - stop)
-            const entryPrice = result.price;
-            const stopLoss = classification.stopLoss || entryPrice * 0.93;
-            const riskAmount = entryPrice - stopLoss;
-            const targetPrice = entryPrice + (riskAmount * 2); // 2R target
-            
-            // Get endpoint name for display
-            const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
-            
-            const webhookResult = await sendWebhookToEndpoint(
-              rule.automationEndpointId,
-              rule.symbol,
-              entryPrice,
-              targetPrice,
-              stopLoss
-            );
-            
-            if (webhookResult.success) {
-              deliveryStatus.webhook = true;
-              deliveryStatus.webhookSentAt = new Date().toISOString();
-              deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
-              console.log(`[AlertEngine] Webhook sent for ${rule.symbol}`);
+            if (isWithinMarketHours()) {
+              // For webhook: entry at current price, target based on risk (entry - stop)
+              const entryPrice = result.price;
+              const stopLoss = classification.stopLoss || entryPrice * 0.93;
+              const riskAmount = entryPrice - stopLoss;
+              const targetPrice = entryPrice + (riskAmount * 2); // 2R target
+              
+              // Get endpoint name for display
+              const endpoint = await storage.getAutomationEndpoint(rule.automationEndpointId);
+              
+              const webhookResult = await sendWebhookToEndpoint(
+                rule.automationEndpointId,
+                rule.symbol,
+                entryPrice,
+                targetPrice,
+                stopLoss
+              );
+              
+              if (webhookResult.success) {
+                deliveryStatus.webhook = true;
+                deliveryStatus.webhookSentAt = new Date().toISOString();
+                deliveryStatus.endpointName = endpoint?.name || "AlgoPilotX";
+                console.log(`[AlertEngine] Webhook sent for ${rule.symbol}`);
+              } else {
+                console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+              }
             } else {
-              console.error(`[AlertEngine] Webhook failed for ${rule.symbol}: ${webhookResult.error}`);
+              console.log(`[AlertEngine] Webhook skipped for ${rule.symbol} (outside market hours 9:30 AM - 4:00 PM ET)`);
             }
           }
           
           // Update event with delivery status
           await storage.updateAlertEvent(event.id, { deliveryStatus });
           
-          // Legacy automation profile handling
-          if (result.toState === PatternStage.BREAKOUT) {
+          // Legacy automation profile handling (only during market hours)
+          if (result.toState === PatternStage.BREAKOUT && isWithinMarketHours()) {
             try {
               const alertScore = (eventData.payload as any)?.score || 75;
               const targetPrice = classification.resistance * 1.03;
@@ -714,6 +752,8 @@ export async function processAlertRules(
             } catch (webhookError) {
               console.error(`[AlertEngine] Error in automation for ${rule.symbol}:`, webhookError);
             }
+          } else if (result.toState === PatternStage.BREAKOUT) {
+            console.log(`[AlertEngine] Legacy automation skipped for ${rule.symbol} (outside market hours 9:30 AM - 4:00 PM ET)`);
           }
         } else {
           await storage.updateAlertRule(rule.id, {
