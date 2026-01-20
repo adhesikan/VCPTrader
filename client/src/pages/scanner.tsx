@@ -1144,7 +1144,7 @@ export default function Scanner() {
                         <p className="font-medium text-blue-700 dark:text-blue-400">Pro tip: Create a watchlist</p>
                         <p className="text-muted-foreground mt-1">
                           For faster, more focused scans, create a custom watchlist with your favorite stocks. 
-                          Go to <Link href="/settings" className="text-primary hover:underline">Settings → Watchlists</Link> to add your own.
+                          Go to <Link href="/watchlists" className="text-primary hover:underline">Watchlists</Link> to add your own.
                         </p>
                       </div>
                     </div>
