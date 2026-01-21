@@ -1,0 +1,45 @@
+Starting Container
+Running database schema sync...
+npm warn config production Use `--omit=dev` instead.
+npm warn using --force Recommended protections disabled.
+> rest-express@1.0.0 db:push
+> drizzle-kit push
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/app/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[⣯] Pulling schema from database...
+[⣟] Pulling schema from database...
+[⡿] Pulling schema from database...
+[⢿] Pulling schema from database...
+[⣻] Pulling schema from database...
+[✓] Pulling schema from database...
+· You're about to add broker_connections_user_id_unique unique constraint to the table, which contains 2 items. If this statement fails, you will receive an error from the database. Do you want to truncate broker_connections table?
+❯ No, add the constraint without truncating the table
+  Yes, truncate the table
+Running additional migrations...
+Connecting to database...
+Connected. Running migrations...
+Created/verified opportunity_defaults table
+Created/verified user_settings table
+Added/verified tutorial tracking columns
+Marked 0 existing users as having seen tutorials
+Created/verified automation_endpoints table
+Created/verified trades table
+Verified alert_event_id column exists in trades
+Created/verified execution_requests table
+Verified all columns exist in execution_requests
+Verified all columns exist in alert_rules
+Migrations complete!
+Schema sync complete. Starting server...
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+11:56:53 PM [migrations] Running startup migrations...
+11:56:53 PM [migrations] Startup migrations completed successfully
+[PushService] Push notifications configured successfully
+11:56:53 PM [express] Restored 2 broker connection(s) from database
+[AlertEngine] Starting with 60000ms interval
+11:56:54 PM [express] Alert engine started
+11:56:54 PM [express] serving on port 8080
+[AlertEngine] Processing 2 global rule(s) against 0 scan results
