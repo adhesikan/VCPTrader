@@ -192,6 +192,7 @@ async function migrate() {
         symbol TEXT NOT NULL,
         strategy_id TEXT NOT NULL,
         endpoint_id VARCHAR,
+        alert_event_id VARCHAR,
         entry_execution_id VARCHAR,
         exit_execution_id VARCHAR,
         side TEXT NOT NULL DEFAULT 'LONG',
@@ -211,6 +212,21 @@ async function migrate() {
       );
     `);
     console.log('Created/verified trades table');
+
+    // Add alert_event_id column to trades table if it doesn't exist
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'trades' AND column_name = 'alert_event_id'
+        ) THEN
+          ALTER TABLE trades ADD COLUMN alert_event_id VARCHAR;
+          RAISE NOTICE 'Added alert_event_id column to trades';
+        END IF;
+      END $$;
+    `);
+    console.log('Verified alert_event_id column exists in trades');
 
     // Create execution_requests table if it doesn't exist (matches Drizzle schema)
     await client.query(`
