@@ -530,12 +530,17 @@ export default function ExecutionCockpit() {
                             <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                               <Badge variant="outline" className="text-xs">{trade.strategyId}</Badge>
                               <span>{trade.side}</span>
-                              {trade.alertEventId && (
+                              {trade.alertEventId ? (
                                 <Badge variant="secondary" className="text-xs gap-1">
                                   <Bell className="h-3 w-3" />
                                   From Alert
                                 </Badge>
-                              )}
+                              ) : trade.endpointId ? (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <Zap className="h-3 w-3" />
+                                  InstaTrade
+                                </Badge>
+                              ) : null}
                             </div>
                           </div>
                         </div>
