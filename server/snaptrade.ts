@@ -109,16 +109,24 @@ export async function getSnaptradeAccounts(
       userId: snaptradeUserId,
       userSecret: userSecret,
     });
-
-    return (response.data || []).map((account: any) => ({
-      id: account.id || "",
-      brokerageAuthorizationId: account.brokerage_authorization_id || account.brokerageAuthorizationId || "",
-      brokerName: account.brokerage?.name || account.brokerage_name || "Unknown",
-      name: account.name || "",
-      number: account.number || "",
-      type: account.type?.type || account.account_type || "Unknown",
-      syncStatus: account.sync_status?.status || "synced",
-    }));
+    
+    return (response.data || []).map((account: any) => {
+      // Try multiple paths to get the broker name
+      const brokerName = account.brokerage?.name 
+        || account.brokerage_name 
+        || account.meta?.brokerage?.name
+        || "Unknown";
+      
+      return {
+        id: account.id || "",
+        brokerageAuthorizationId: account.brokerage_authorization_id || account.brokerageAuthorizationId || "",
+        brokerName,
+        name: account.name || "",
+        number: account.number || "",
+        type: account.type?.type || account.account_type || "Unknown",
+        syncStatus: account.sync_status?.status || "synced",
+      };
+    });
   } catch (error) {
     console.error("Failed to get SnapTrade accounts:", error);
     throw error;

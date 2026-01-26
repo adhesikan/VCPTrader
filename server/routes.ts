@@ -1188,15 +1188,18 @@ export async function registerRoutes(
         credentials.snaptradeUserId,
         credentials.snaptradeUserSecret
       );
-      console.log("[SnapTrade] Authorizations:", JSON.stringify(authorizations, null, 2));
+      console.log(`[SnapTrade] Found ${authorizations.length} authorizations`);
 
       const accounts = await getSnaptradeAccounts(
         credentials.snaptradeUserId,
         credentials.snaptradeUserSecret
       );
-      console.log("[SnapTrade] Accounts:", JSON.stringify(accounts, null, 2));
+      console.log(`[SnapTrade] Found ${accounts.length} accounts`);
 
       const existingConnections = await storage.getSnaptradeConnections(userId);
+
+      // Track which existing connections are still valid
+      const validConnectionIds = new Set<string>();
 
       for (const account of accounts) {
         const existing = existingConnections.find(
@@ -1208,11 +1211,12 @@ export async function registerRoutes(
         // Get broker name from authorization if account doesn't have it
         const brokerName = (account.brokerName && account.brokerName !== "Unknown") 
           ? account.brokerName 
-          : (auth?.brokerage?.name || auth?.brokerage_name || "Unknown Broker");
+          : (auth?.brokerage?.name || auth?.brokerage_name || auth?.name || "Unknown Broker");
         const brokerSlug = auth?.brokerage?.slug || auth?.brokerage_slug || null;
+        console.log(`[SnapTrade] Account ${account.id}: brokerName=${brokerName}`);
 
         if (!existing) {
-          await storage.createSnaptradeConnection({
+          const newConnection = await storage.createSnaptradeConnection({
             userId,
             brokerageAuthorizationId: account.brokerageAuthorizationId,
             brokerName,
@@ -1225,6 +1229,7 @@ export async function registerRoutes(
             isTradingEnabled: auth?.type === "trade",
             lastSyncAt: new Date(),
           });
+          validConnectionIds.add(newConnection.id);
         } else {
           await storage.updateSnaptradeConnection(existing.id, {
             brokerName,
@@ -1234,13 +1239,28 @@ export async function registerRoutes(
             isTradingEnabled: auth?.type === "trade",
             lastSyncAt: new Date(),
           });
+          validConnectionIds.add(existing.id);
         }
+      }
+
+      // Remove connections that are no longer in SnapTrade (disconnected brokerages)
+      // Only cleanup if we have at least one account OR no authorizations (user disconnected all)
+      const shouldCleanup = accounts.length > 0 || authorizations.length === 0;
+      if (shouldCleanup) {
+        for (const existingConn of existingConnections) {
+          if (!validConnectionIds.has(existingConn.id)) {
+            console.log(`[SnapTrade] Removing stale connection: ${existingConn.id}`);
+            await storage.deleteSnaptradeConnection(existingConn.id);
+          }
+        }
+      } else {
+        console.log(`[SnapTrade] Skipping cleanup - API returned 0 accounts but ${authorizations.length} authorizations (possible API issue)`);
       }
 
       const updatedConnections = await storage.getSnaptradeConnections(userId);
       res.json({ 
         success: true, 
-        message: `Synced ${accounts.length} account(s)`,
+        message: `Synced ${accounts.length} account(s), removed ${existingConnections.length - validConnectionIds.size} stale connection(s)`,
         connections: updatedConnections 
       });
     } catch (error: any) {
