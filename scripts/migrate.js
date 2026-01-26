@@ -97,15 +97,80 @@ async function migrate() {
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
         user_id VARCHAR NOT NULL,
         brokerage_authorization_id VARCHAR NOT NULL,
-        brokerage_name VARCHAR,
+        broker_name TEXT NOT NULL DEFAULT '',
+        broker_slug TEXT,
         account_id VARCHAR,
-        account_name VARCHAR,
-        account_number VARCHAR,
+        account_name TEXT,
+        account_number TEXT,
+        account_type TEXT,
+        is_active BOOLEAN DEFAULT true,
+        is_trading_enabled BOOLEAN DEFAULT false,
+        last_sync_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
     console.log('Created/verified snaptrade_connections table');
+    
+    // Fix existing snaptrade_connections table if it has wrong column names
+    await client.query(`
+      DO $$
+      BEGIN
+        -- Rename brokerage_name to broker_name if old column exists
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'brokerage_name'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'broker_name'
+        ) THEN
+          ALTER TABLE snaptrade_connections RENAME COLUMN brokerage_name TO broker_name;
+          RAISE NOTICE 'Renamed brokerage_name to broker_name';
+        END IF;
+
+        -- Add missing columns
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'broker_slug'
+        ) THEN
+          ALTER TABLE snaptrade_connections ADD COLUMN broker_slug TEXT;
+          RAISE NOTICE 'Added broker_slug column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'account_type'
+        ) THEN
+          ALTER TABLE snaptrade_connections ADD COLUMN account_type TEXT;
+          RAISE NOTICE 'Added account_type column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'is_active'
+        ) THEN
+          ALTER TABLE snaptrade_connections ADD COLUMN is_active BOOLEAN DEFAULT true;
+          RAISE NOTICE 'Added is_active column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'is_trading_enabled'
+        ) THEN
+          ALTER TABLE snaptrade_connections ADD COLUMN is_trading_enabled BOOLEAN DEFAULT false;
+          RAISE NOTICE 'Added is_trading_enabled column';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'snaptrade_connections' AND column_name = 'last_sync_at'
+        ) THEN
+          ALTER TABLE snaptrade_connections ADD COLUMN last_sync_at TIMESTAMP;
+          RAISE NOTICE 'Added last_sync_at column';
+        END IF;
+      END $$;
+    `);
+    console.log('Fixed snaptrade_connections table columns');
 
     // Add user_id column to watchlists table
     await client.query(`
