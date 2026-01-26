@@ -1322,9 +1322,27 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing required order parameters" });
       }
 
+      // Validate quantity is a positive number
+      const parsedQuantity = parseInt(quantity);
+      if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+        return res.status(400).json({ error: "Quantity must be a positive number" });
+      }
+
+      // Validate action
+      if (!["BUY", "SELL"].includes(action.toUpperCase())) {
+        return res.status(400).json({ error: "Action must be BUY or SELL" });
+      }
+
       const credentials = await storage.getUserSnaptradeCredentials(userId);
       if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
         return res.status(400).json({ error: "Not registered with SnapTrade" });
+      }
+
+      // Verify account ownership - check that this account belongs to the user
+      const userConnections = await storage.getSnaptradeConnections(userId);
+      const accountOwned = userConnections.some(conn => conn.accountId === accountId);
+      if (!accountOwned) {
+        return res.status(403).json({ error: "Account not found or not authorized" });
       }
 
       const orderResult = await placeSnaptradeOrder(
@@ -1333,9 +1351,9 @@ export async function registerRoutes(
         {
           accountId,
           symbol,
-          action,
+          action: action.toUpperCase(),
           orderType,
-          quantity,
+          quantity: parsedQuantity,
           price,
           stopPrice,
           timeInForce,

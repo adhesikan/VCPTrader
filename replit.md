@@ -121,6 +121,40 @@ The app connects to multiple brokerage providers for market data:
 
 **Security**: Broker credentials are encrypted with `BROKER_TOKEN_KEY` environment variable before storage. Never stored in plaintext.
 
+### SnapTrade Integration (Direct Brokerage Trading)
+- **Purpose**: OAuth-based brokerage connections for direct order execution via InstaTrade
+- **SDK**: `snaptrade-typescript-sdk` for API communication
+- **Supported Brokers**: 20+ brokerages including Alpaca, Interactive Brokers, TD Ameritrade, Schwab, Fidelity, Robinhood, and more
+- **Required Environment Variables**:
+  - `SNAPTRADE_CLIENT_ID` - SnapTrade application client ID
+  - `SNAPTRADE_CONSUMER_KEY` - SnapTrade consumer/API key
+
+**SnapTrade OAuth Flow**:
+1. User clicks "Connect Brokerage" in Settings
+2. App registers user with SnapTrade (or retrieves existing credentials)
+3. User redirected to SnapTrade portal for broker authentication
+4. Callback syncs accounts to `snaptradeConnections` table
+5. User can place orders directly from InstaTrade dialog
+
+**SnapTrade API Endpoints**:
+- `GET /api/snaptrade/status` - Check if SnapTrade is configured
+- `POST /api/snaptrade/register` - Register user with SnapTrade
+- `POST /api/snaptrade/auth-link` - Generate OAuth redirect link
+- `GET /api/snaptrade/connections` - List user's connected accounts
+- `POST /api/snaptrade/sync` - Sync accounts after OAuth callback
+- `GET /api/snaptrade/holdings/:accountId` - Fetch account holdings
+- `GET /api/snaptrade/balance/:accountId` - Fetch account balance
+- `POST /api/snaptrade/orders` - Place a trade order
+- `GET /api/snaptrade/brokers` - List supported brokers
+- `DELETE /api/snaptrade/connections/:authId` - Disconnect a brokerage
+
+**Security**: SnapTrade user secrets are encrypted at rest using AES-256-GCM (same as broker tokens). Account ownership is validated before order placement.
+
+### Dual Execution Methods (InstaTrade)
+InstaTrade supports two execution methods, selectable per trade:
+1. **AlgoPilotX Webhook**: Sends trade setup to external automation platform
+2. **SnapTrade Direct**: Places limit order directly with connected brokerage
+
 ### Push Notifications
 - Web Push API with VAPID keys for real-time alert delivery
 

@@ -1772,11 +1772,20 @@ export class MemStorage implements IStorage {
   }
 
   async updateUserSnaptradeCredentials(userId: string, snaptradeUserId: string, userSecret: string): Promise<void> {
+    // Require encryption key for storing sensitive SnapTrade credentials
+    if (!hasEncryptionKey()) {
+      throw new Error("BROKER_TOKEN_KEY is required to securely store SnapTrade credentials");
+    }
+    
+    // Encrypt the userSecret before storing
+    const encrypted = encryptToken(userSecret);
+    const encryptedSecret = JSON.stringify(encrypted);
+    
     await db
       .update(usersTable)
       .set({ 
         snaptradeUserId,
-        snaptradeUserSecret: userSecret,
+        snaptradeUserSecret: encryptedSecret,
         updatedAt: new Date()
       })
       .where(eq(usersTable.id, userId));
@@ -1791,7 +1800,26 @@ export class MemStorage implements IStorage {
       .from(usersTable)
       .where(eq(usersTable.id, userId))
       .limit(1);
-    return user || null;
+    
+    if (!user) return null;
+    
+    // Decrypt the userSecret if encrypted
+    let decryptedSecret = user.snaptradeUserSecret;
+    if (decryptedSecret && hasEncryptionKey()) {
+      try {
+        const encrypted = JSON.parse(decryptedSecret);
+        if (encrypted.ciphertext && encrypted.iv && encrypted.authTag) {
+          decryptedSecret = decryptToken(encrypted);
+        }
+      } catch (e) {
+        // Not encrypted or invalid format, use as-is
+      }
+    }
+    
+    return {
+      snaptradeUserId: user.snaptradeUserId,
+      snaptradeUserSecret: decryptedSecret,
+    };
   }
 }
 
