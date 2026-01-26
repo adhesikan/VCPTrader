@@ -27,7 +27,7 @@ import {
   LARGE_CAP_UNIVERSE
 } from "./broker-service";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
-import { fetchTwelveDataQuotes, fetchTwelveDataHistory, isTwelveDataConfigured } from "./twelvedata-service";
+import { fetchTwelveDataQuotes, fetchTwelveDataHistory, isTwelveDataConfigured, runTwelveDataMultidayScan } from "./twelvedata-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -379,10 +379,15 @@ export async function registerRoutes(
           const quotes = await fetchTwelveDataQuotes(DEFAULT_SCAN_SYMBOLS);
           const intradayResults = quotesToScanResults(quotes);
           
+          // Run multiday scan for Twelve Data (rate-limited, processes top 5 symbols)
+          const multidayResults = await runTwelveDataMultidayScan(quotes);
+          
+          const allResults = [...intradayResults, ...multidayResults];
+          
           if (includeMeta) {
-            return res.json({ data: intradayResults, isLive: true, provider: "twelvedata" });
+            return res.json({ data: allResults, isLive: true, provider: "twelvedata" });
           }
-          return res.json(intradayResults);
+          return res.json(allResults);
         } catch (twelveDataError: any) {
           console.error("Twelve Data fetch failed:", twelveDataError.message);
         }

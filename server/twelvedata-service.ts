@@ -179,3 +179,73 @@ export function getDataSourceStatus(): { configured: boolean; provider: string }
     provider: "twelvedata",
   };
 }
+
+import { randomUUID } from "crypto";
+import { vcpMultidayStrategy } from "./strategies/vcpMultiday";
+import { StrategyType, type ScanResult } from "@shared/schema";
+import type { Candle } from "./strategies/types";
+
+// Rate-limited multiday scan using Twelve Data
+// Note: Free tier is 8 req/min, so we process sequentially with delays
+export async function runTwelveDataMultidayScan(quotes: QuoteData[]): Promise<ScanResult[]> {
+  if (!isTwelveDataConfigured()) {
+    console.log("[TwelveData] Not configured, skipping multiday scan");
+    return [];
+  }
+  
+  const results: ScanResult[] = [];
+  const DELAY_MS = 8000; // 8 seconds between requests to respect rate limit (8 req/min)
+  
+  // Process top 5 symbols to respect rate limits on free tier
+  const symbolsToProcess = quotes.slice(0, 5);
+  
+  for (let i = 0; i < symbolsToProcess.length; i++) {
+    const quote = symbolsToProcess[i];
+    
+    try {
+      // Add delay between requests (except for first one)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+      }
+      
+      const candles = await fetchTwelveDataHistory(quote.symbol, "1day", 90);
+      
+      const strategyCandles: Candle[] = candles.map(c => ({
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+        timestamp: new Date(c.date),
+      }));
+      
+      const classification = vcpMultidayStrategy.classify(quote, strategyCandles);
+      
+      results.push({
+        id: randomUUID(),
+        scanRunId: null,
+        ticker: quote.symbol,
+        name: quote.symbol,
+        price: Number(quote.last.toFixed(2)),
+        change: Number(quote.change.toFixed(2)),
+        changePercent: Number(quote.changePercent.toFixed(2)),
+        volume: quote.volume,
+        avgVolume: quote.avgVolume !== undefined ? quote.avgVolume : null,
+        rvol: classification.rvol != null ? Number(classification.rvol.toFixed(2)) : null,
+        stage: classification.stage,
+        resistance: classification.levels.resistance ?? null,
+        stopLoss: classification.levels.stopLevel ?? null,
+        patternScore: classification.score,
+        ema9: classification.ema9 ? Number(classification.ema9.toFixed(2)) : Number((quote.last * 0.99).toFixed(2)),
+        ema21: classification.ema21 ? Number(classification.ema21.toFixed(2)) : Number((quote.last * 0.97).toFixed(2)),
+        atr: Number((quote.last * 0.02).toFixed(2)),
+        createdAt: new Date(),
+        strategy: StrategyType.VCP_MULTIDAY,
+      });
+    } catch (error) {
+      console.error(`[TwelveData] Failed multiday scan for ${quote.symbol}:`, error);
+    }
+  }
+  
+  return results;
+}
