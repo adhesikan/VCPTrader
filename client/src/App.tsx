@@ -49,6 +49,7 @@ import OpenSourcePage from "@/pages/open-source";
 import StrategyGuide from "@/pages/strategy-guide";
 import AutomationPage from "@/pages/automation";
 import ExecutionCockpit from "@/pages/execution";
+import SnaptradeCallback from "@/pages/snaptrade-callback";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -70,6 +71,7 @@ function AppRouter() {
       <Route path="/disclaimer" component={DisclaimerPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/open-source" component={OpenSourcePage} />
+      <Route path="/snaptrade/callback" component={SnaptradeCallback} />
       <Route component={NotFound} />
     </Switch>
   );

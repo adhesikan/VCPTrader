@@ -1050,6 +1050,321 @@ export async function registerRoutes(
     }
   });
 
+  // SnapTrade OAuth brokerage connection routes
+  app.get("/api/snaptrade/status", (req, res) => {
+    const { isSnaptradeConfigured } = require("./snaptrade");
+    res.json({ configured: isSnaptradeConfigured() });
+  });
+
+  app.post("/api/snaptrade/register", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { isSnaptradeConfigured, registerSnaptradeUser } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      const credentials = await storage.getUserSnaptradeCredentials(userId);
+      if (credentials?.snaptradeUserId && credentials?.snaptradeUserSecret) {
+        return res.json({ 
+          success: true, 
+          message: "Already registered",
+          snaptradeUserId: credentials.snaptradeUserId 
+        });
+      }
+
+      const result = await registerSnaptradeUser(userId);
+      if (!result) {
+        return res.status(500).json({ error: "Failed to register with SnapTrade" });
+      }
+
+      await storage.updateUserSnaptradeCredentials(userId, result.userId, result.userSecret);
+
+      res.json({ 
+        success: true, 
+        message: "Registered with SnapTrade",
+        snaptradeUserId: result.userId 
+      });
+    } catch (error: any) {
+      console.error("SnapTrade register error:", error);
+      res.status(500).json({ error: error.message || "Failed to register with SnapTrade" });
+    }
+  });
+
+  app.post("/api/snaptrade/auth-link", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { broker, connectionType, reconnect } = req.body;
+      const { isSnaptradeConfigured, getSnaptradeAuthLink, registerSnaptradeUser } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      let credentials = await storage.getUserSnaptradeCredentials(userId);
+      
+      if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
+        const result = await registerSnaptradeUser(userId);
+        if (!result) {
+          return res.status(500).json({ error: "Failed to register with SnapTrade" });
+        }
+        await storage.updateUserSnaptradeCredentials(userId, result.userId, result.userSecret);
+        credentials = { snaptradeUserId: result.userId, snaptradeUserSecret: result.userSecret };
+      }
+
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN}`
+        : `http://localhost:5000`;
+      
+      const authLink = await getSnaptradeAuthLink(
+        credentials.snaptradeUserId!,
+        credentials.snaptradeUserSecret!,
+        {
+          broker,
+          connectionType: connectionType || "trade",
+          customRedirect: `${baseUrl}/snaptrade/callback`,
+          reconnect,
+        }
+      );
+
+      if (!authLink) {
+        return res.status(500).json({ error: "Failed to generate auth link" });
+      }
+
+      res.json({ authLink });
+    } catch (error: any) {
+      console.error("SnapTrade auth-link error:", error);
+      res.status(500).json({ error: error.message || "Failed to get auth link" });
+    }
+  });
+
+  app.get("/api/snaptrade/connections", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const connections = await storage.getSnaptradeConnections(userId);
+      res.json(connections);
+    } catch (error: any) {
+      console.error("SnapTrade connections error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch connections" });
+    }
+  });
+
+  app.post("/api/snaptrade/sync", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { getSnaptradeAccounts, listSnaptradeAuthorizations, isSnaptradeConfigured } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      const credentials = await storage.getUserSnaptradeCredentials(userId);
+      if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
+        return res.status(400).json({ error: "Not registered with SnapTrade" });
+      }
+
+      const authorizations = await listSnaptradeAuthorizations(
+        credentials.snaptradeUserId,
+        credentials.snaptradeUserSecret
+      );
+
+      const accounts = await getSnaptradeAccounts(
+        credentials.snaptradeUserId,
+        credentials.snaptradeUserSecret
+      );
+
+      const existingConnections = await storage.getSnaptradeConnections(userId);
+
+      for (const account of accounts) {
+        const existing = existingConnections.find(
+          (c) => c.brokerageAuthorizationId === account.brokerageAuthorizationId && c.accountId === account.id
+        );
+
+        const auth = authorizations.find((a: any) => a.id === account.brokerageAuthorizationId);
+
+        if (!existing) {
+          await storage.createSnaptradeConnection({
+            userId,
+            brokerageAuthorizationId: account.brokerageAuthorizationId,
+            brokerName: account.brokerName,
+            brokerSlug: auth?.brokerage?.slug || null,
+            accountId: account.id,
+            accountName: account.name,
+            accountNumber: account.number,
+            accountType: account.type,
+            isActive: true,
+            isTradingEnabled: auth?.type === "trade",
+            lastSyncAt: new Date(),
+          });
+        } else {
+          await storage.updateSnaptradeConnection(existing.id, {
+            brokerName: account.brokerName,
+            accountName: account.name,
+            accountNumber: account.number,
+            accountType: account.type,
+            isTradingEnabled: auth?.type === "trade",
+            lastSyncAt: new Date(),
+          });
+        }
+      }
+
+      const updatedConnections = await storage.getSnaptradeConnections(userId);
+      res.json({ 
+        success: true, 
+        message: `Synced ${accounts.length} account(s)`,
+        connections: updatedConnections 
+      });
+    } catch (error: any) {
+      console.error("SnapTrade sync error:", error);
+      res.status(500).json({ error: error.message || "Failed to sync accounts" });
+    }
+  });
+
+  app.delete("/api/snaptrade/connections/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { id } = req.params;
+      const { removeSnaptradeAuthorization, isSnaptradeConfigured } = require("./snaptrade");
+      
+      const connection = await storage.getSnaptradeConnection(id);
+      if (!connection || connection.userId !== userId) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      if (isSnaptradeConfigured()) {
+        const credentials = await storage.getUserSnaptradeCredentials(userId);
+        if (credentials?.snaptradeUserId && credentials?.snaptradeUserSecret) {
+          await removeSnaptradeAuthorization(
+            credentials.snaptradeUserId,
+            credentials.snaptradeUserSecret,
+            connection.brokerageAuthorizationId
+          );
+        }
+      }
+
+      await storage.deleteSnaptradeConnectionsByAuthId(connection.brokerageAuthorizationId);
+
+      res.json({ success: true, message: "Connection removed" });
+    } catch (error: any) {
+      console.error("SnapTrade delete connection error:", error);
+      res.status(500).json({ error: error.message || "Failed to delete connection" });
+    }
+  });
+
+  app.get("/api/snaptrade/accounts/:accountId/balance", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { accountId } = req.params;
+      const { getSnaptradeBalance, isSnaptradeConfigured } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      const credentials = await storage.getUserSnaptradeCredentials(userId);
+      if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
+        return res.status(400).json({ error: "Not registered with SnapTrade" });
+      }
+
+      const balances = await getSnaptradeBalance(
+        credentials.snaptradeUserId,
+        credentials.snaptradeUserSecret,
+        accountId
+      );
+
+      res.json(balances);
+    } catch (error: any) {
+      console.error("SnapTrade balance error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch balance" });
+    }
+  });
+
+  app.get("/api/snaptrade/holdings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { accountId } = req.query;
+      const { getSnaptradeHoldings, isSnaptradeConfigured } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      const credentials = await storage.getUserSnaptradeCredentials(userId);
+      if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
+        return res.status(400).json({ error: "Not registered with SnapTrade" });
+      }
+
+      const holdings = await getSnaptradeHoldings(
+        credentials.snaptradeUserId,
+        credentials.snaptradeUserSecret,
+        accountId as string | undefined
+      );
+
+      res.json(holdings);
+    } catch (error: any) {
+      console.error("SnapTrade holdings error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch holdings" });
+    }
+  });
+
+  app.post("/api/snaptrade/orders", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { accountId, symbol, action, orderType, quantity, price, stopPrice, timeInForce } = req.body;
+      const { placeSnaptradeOrder, isSnaptradeConfigured } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      if (!accountId || !symbol || !action || !orderType || !quantity) {
+        return res.status(400).json({ error: "Missing required order parameters" });
+      }
+
+      const credentials = await storage.getUserSnaptradeCredentials(userId);
+      if (!credentials?.snaptradeUserId || !credentials?.snaptradeUserSecret) {
+        return res.status(400).json({ error: "Not registered with SnapTrade" });
+      }
+
+      const orderResult = await placeSnaptradeOrder(
+        credentials.snaptradeUserId,
+        credentials.snaptradeUserSecret,
+        {
+          accountId,
+          symbol,
+          action,
+          orderType,
+          quantity,
+          price,
+          stopPrice,
+          timeInForce,
+        }
+      );
+
+      res.json(orderResult);
+    } catch (error: any) {
+      console.error("SnapTrade order error:", error);
+      res.status(500).json({ error: error.message || "Failed to place order" });
+    }
+  });
+
+  app.get("/api/snaptrade/brokers", async (req, res) => {
+    try {
+      const { getSupportedBrokers, isSnaptradeConfigured } = require("./snaptrade");
+      
+      if (!isSnaptradeConfigured()) {
+        return res.status(503).json({ error: "SnapTrade not configured" });
+      }
+
+      const brokers = await getSupportedBrokers();
+      res.json(brokers);
+    } catch (error: any) {
+      console.error("SnapTrade brokers error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch brokers" });
+    }
+  });
+
   app.post("/api/push/subscribe", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;

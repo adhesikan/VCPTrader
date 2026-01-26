@@ -37,7 +37,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { InteractiveTutorial } from "@/components/interactive-tutorial";
-import type { BrokerConnection, BrokerProviderType, OpportunityDefaults } from "@shared/schema";
+import type { BrokerConnection, BrokerProviderType, OpportunityDefaults, SnaptradeConnection } from "@shared/schema";
 import { STRATEGY_CONFIGS, getStrategyDisplayName } from "@shared/strategies";
 import { useTooltipVisibility } from "@/hooks/use-tooltips";
 
@@ -220,6 +220,73 @@ export default function Settings() {
 
   const { data: brokerStatus } = useQuery<BrokerConnection | null>({
     queryKey: ["/api/broker/status"],
+  });
+
+  const { data: snaptradeStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/snaptrade/status"],
+  });
+
+  const { data: snaptradeConnections = [], refetch: refetchSnaptradeConnections } = useQuery<SnaptradeConnection[]>({
+    queryKey: ["/api/snaptrade/connections"],
+    enabled: !!snaptradeStatus?.configured,
+  });
+
+  const [snaptradeDialogOpen, setSnaptradeDialogOpen] = useState(false);
+  const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
+
+  const connectSnaptradesMutation = useMutation({
+    mutationFn: async (broker?: string) => {
+      const response = await fetch("/api/snaptrade/auth-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broker, connectionType: "trade" }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to get auth link");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.authLink) {
+        window.location.href = data.authLink;
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSnaptradeConnectionMutation = useMutation({
+    mutationFn: async (connectionId: string) => {
+      const response = await fetch(`/api/snaptrade/connections/${connectionId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to disconnect");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/snaptrade/connections"] });
+      setDeletingConnectionId(null);
+      toast({
+        title: "Disconnected",
+        description: "Brokerage account disconnected successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Disconnect Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const connectBrokerMutation = useMutation({
@@ -580,6 +647,106 @@ export default function Settings() {
                 </Dialog>
               </CardContent>
             </Card>
+
+            {snaptradeStatus?.configured && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-base font-medium">Brokerage Trading Accounts</CardTitle>
+                      <CardDescription>
+                        Connect your brokerage via OAuth for direct trading with InstaTrade
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => connectSnaptradesMutation.mutate(undefined)}
+                      disabled={connectSnaptradesMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-connect-snaptrade"
+                    >
+                      {connectSnaptradesMutation.isPending ? (
+                        <>
+                          <Zap className="h-4 w-4 animate-pulse" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Connect Brokerage
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {snaptradeConnections.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Zap className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="font-medium">No trading accounts connected</p>
+                      <p className="text-sm mt-1">Connect your brokerage to enable direct trading via InstaTrade</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {snaptradeConnections.map((connection) => (
+                        <div
+                          key={connection.id}
+                          className="flex items-center justify-between p-3 rounded-md border"
+                          data-testid={`snaptrade-connection-${connection.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`h-3 w-3 rounded-full ${connection.isActive ? "bg-status-online" : "bg-status-offline"}`} />
+                            <div>
+                              <p className="font-medium">{connection.brokerName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {connection.accountName || connection.accountNumber || "Trading Account"}
+                                {connection.accountType && ` (${connection.accountType})`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {connection.isTradingEnabled && (
+                              <Badge variant="default" className="text-xs gap-1">
+                                <Zap className="h-3 w-3" />
+                                Trading
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingConnectionId(connection.id)}
+                              data-testid={`button-disconnect-${connection.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <AlertDialog open={!!deletingConnectionId} onOpenChange={(open) => !open && setDeletingConnectionId(null)}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect Brokerage?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the connection to your brokerage account. You can reconnect at any time.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-disconnect">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deletingConnectionId && deleteSnaptradeConnectionMutation.mutate(deletingConnectionId)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          data-testid="button-confirm-disconnect"
+                        >
+                          {deleteSnaptradeConnectionMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

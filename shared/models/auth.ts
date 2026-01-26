@@ -37,6 +37,8 @@ export const users = pgTable("users", {
   acceptedAt: timestamp("accepted_at"),
   acceptedIp: varchar("accepted_ip"),
   acceptedUserAgent: varchar("accepted_user_agent"),
+  snaptradeUserId: varchar("snaptrade_user_id"),
+  snaptradeUserSecret: varchar("snaptrade_user_secret"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

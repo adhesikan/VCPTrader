@@ -270,6 +270,27 @@ export const insertBrokerConnectionSchema = createInsertSchema(brokerConnections
 export type InsertBrokerConnection = z.infer<typeof insertBrokerConnectionSchema>;
 export type BrokerConnection = typeof brokerConnections.$inferSelect;
 
+export const snaptradeConnections = pgTable("snaptrade_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  brokerageAuthorizationId: varchar("brokerage_authorization_id").notNull(),
+  brokerName: text("broker_name").notNull(),
+  brokerSlug: text("broker_slug"),
+  accountId: varchar("account_id"),
+  accountName: text("account_name"),
+  accountNumber: text("account_number"),
+  accountType: text("account_type"),
+  isActive: boolean("is_active").default(true),
+  isTradingEnabled: boolean("is_trading_enabled").default(false),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSnaptradeConnectionSchema = createInsertSchema(snaptradeConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSnaptradeConnection = z.infer<typeof insertSnaptradeConnectionSchema>;
+export type SnaptradeConnection = typeof snaptradeConnections.$inferSelect;
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),

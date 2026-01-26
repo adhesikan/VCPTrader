@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable, snaptradeConnections as snaptradeConnectionsTable } from "@shared/schema";
+import { users as usersTable } from "@shared/models/auth";
 import { desc, inArray, lt } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
@@ -50,6 +51,8 @@ import type {
   Trade,
   InsertTrade,
   OpportunityFirstSeen,
+  SnaptradeConnection,
+  InsertSnaptradeConnection,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -175,6 +178,16 @@ export interface IStorage {
   getTrade(id: string): Promise<Trade | null>;
   createTrade(trade: InsertTrade): Promise<Trade>;
   updateTrade(id: string, data: Partial<Trade>): Promise<Trade | null>;
+
+  getSnaptradeConnections(userId: string): Promise<SnaptradeConnection[]>;
+  getSnaptradeConnection(id: string): Promise<SnaptradeConnection | null>;
+  getSnaptradeConnectionByAuthId(authorizationId: string): Promise<SnaptradeConnection | null>;
+  createSnaptradeConnection(connection: InsertSnaptradeConnection): Promise<SnaptradeConnection>;
+  updateSnaptradeConnection(id: string, data: Partial<SnaptradeConnection>): Promise<SnaptradeConnection | null>;
+  deleteSnaptradeConnection(id: string): Promise<void>;
+  deleteSnaptradeConnectionsByAuthId(authorizationId: string): Promise<void>;
+  updateUserSnaptradeCredentials(userId: string, snaptradeUserId: string, userSecret: string): Promise<void>;
+  getUserSnaptradeCredentials(userId: string): Promise<{ snaptradeUserId: string | null; snaptradeUserSecret: string | null } | null>;
 
   getOpportunityFirstSeen(ticker: string): Promise<OpportunityFirstSeen | null>;
   upsertOpportunityFirstSeen(ticker: string, stage: string, strategy?: string): Promise<OpportunityFirstSeen>;
@@ -1701,6 +1714,84 @@ export class MemStorage implements IStorage {
     await db
       .delete(opportunityFirstSeenTable)
       .where(lt(opportunityFirstSeenTable.lastSeenAt, oneHourAgo));
+  }
+
+  async getSnaptradeConnections(userId: string): Promise<SnaptradeConnection[]> {
+    return db
+      .select()
+      .from(snaptradeConnectionsTable)
+      .where(eq(snaptradeConnectionsTable.userId, userId))
+      .orderBy(desc(snaptradeConnectionsTable.createdAt));
+  }
+
+  async getSnaptradeConnection(id: string): Promise<SnaptradeConnection | null> {
+    const [connection] = await db
+      .select()
+      .from(snaptradeConnectionsTable)
+      .where(eq(snaptradeConnectionsTable.id, id))
+      .limit(1);
+    return connection || null;
+  }
+
+  async getSnaptradeConnectionByAuthId(authorizationId: string): Promise<SnaptradeConnection | null> {
+    const [connection] = await db
+      .select()
+      .from(snaptradeConnectionsTable)
+      .where(eq(snaptradeConnectionsTable.brokerageAuthorizationId, authorizationId))
+      .limit(1);
+    return connection || null;
+  }
+
+  async createSnaptradeConnection(connection: InsertSnaptradeConnection): Promise<SnaptradeConnection> {
+    const [created] = await db
+      .insert(snaptradeConnectionsTable)
+      .values(connection)
+      .returning();
+    return created;
+  }
+
+  async updateSnaptradeConnection(id: string, data: Partial<SnaptradeConnection>): Promise<SnaptradeConnection | null> {
+    const [updated] = await db
+      .update(snaptradeConnectionsTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(snaptradeConnectionsTable.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteSnaptradeConnection(id: string): Promise<void> {
+    await db
+      .delete(snaptradeConnectionsTable)
+      .where(eq(snaptradeConnectionsTable.id, id));
+  }
+
+  async deleteSnaptradeConnectionsByAuthId(authorizationId: string): Promise<void> {
+    await db
+      .delete(snaptradeConnectionsTable)
+      .where(eq(snaptradeConnectionsTable.brokerageAuthorizationId, authorizationId));
+  }
+
+  async updateUserSnaptradeCredentials(userId: string, snaptradeUserId: string, userSecret: string): Promise<void> {
+    await db
+      .update(usersTable)
+      .set({ 
+        snaptradeUserId,
+        snaptradeUserSecret: userSecret,
+        updatedAt: new Date()
+      })
+      .where(eq(usersTable.id, userId));
+  }
+
+  async getUserSnaptradeCredentials(userId: string): Promise<{ snaptradeUserId: string | null; snaptradeUserSecret: string | null } | null> {
+    const [user] = await db
+      .select({
+        snaptradeUserId: usersTable.snaptradeUserId,
+        snaptradeUserSecret: usersTable.snaptradeUserSecret,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    return user || null;
   }
 }
 
