@@ -5,8 +5,10 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "echo 'Running database schema sync...' && npm run db:push --force && echo 'Running additional migrations...' && node scripts/migrate.js && echo 'Schema sync complete. Starting server...' && npm run start",
+    "startCommand": "npm run db:push --force && node scripts/migrate.js && npm run start",
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
+    "restartPolicyMaxRetries": 10,
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 300
   }
 }
