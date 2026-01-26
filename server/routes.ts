@@ -1426,12 +1426,22 @@ export async function registerRoutes(
         credentials.snaptradeUserSecret
       );
       console.log(`[SnapTrade] Found ${authorizations.length} authorizations`);
+      
+      // Log authorization details for debugging
+      for (const auth of authorizations) {
+        console.log(`[SnapTrade] Authorization: id=${auth.id}, brokerage=${JSON.stringify(auth.brokerage)}, type=${auth.type}`);
+      }
 
       const accounts = await getSnaptradeAccounts(
         credentials.snaptradeUserId,
         credentials.snaptradeUserSecret
       );
       console.log(`[SnapTrade] Found ${accounts.length} accounts`);
+      
+      // Log account details for debugging
+      for (const account of accounts) {
+        console.log(`[SnapTrade] Account: id=${account.id}, brokerName=${account.brokerName}, authId=${account.brokerageAuthorizationId}`);
+      }
 
       const existingConnections = await storage.getSnaptradeConnections(userId);
 
@@ -1448,9 +1458,19 @@ export async function registerRoutes(
         // Get broker name from authorization if account doesn't have it
         const brokerName = (account.brokerName && account.brokerName !== "Unknown") 
           ? account.brokerName 
-          : (auth?.brokerage?.name || auth?.brokerage_name || auth?.name || "Unknown Broker");
+          : (auth?.brokerage?.name || auth?.brokerage_name || auth?.name || null);
         const brokerSlug = auth?.brokerage?.slug || auth?.brokerage_slug || null;
-        console.log(`[SnapTrade] Account ${account.id}: brokerName=${brokerName}`);
+        console.log(`[SnapTrade] Account ${account.id}: brokerName=${brokerName}, brokerSlug=${brokerSlug}`);
+
+        // Skip accounts with unknown/missing broker info - don't create incomplete connections
+        if (!brokerName || brokerName === "Unknown" || brokerName === "Unknown Broker") {
+          console.log(`[SnapTrade] Skipping account ${account.id}: no valid broker name found`);
+          // If there's an existing connection, keep it valid but don't update with bad data
+          if (existing) {
+            validConnectionIds.add(existing.id);
+          }
+          continue;
+        }
 
         if (!existing) {
           const newConnection = await storage.createSnaptradeConnection({
