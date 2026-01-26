@@ -1384,6 +1384,7 @@ export class MemStorage implements IStorage {
     if (settings.stopAlertsEnabled !== undefined) dbSettings.stopAlertsEnabled = String(settings.stopAlertsEnabled);
     if (settings.emaAlertsEnabled !== undefined) dbSettings.emaAlertsEnabled = String(settings.emaAlertsEnabled);
     if (settings.approachingAlertsEnabled !== undefined) dbSettings.approachingAlertsEnabled = String(settings.approachingAlertsEnabled);
+    if (settings.preferredDataSource !== undefined) dbSettings.preferredDataSource = settings.preferredDataSource;
     
     if (existing) {
       const [updated] = await db

@@ -2358,6 +2358,7 @@ export async function registerRoutes(
         hasSeenScannerTutorial: settings.hasSeenScannerTutorial === "true",
         hasSeenVcpTutorial: settings.hasSeenVcpTutorial === "true",
         hasSeenAlertsTutorial: settings.hasSeenAlertsTutorial === "true",
+        preferredDataSource: settings.preferredDataSource || "twelvedata",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
