@@ -33,6 +33,7 @@ interface BrokerStatusContextValue {
   providerName: string | null;
   dataStatus: DataStatus | null;
   dataSourceStatus: DataSourceStatus | null;
+  hasDataSource: boolean;
 }
 
 const BrokerStatusContext = createContext<BrokerStatusContextValue | null>(null);
@@ -67,9 +68,12 @@ export function BrokerStatusProvider({ children }: { children: ReactNode }) {
     isLive: dataSourceStatus.isLive,
     provider: dataSourceStatus.activeProvider || undefined,
   } : null;
+  
+  // Has data source if either broker is connected OR Twelve Data is configured
+  const hasDataSource = isConnected || dataSourceStatus?.twelveDataConfigured || false;
 
   return (
-    <BrokerStatusContext.Provider value={{ status: status ?? null, isConnected, isLoading, providerName, dataStatus, dataSourceStatus: dataSourceStatus ?? null }}>
+    <BrokerStatusContext.Provider value={{ status: status ?? null, isConnected, isLoading, providerName, dataStatus, dataSourceStatus: dataSourceStatus ?? null, hasDataSource }}>
       {children}
     </BrokerStatusContext.Provider>
   );
@@ -78,7 +82,7 @@ export function BrokerStatusProvider({ children }: { children: ReactNode }) {
 export function useBrokerStatus() {
   const context = useContext(BrokerStatusContext);
   if (!context) {
-    return { status: null, isConnected: false, isLoading: false, providerName: null, dataStatus: null, dataSourceStatus: null };
+    return { status: null, isConnected: false, isLoading: false, providerName: null, dataStatus: null, dataSourceStatus: null, hasDataSource: false };
   }
   return context;
 }

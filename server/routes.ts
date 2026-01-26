@@ -432,9 +432,65 @@ export async function registerRoutes(
       const userId = req.session.userId!;
       const connection = await storage.getBrokerConnectionWithToken(userId);
       
+      // Get user's preferred data source
+      const userSettings = await storage.getUserSettings(userId);
+      const preferredDataSource = userSettings?.preferredDataSource || "twelvedata";
+      
+      // If no broker connection, try Twelve Data
       if (!connection || !connection.accessToken) {
+        if (isTwelveDataConfigured()) {
+          // Use Twelve Data for scanning
+          const requestedSymbols = req.body.symbols || DEFAULT_SCAN_SYMBOLS;
+          const strategy = req.body.strategy || StrategyType.VCP;
+          const { minPrice, maxPrice, minVolume, minRvol } = req.body.filters || {};
+          const startTime = Date.now();
+          
+          try {
+            const quotes = await fetchTwelveDataQuotes(requestedSymbols);
+            
+            // Apply filters
+            const filteredQuotes = quotes.filter(quote => {
+              if (minPrice && quote.last < minPrice) return false;
+              if (maxPrice && quote.last > maxPrice) return false;
+              if (minVolume && quote.volume < minVolume) return false;
+              if (minRvol && quote.avgVolume) {
+                const rvol = quote.volume / quote.avgVolume;
+                if (rvol < minRvol) return false;
+              }
+              return true;
+            });
+            
+            const intradayResults = quotesToScanResults(filteredQuotes, strategy);
+            const multidayResults = await runTwelveDataMultidayScan(filteredQuotes);
+            const results = [...intradayResults, ...multidayResults];
+            
+            const scanTime = Date.now() - startTime;
+            
+            // Store results in storage
+            await storage.clearScanResults();
+            for (const result of results) {
+              await storage.createScanResult(result);
+            }
+            
+            return res.json({
+              results,
+              metadata: {
+                isLive: true,
+                provider: "twelvedata",
+                symbolsRequested: requestedSymbols.length,
+                symbolsReturned: quotes.length,
+                scanTimeMs: scanTime,
+                timestamp: new Date().toISOString(),
+              }
+            });
+          } catch (twelveDataError: any) {
+            console.error("Twelve Data scan failed:", twelveDataError.message);
+            return res.status(500).json({ error: "Failed to fetch data from Twelve Data" });
+          }
+        }
+        
         return res.status(400).json({ 
-          error: "No broker connection. Please connect a brokerage in Settings first." 
+          error: "No data source available. Please connect a brokerage or configure Twelve Data API." 
         });
       }
 

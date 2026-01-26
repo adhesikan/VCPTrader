@@ -108,7 +108,7 @@ interface UniversesResponse {
 export default function Scanner() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { isConnected } = useBrokerStatus();
+  const { isConnected, hasDataSource } = useBrokerStatus();
 
   const [engineMode, setEngineMode] = useState<EngineMode>("single");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("VCP");
@@ -354,7 +354,7 @@ export default function Scanner() {
   }, [userDefaults, defaultsApplied, defaultsLoading, watchlistsLoading, watchlists]);
 
   useEffect(() => {
-    if (shouldAutoRun && defaultsApplied && isConnected && !runScanMutation.isPending && !confluenceMutation.isPending) {
+    if (shouldAutoRun && defaultsApplied && hasDataSource && !runScanMutation.isPending && !confluenceMutation.isPending) {
       setShouldAutoRun(false);
       if (engineMode === "fusion") {
         confluenceMutation.mutate();
@@ -362,12 +362,12 @@ export default function Scanner() {
         runScanMutation.mutate();
       }
     }
-  }, [shouldAutoRun, defaultsApplied, isConnected, engineMode]);
+  }, [shouldAutoRun, defaultsApplied, hasDataSource, engineMode]);
 
   // Auto-run scan on page load (with or without saved defaults)
   useEffect(() => {
     const shouldRun = !initialScanDone && 
-                      isConnected && 
+                      hasDataSource && 
                       !defaultsLoading && 
                       !watchlistsLoading &&
                       !runScanMutation.isPending && 
@@ -757,7 +757,7 @@ export default function Scanner() {
                   variant="outline"
                   size="sm"
                   onClick={() => runScanMutation.mutate()}
-                  disabled={runScanMutation.isPending || !isConnected}
+                  disabled={runScanMutation.isPending || !hasDataSource}
                   className="gap-1 h-7"
                   data-testid="button-scan-now-header"
                 >
@@ -1345,7 +1345,7 @@ export default function Scanner() {
           <div className="flex items-center gap-4 pt-2">
             <Button
               onClick={handleRunScan}
-              disabled={isScanning || !isConnected}
+              disabled={isScanning || !hasDataSource}
               variant="outline"
               className="gap-2"
               data-testid="button-run-scan"
@@ -1407,9 +1407,9 @@ export default function Scanner() {
               <span className="text-xs text-muted-foreground ml-2">Using saved defaults</span>
             )}
 
-            {!isConnected && (
+            {!hasDataSource && (
               <p className="text-sm text-muted-foreground">
-                <Link href="/settings" className="text-primary underline">Connect your broker</Link> to run scans
+                <Link href="/settings" className="text-primary underline">Configure a data source</Link> to run scans
               </p>
             )}
 
