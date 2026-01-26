@@ -63,6 +63,12 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
       
       const data = await response.json();
       
+      // Check if the response is an error
+      if (data.code && data.message) {
+        console.error(`[TwelveData] API Error: ${data.code} - ${data.message}`);
+        continue;
+      }
+      
       // Handle single symbol response (not wrapped in object)
       if (batch.length === 1 && data.symbol) {
         const quote = data as TwelveDataQuote;
@@ -196,7 +202,7 @@ export function getDataSourceStatus(): { configured: boolean; provider: string }
 
 import { randomUUID } from "crypto";
 import { vcpMultidayStrategy } from "./strategies/vcpMultiday";
-import { StrategyType, type ScanResult } from "@shared/schema";
+import type { ScanResult } from "@shared/schema";
 import type { Candle } from "./strategies/types";
 
 // Rate-limited multiday scan using Twelve Data
@@ -254,7 +260,6 @@ export async function runTwelveDataMultidayScan(quotes: QuoteData[]): Promise<Sc
         ema21: classification.ema21 ? Number(classification.ema21.toFixed(2)) : Number((quote.last * 0.97).toFixed(2)),
         atr: Number((quote.last * 0.02).toFixed(2)),
         createdAt: new Date(),
-        strategy: StrategyType.VCP_MULTIDAY,
       });
     } catch (error) {
       console.error(`[TwelveData] Failed multiday scan for ${quote.symbol}:`, error);

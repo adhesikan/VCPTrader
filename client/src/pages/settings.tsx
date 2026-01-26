@@ -60,7 +60,7 @@ const brokerProviders = [
     id: "tradier", 
     name: "Tradier", 
     description: "Commission-free trading platform",
-    tokenUrl: "https://dash.tradier.com/settings/api",
+    tokenUrl: "https://brokerage.tradier.com/settings/api",
     tokenInstructions: "Log in to Tradier, go to Settings > API Access, and copy your Access Token.",
     requiresSecretKey: false,
   },
