@@ -868,6 +868,43 @@ export async function registerRoutes(
     }
   });
 
+  // Test Twelve Data API connection (authenticated to prevent abuse)
+  app.post("/api/twelvedata/test", isAuthenticated, async (req, res) => {
+    try {
+      if (!isTwelveDataConfigured()) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Twelve Data API key is not configured" 
+        });
+      }
+      
+      // Test with a simple quote request for SPY
+      const quotes = await fetchTwelveDataQuotes(["SPY"]);
+      
+      if (quotes.length > 0 && quotes[0].last > 0) {
+        res.json({ 
+          success: true, 
+          message: "Twelve Data API connection successful",
+          testQuote: {
+            symbol: quotes[0].symbol,
+            price: quotes[0].last,
+          }
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          error: "Failed to retrieve quote data from Twelve Data API" 
+        });
+      }
+    } catch (error) {
+      console.error("[TwelveData] Test connection error:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : "Connection test failed" 
+      });
+    }
+  });
+
   app.get("/api/data-source/status", async (req, res) => {
     try {
       const userId = req.session?.userId;
