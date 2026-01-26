@@ -1132,7 +1132,7 @@ export async function registerRoutes(
         baseUrl = `http://localhost:5000`;
       }
       
-      const callbackUrl = `${baseUrl}/v1/webhooks/snaptrade`;
+      const callbackUrl = `${baseUrl}/snaptrade/callback`;
       console.log(`[SnapTrade] Generating auth link with callback: ${callbackUrl}`);
       
       const authLink = await getSnaptradeAuthLink(
@@ -1157,13 +1157,6 @@ export async function registerRoutes(
       console.error("SnapTrade auth-link error:", error);
       res.status(500).json({ error: error.message || "Failed to get auth link" });
     }
-  });
-
-  // SnapTrade OAuth callback webhook - redirects to frontend callback page
-  app.get("/v1/webhooks/snaptrade", (req, res) => {
-    console.log("[SnapTrade] OAuth callback received:", req.query);
-    // Redirect to frontend callback page which will sync the connection
-    res.redirect("/snaptrade/callback");
   });
 
   app.get("/api/snaptrade/connections", isAuthenticated, async (req, res) => {
