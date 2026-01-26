@@ -2315,6 +2315,7 @@ export async function registerRoutes(
           hasSeenScannerTutorial: false,
           hasSeenVcpTutorial: false,
           hasSeenAlertsTutorial: false,
+          preferredDataSource: "twelvedata",
         });
       }
       
@@ -2329,6 +2330,7 @@ export async function registerRoutes(
         hasSeenScannerTutorial: settings.hasSeenScannerTutorial === "true",
         hasSeenVcpTutorial: settings.hasSeenVcpTutorial === "true",
         hasSeenAlertsTutorial: settings.hasSeenAlertsTutorial === "true",
+        preferredDataSource: settings.preferredDataSource || "twelvedata",
       });
     } catch (error) {
       console.error("Failed to get user settings:", error);

@@ -2,13 +2,18 @@ import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 
 export function StatusBanner() {
-  const { isLoading, dataStatus } = useBrokerStatus();
+  const { isLoading, dataStatus, dataSourceStatus } = useBrokerStatus();
 
   if (isLoading) {
     return null;
   }
 
   if (dataStatus?.isLive) {
+    const providerName = dataSourceStatus?.activeProvider || 
+      (dataSourceStatus?.activeSource === "twelvedata" ? "Twelve Data" : 
+       dataSourceStatus?.activeSource === "brokerage" ? dataSourceStatus?.brokerProvider || "Brokerage" : 
+       "Live Data");
+    
     return (
       <div 
         className="bg-green-500/10 border-b border-green-500/20 px-4 py-1.5 flex items-center justify-center gap-2"
@@ -16,7 +21,7 @@ export function StatusBanner() {
       >
         <Wifi className="h-3.5 w-3.5 text-green-500" />
         <span className="text-xs text-green-600 dark:text-green-400">
-          Connected to Live Market Data
+          Live: {providerName}
         </span>
       </div>
     );
