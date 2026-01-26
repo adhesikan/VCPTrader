@@ -379,15 +379,17 @@ export async function registerRoutes(
           const quotes = await fetchTwelveDataQuotes(DEFAULT_SCAN_SYMBOLS);
           const intradayResults = quotesToScanResults(quotes);
           
-          // Run multiday scan for Twelve Data (rate-limited, processes top 5 symbols)
-          const multidayResults = await runTwelveDataMultidayScan(quotes);
-          
-          const allResults = [...intradayResults, ...multidayResults];
+          // Run multiday scan in background (rate-limited, takes ~40 seconds)
+          runTwelveDataMultidayScan(quotes).then(multidayResults => {
+            console.log(`[TwelveData] Background multiday scan complete: ${multidayResults.length} results`);
+          }).catch(err => {
+            console.error("[TwelveData] Background multiday scan failed:", err.message);
+          });
           
           if (includeMeta) {
-            return res.json({ data: allResults, isLive: true, provider: "twelvedata" });
+            return res.json({ data: intradayResults, isLive: true, provider: "twelvedata" });
           }
-          return res.json(allResults);
+          return res.json(intradayResults);
         } catch (twelveDataError: any) {
           console.error("Twelve Data fetch failed:", twelveDataError.message);
         }
@@ -460,20 +462,30 @@ export async function registerRoutes(
               return true;
             });
             
+            // Return intraday results immediately (fast)
             const intradayResults = quotesToScanResults(filteredQuotes, strategy);
-            const multidayResults = await runTwelveDataMultidayScan(filteredQuotes);
-            const results = [...intradayResults, ...multidayResults];
             
             const scanTime = Date.now() - startTime;
             
             // Store results in storage
             await storage.clearScanResults();
-            for (const result of results) {
+            for (const result of intradayResults) {
               await storage.createScanResult(result);
             }
             
+            // Run multiday scan in background (slow due to rate limits)
+            // Results will be added to storage as they complete
+            runTwelveDataMultidayScan(filteredQuotes).then(async (multidayResults) => {
+              for (const result of multidayResults) {
+                await storage.createScanResult(result);
+              }
+              console.log(`[TwelveData] Background multiday scan complete: ${multidayResults.length} results`);
+            }).catch(err => {
+              console.error("[TwelveData] Background multiday scan failed:", err.message);
+            });
+            
             return res.json({
-              results,
+              results: intradayResults,
               metadata: {
                 isLive: true,
                 provider: "twelvedata",
@@ -481,6 +493,7 @@ export async function registerRoutes(
                 symbolsReturned: quotes.length,
                 scanTimeMs: scanTime,
                 timestamp: new Date().toISOString(),
+                note: "Multiday patterns loading in background..."
               }
             });
           } catch (twelveDataError: any) {
