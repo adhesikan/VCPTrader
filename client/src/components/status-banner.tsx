@@ -1,23 +1,14 @@
 import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useBrokerStatus } from "@/hooks/use-broker-status";
 
-const providerNames: Record<string, string> = {
-  tradier: "Tradier",
-  alpaca: "Alpaca",
-  polygon: "Polygon.io",
-  schwab: "Charles Schwab",
-  ibkr: "Interactive Brokers",
-};
-
 export function StatusBanner() {
-  const { isConnected, providerName, isLoading, dataStatus } = useBrokerStatus();
+  const { isLoading, dataStatus } = useBrokerStatus();
 
   if (isLoading) {
     return null;
   }
 
-  if (dataStatus?.isLive && dataStatus.provider) {
-    const displayName = providerNames[dataStatus.provider] || dataStatus.provider;
+  if (dataStatus?.isLive) {
     return (
       <div 
         className="bg-green-500/10 border-b border-green-500/20 px-4 py-1.5 flex items-center justify-center gap-2"
@@ -25,13 +16,13 @@ export function StatusBanner() {
       >
         <Wifi className="h-3.5 w-3.5 text-green-500" />
         <span className="text-xs text-green-600 dark:text-green-400">
-          Connected to live data via {displayName}
+          Connected to Live Market Data
         </span>
       </div>
     );
   }
 
-  if (isConnected && dataStatus?.error) {
+  if (dataStatus?.error) {
     return (
       <div 
         className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-1.5 flex items-center justify-center gap-2"
@@ -39,7 +30,7 @@ export function StatusBanner() {
       >
         <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
         <span className="text-xs text-orange-600 dark:text-orange-400">
-          Broker connected but data fetch failed - showing mock data
+          Data fetch failed - showing cached data
         </span>
       </div>
     );
@@ -52,7 +43,7 @@ export function StatusBanner() {
     >
       <WifiOff className="h-3.5 w-3.5 text-yellow-500" />
       <span className="text-xs text-yellow-600 dark:text-yellow-400">
-        Showing mock data - connect a broker in Settings for live market data
+        Mock Data
       </span>
     </div>
   );

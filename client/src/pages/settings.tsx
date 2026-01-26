@@ -52,6 +52,7 @@ interface UserSettingsResponse {
   hasSeenScannerTutorial: boolean;
   hasSeenVcpTutorial: boolean;
   hasSeenAlertsTutorial: boolean;
+  preferredDataSource: "twelvedata" | "brokerage";
 }
 
 const brokerProviders = [
@@ -133,6 +134,7 @@ export default function Settings() {
     hasSeenScannerTutorial: false,
     hasSeenVcpTutorial: false,
     hasSeenAlertsTutorial: false,
+    preferredDataSource: "twelvedata",
   });
   const [originalSettings, setOriginalSettings] = useState<UserSettingsResponse | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -475,9 +477,61 @@ export default function Settings() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-medium">Connection Status</CardTitle>
+                <CardTitle className="text-base font-medium">Market Data Source</CardTitle>
                 <CardDescription>
-                  Current market data connection
+                  Choose your preferred source for live market data
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div 
+                    className={`flex items-center justify-between p-4 rounded-md border cursor-pointer hover-elevate ${userSettings?.preferredDataSource !== "brokerage" ? "border-primary bg-primary/5" : ""}`}
+                    onClick={() => saveSettingsMutation.mutate({ ...localSettings, preferredDataSource: "twelvedata" })}
+                    data-testid="data-source-twelvedata"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-3 w-3 rounded-full ${userSettings?.preferredDataSource !== "brokerage" ? "bg-status-online" : "bg-muted"}`} />
+                      <div>
+                        <p className="font-medium">Twelve Data (Default)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Free live market data for scanning and charts
+                        </p>
+                      </div>
+                    </div>
+                    {userSettings?.preferredDataSource !== "brokerage" && (
+                      <span className="text-xs text-primary font-medium">Active</span>
+                    )}
+                  </div>
+                  <div 
+                    className={`flex items-center justify-between p-4 rounded-md border cursor-pointer hover-elevate ${userSettings?.preferredDataSource === "brokerage" ? "border-primary bg-primary/5" : ""} ${!brokerStatus?.isConnected ? "opacity-50" : ""}`}
+                    onClick={() => brokerStatus?.isConnected && saveSettingsMutation.mutate({ ...localSettings, preferredDataSource: "brokerage" })}
+                    data-testid="data-source-brokerage"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-3 w-3 rounded-full ${userSettings?.preferredDataSource === "brokerage" && brokerStatus?.isConnected ? "bg-status-online" : "bg-muted"}`} />
+                      <div>
+                        <p className="font-medium">Brokerage Data</p>
+                        <p className="text-sm text-muted-foreground">
+                          {brokerStatus?.isConnected 
+                            ? `Use data from ${brokerProviders.find(b => b.id === brokerStatus.provider)?.name || brokerStatus.provider}`
+                            : "Connect a broker below to enable this option"
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    {userSettings?.preferredDataSource === "brokerage" && brokerStatus?.isConnected && (
+                      <span className="text-xs text-primary font-medium">Active</span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Brokerage Connection</CardTitle>
+                <CardDescription>
+                  Optional: Connect a brokerage for alternative data source
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -524,7 +578,7 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="text-base font-medium">Data Providers</CardTitle>
                 <CardDescription>
-                  Connect to a brokerage for live market data
+                  Connect to a brokerage for alternative market data
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -587,6 +587,7 @@ export const userSettings = pgTable("user_settings", {
   hasSeenScannerTutorial: varchar("has_seen_scanner_tutorial").notNull().default("false"),
   hasSeenVcpTutorial: varchar("has_seen_vcp_tutorial").notNull().default("false"),
   hasSeenAlertsTutorial: varchar("has_seen_alerts_tutorial").notNull().default("false"),
+  preferredDataSource: varchar("preferred_data_source").notNull().default("twelvedata"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -607,6 +608,7 @@ export const userSettingsUpdateSchema = z.object({
   hasSeenScannerTutorial: z.boolean().optional(),
   hasSeenVcpTutorial: z.boolean().optional(),
   hasSeenAlertsTutorial: z.boolean().optional(),
+  preferredDataSource: z.enum(["twelvedata", "brokerage"]).optional(),
 });
 export type UserSettingsUpdate = z.infer<typeof userSettingsUpdateSchema>;
 export type UserSettings = typeof userSettings.$inferSelect;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./use-auth";
 
@@ -8,6 +8,16 @@ interface BrokerStatus {
   provider: string;
   isConnected: boolean;
   lastSync: string | null;
+}
+
+interface DataSourceStatus {
+  activeSource: string;
+  activeProvider: string | null;
+  isLive: boolean;
+  preferredDataSource: string;
+  twelveDataConfigured: boolean;
+  hasBrokerConnection: boolean;
+  brokerProvider: string | null;
 }
 
 interface DataStatus {
@@ -22,6 +32,7 @@ interface BrokerStatusContextValue {
   isLoading: boolean;
   providerName: string | null;
   dataStatus: DataStatus | null;
+  dataSourceStatus: DataSourceStatus | null;
 }
 
 const BrokerStatusContext = createContext<BrokerStatusContextValue | null>(null);
@@ -32,11 +43,11 @@ const providerNames: Record<string, string> = {
   polygon: "Polygon.io",
   schwab: "Charles Schwab",
   ibkr: "Interactive Brokers",
+  twelvedata: "Twelve Data",
 };
 
 export function BrokerStatusProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [dataStatus, setDataStatus] = useState<DataStatus | null>(null);
 
   const { data: status, isLoading } = useQuery<BrokerStatus | null>({
     queryKey: ["/api/broker/status"],
@@ -44,32 +55,21 @@ export function BrokerStatusProvider({ children }: { children: ReactNode }) {
     refetchInterval: 60000,
   });
 
-  const { data: scanMeta } = useQuery<{ data: any[]; isLive: boolean; provider?: string; error?: string }>({
-    queryKey: ["/api/scan/results", "meta"],
-    queryFn: async () => {
-      const res = await fetch("/api/scan/results?meta=true");
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
-    enabled: !!user,
+  const { data: dataSourceStatus } = useQuery<DataSourceStatus>({
+    queryKey: ["/api/data-source/status"],
     refetchInterval: 30000,
   });
 
-  useEffect(() => {
-    if (scanMeta) {
-      setDataStatus({
-        isLive: scanMeta.isLive,
-        provider: scanMeta.provider,
-        error: scanMeta.error,
-      });
-    }
-  }, [scanMeta]);
-
   const isConnected = !!status?.isConnected;
   const providerName = status?.provider ? providerNames[status.provider] || status.provider : null;
+  
+  const dataStatus: DataStatus | null = dataSourceStatus ? {
+    isLive: dataSourceStatus.isLive,
+    provider: dataSourceStatus.activeProvider || undefined,
+  } : null;
 
   return (
-    <BrokerStatusContext.Provider value={{ status, isConnected, isLoading, providerName, dataStatus }}>
+    <BrokerStatusContext.Provider value={{ status: status ?? null, isConnected, isLoading, providerName, dataStatus, dataSourceStatus: dataSourceStatus ?? null }}>
       {children}
     </BrokerStatusContext.Provider>
   );
@@ -78,7 +78,7 @@ export function BrokerStatusProvider({ children }: { children: ReactNode }) {
 export function useBrokerStatus() {
   const context = useContext(BrokerStatusContext);
   if (!context) {
-    return { status: null, isConnected: false, isLoading: false, providerName: null, dataStatus: null };
+    return { status: null, isConnected: false, isLoading: false, providerName: null, dataStatus: null, dataSourceStatus: null };
   }
   return context;
 }

@@ -27,6 +27,7 @@ import {
   LARGE_CAP_UNIVERSE
 } from "./broker-service";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
+import { fetchTwelveDataQuotes, fetchTwelveDataHistory, isTwelveDataConfigured } from "./twelvedata-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -341,7 +342,17 @@ export async function registerRoutes(
       const userId = req.session?.userId;
       const includeMeta = req.query.meta === "true";
       
+      // Get user's preferred data source
+      let preferredDataSource = "twelvedata";
       if (userId) {
+        const userSettings = await storage.getUserSettings(userId);
+        if (userSettings?.preferredDataSource) {
+          preferredDataSource = userSettings.preferredDataSource;
+        }
+      }
+      
+      // If user prefers brokerage and has a connection, use it
+      if (userId && preferredDataSource === "brokerage") {
         const connection = await storage.getBrokerConnectionWithToken(userId);
         if (connection?.accessToken && connection?.isConnected) {
           try {
@@ -357,19 +368,30 @@ export async function registerRoutes(
             }
             return res.json(allResults);
           } catch (brokerError: any) {
-            console.error("Broker fetch failed, falling back to stored results:", brokerError.message);
-            const storedResults = await storage.getScanResults();
-            if (includeMeta) {
-              return res.json({ data: storedResults, isLive: false, error: brokerError.message });
-            }
-            return res.json(storedResults);
+            console.error("Broker fetch failed, falling back to Twelve Data:", brokerError.message);
           }
         }
       }
       
+      // Use Twelve Data as default market data source
+      if (isTwelveDataConfigured()) {
+        try {
+          const quotes = await fetchTwelveDataQuotes(DEFAULT_SCAN_SYMBOLS);
+          const intradayResults = quotesToScanResults(quotes);
+          
+          if (includeMeta) {
+            return res.json({ data: intradayResults, isLive: true, provider: "twelvedata" });
+          }
+          return res.json(intradayResults);
+        } catch (twelveDataError: any) {
+          console.error("Twelve Data fetch failed:", twelveDataError.message);
+        }
+      }
+      
+      // Fallback to stored results (mock data)
       const storedResults = await storage.getScanResults();
       if (includeMeta) {
-        return res.json({ data: storedResults, isLive: false, requiresBroker: !storedResults.length });
+        return res.json({ data: storedResults, isLive: false });
       }
       res.json(storedResults);
     } catch (error) {
@@ -843,6 +865,56 @@ export async function registerRoutes(
       res.json(sanitizedConnection);
     } catch (error) {
       res.status(500).json({ error: "Failed to get broker status" });
+    }
+  });
+
+  app.get("/api/data-source/status", async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      
+      // Get user's preferred data source
+      let preferredDataSource = "twelvedata";
+      let hasBrokerConnection = false;
+      let brokerProvider: string | null = null;
+      
+      if (userId) {
+        const userSettings = await storage.getUserSettings(userId);
+        if (userSettings?.preferredDataSource) {
+          preferredDataSource = userSettings.preferredDataSource;
+        }
+        
+        const connection = await storage.getBrokerConnection(userId);
+        if (connection?.isConnected) {
+          hasBrokerConnection = true;
+          brokerProvider = connection.provider;
+        }
+      }
+      
+      const twelveDataConfigured = isTwelveDataConfigured();
+      
+      // Determine active data source
+      let activeSource = "mock";
+      let activeProvider = null;
+      
+      if (preferredDataSource === "brokerage" && hasBrokerConnection) {
+        activeSource = "brokerage";
+        activeProvider = brokerProvider;
+      } else if (twelveDataConfigured) {
+        activeSource = "twelvedata";
+        activeProvider = "Twelve Data";
+      }
+      
+      res.json({
+        activeSource,
+        activeProvider,
+        isLive: activeSource !== "mock",
+        preferredDataSource,
+        twelveDataConfigured,
+        hasBrokerConnection,
+        brokerProvider,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get data source status" });
     }
   });
 
