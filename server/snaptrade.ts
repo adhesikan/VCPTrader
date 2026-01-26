@@ -362,13 +362,50 @@ export async function removeSnaptradeAuthorization(
   }
 }
 
+// Known crypto exchange slugs/names to filter out
+const CRYPTO_EXCHANGES = [
+  'coinbase',
+  'kraken',
+  'binance',
+  'gemini',
+  'crypto.com',
+  'bitfinex',
+  'bitstamp',
+  'kucoin',
+  'ftx',
+  'huobi',
+  'okx',
+  'bybit',
+  'gate.io',
+  'bitget',
+];
+
 export async function getSupportedBrokers(): Promise<any[]> {
   const client = getSnaptradeClient();
   if (!client) return [];
 
   try {
     const response = await client.referenceData.listAllBrokerages();
-    return (response.data || []).filter((broker: any) => broker.isActive !== false);
+    return (response.data || []).filter((broker: any) => {
+      // Filter out inactive brokers
+      if (broker.isActive === false) return false;
+      
+      // Filter out crypto exchanges by slug or name
+      const slug = (broker.slug || '').toLowerCase();
+      const name = (broker.name || '').toLowerCase();
+      
+      // Check if it's a crypto exchange
+      const isCrypto = CRYPTO_EXCHANGES.some(crypto => 
+        slug.includes(crypto) || name.includes(crypto)
+      );
+      
+      // Also filter by brokerType if available (some APIs use this)
+      if (broker.brokerType === 'CRYPTO' || broker.brokerType === 'crypto') {
+        return false;
+      }
+      
+      return !isCrypto;
+    });
   } catch (error) {
     console.error("Failed to get supported brokers:", error);
     return [];
