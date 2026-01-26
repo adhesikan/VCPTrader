@@ -1,0 +1,79 @@
+6:28:03 PM [express] GET /api/snaptrade/connections 200 in 12ms :: []
+Failed to save user settings: error: column "preferred_data_source" does not exist
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:70:37989
+    at async ny.getUserSettings (/app/dist/index.cjs:70:147487)
+    at async ny.setUserSettings (/app/dist/index.cjs:70:147592)
+    at async n (/app/dist/index.cjs:76:126146) {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '285',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+6:28:12 PM [express] PUT /api/user/settings 500 in 10ms :: {"error":"Failed to save user settings"}
+Failed to save user settings: error: column "preferred_data_source" does not exist
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:70:37989
+    at async ny.getUserSettings (/app/dist/index.cjs:70:147487)
+    at async ny.setUserSettings (/app/dist/index.cjs:70:147592)
+    at async n (/app/dist/index.cjs:76:126146) {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '285',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+6:28:16 PM [express] PUT /api/user/settings 500 in 82ms :: {"error":"Failed to save user settings"}
+Failed to save user settings: error: column "preferred_data_source" does not exist
+  table: undefined,
+    at /app/dist/index.cjs:64:13326
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /app/dist/index.cjs:70:37989
+  column: undefined,
+    at async ny.getUserSettings (/app/dist/index.cjs:70:147487)
+  dataType: undefined,
+    at async ny.setUserSettings (/app/dist/index.cjs:70:147592)
+    at async n (/app/dist/index.cjs:76:126146) {
+  constraint: undefined,
+  length: 122,
+  file: 'parse_relation.c',
+  severity: 'ERROR',
+  line: '3716',
+  code: '42703',
+  detail: undefined,
+  routine: 'errorMissingColumn'
+  hint: undefined,
+}
+  position: '285',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+6:28:17 PM [express] PUT /api/user/settings 500 in 25ms :: {"error":"Failed to save user settings"}

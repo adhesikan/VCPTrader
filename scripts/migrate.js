@@ -219,6 +219,21 @@ async function migrate() {
     `);
     console.log('Created/verified user_settings table');
 
+    // Add preferred_data_source column to user_settings
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'user_settings' AND column_name = 'preferred_data_source'
+        ) THEN
+          ALTER TABLE user_settings ADD COLUMN preferred_data_source VARCHAR NOT NULL DEFAULT 'twelvedata';
+          RAISE NOTICE 'Added preferred_data_source column';
+        END IF;
+      END $$;
+    `);
+    console.log('Added/verified preferred_data_source column');
+
     // Add tutorial tracking columns to user_settings
     await client.query(`
       DO $$
