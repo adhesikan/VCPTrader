@@ -68,6 +68,45 @@ async function migrate() {
       END $$;
     `);
 
+    // Add SnapTrade columns to users table
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'snaptrade_user_id'
+        ) THEN
+          ALTER TABLE users ADD COLUMN snaptrade_user_id VARCHAR;
+          RAISE NOTICE 'Added snaptrade_user_id column to users';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'snaptrade_user_secret'
+        ) THEN
+          ALTER TABLE users ADD COLUMN snaptrade_user_secret VARCHAR;
+          RAISE NOTICE 'Added snaptrade_user_secret column to users';
+        END IF;
+      END $$;
+    `);
+    console.log('Added SnapTrade columns to users table');
+
+    // Create snaptrade_connections table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS snaptrade_connections (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        brokerage_authorization_id VARCHAR NOT NULL,
+        brokerage_name VARCHAR,
+        account_id VARCHAR,
+        account_name VARCHAR,
+        account_number VARCHAR,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('Created/verified snaptrade_connections table');
+
     // Add user_id column to watchlists table
     await client.query(`
       DO $$
