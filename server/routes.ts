@@ -1188,11 +1188,13 @@ export async function registerRoutes(
         credentials.snaptradeUserId,
         credentials.snaptradeUserSecret
       );
+      console.log("[SnapTrade] Authorizations:", JSON.stringify(authorizations, null, 2));
 
       const accounts = await getSnaptradeAccounts(
         credentials.snaptradeUserId,
         credentials.snaptradeUserSecret
       );
+      console.log("[SnapTrade] Accounts:", JSON.stringify(accounts, null, 2));
 
       const existingConnections = await storage.getSnaptradeConnections(userId);
 
@@ -1202,13 +1204,19 @@ export async function registerRoutes(
         );
 
         const auth = authorizations.find((a: any) => a.id === account.brokerageAuthorizationId);
+        
+        // Get broker name from authorization if account doesn't have it
+        const brokerName = (account.brokerName && account.brokerName !== "Unknown") 
+          ? account.brokerName 
+          : (auth?.brokerage?.name || auth?.brokerage_name || "Unknown Broker");
+        const brokerSlug = auth?.brokerage?.slug || auth?.brokerage_slug || null;
 
         if (!existing) {
           await storage.createSnaptradeConnection({
             userId,
             brokerageAuthorizationId: account.brokerageAuthorizationId,
-            brokerName: account.brokerName,
-            brokerSlug: auth?.brokerage?.slug || null,
+            brokerName,
+            brokerSlug,
             accountId: account.id,
             accountName: account.name,
             accountNumber: account.number,
@@ -1219,7 +1227,7 @@ export async function registerRoutes(
           });
         } else {
           await storage.updateSnaptradeConnection(existing.id, {
-            brokerName: account.brokerName,
+            brokerName,
             accountName: account.name,
             accountNumber: account.number,
             accountType: account.type,
