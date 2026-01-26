@@ -86,15 +86,16 @@ Preferred communication style: Simple, everyday language.
 - `SUPPORT_EMAIL` environment variable for legal page contact info
 
 ### Railway Deployment
-- **Configuration File**: `railway.json` contains build and deploy settings
+- **Configuration Files**: `railway.json` and `railway.toml` for build and deploy settings
 - **Build Command**: `npm run build`
-- **Start Command**: `npm run db:push && npm run start` (runs migrations at startup)
+- **Start Command**: `npm run db:push --force && node scripts/migrate.js && npm run start`
 - **Database**: Automatically pushes schema changes to PostgreSQL when the app starts
 - **Environment Variables Required on Railway**:
   - `DATABASE_URL` - PostgreSQL connection string
   - `SESSION_SECRET` - Random secret for session encryption
   - `LEGAL_VERSION` - Current legal policy version date
   - `SUPPORT_EMAIL` - Support contact email
+  - `APP_URL` - Full app URL for OAuth callbacks (e.g., `https://your-app.railway.app`) - Required for SnapTrade brokerage OAuth flow
 
 ## External Dependencies
 

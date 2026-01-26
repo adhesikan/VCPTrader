@@ -1113,9 +1113,24 @@ export async function registerRoutes(
         credentials = { snaptradeUserId: result.userId, snaptradeUserSecret: result.userSecret };
       }
 
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN}`
-        : `http://localhost:5000`;
+      // Build base URL for OAuth callback - check various deployment environments
+      let baseUrl: string;
+      if (process.env.APP_URL) {
+        // Custom app URL (recommended for Railway)
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        // Railway deployment
+        baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+      } else if (process.env.REPLIT_DEPLOYMENT_URL) {
+        // Replit deployment
+        baseUrl = `https://${process.env.REPLIT_DEPLOYMENT_URL}`;
+      } else if (process.env.REPLIT_DEV_DOMAIN) {
+        // Replit development
+        baseUrl = `https://${process.env.REPLIT_DEV_DOMAIN}`;
+      } else {
+        // Local development
+        baseUrl = `http://localhost:5000`;
+      }
       
       const authLink = await getSnaptradeAuthLink(
         credentials.snaptradeUserId!,
