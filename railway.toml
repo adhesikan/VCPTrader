@@ -6,7 +6,7 @@ buildCommand = "npm run build"
 startCommand = "npm run db:push --force && node scripts/migrate.js && npm run start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
-healthcheckPath = "/"
+healthcheckPath = "/health"
 healthcheckTimeout = 300
 
 [nixpacks]

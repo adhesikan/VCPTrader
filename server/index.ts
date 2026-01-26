@@ -305,6 +305,11 @@ async function restoreBrokerConnections() {
     throw err;
   });
 
+  // Health check endpoint for Railway/deployment platforms
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
