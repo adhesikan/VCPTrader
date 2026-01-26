@@ -1132,16 +1132,21 @@ export async function registerRoutes(
         baseUrl = `http://localhost:5000`;
       }
       
+      const callbackUrl = `${baseUrl}/snaptrade/callback`;
+      console.log(`[SnapTrade] Generating auth link with callback: ${callbackUrl}`);
+      
       const authLink = await getSnaptradeAuthLink(
         credentials.snaptradeUserId!,
         credentials.snaptradeUserSecret!,
         {
           broker,
           connectionType: connectionType || "trade",
-          customRedirect: `${baseUrl}/snaptrade/callback`,
+          customRedirect: callbackUrl,
           reconnect,
         }
       );
+
+      console.log(`[SnapTrade] Auth link generated: ${authLink ? 'success' : 'failed'}`);
 
       if (!authLink) {
         return res.status(500).json({ error: "Failed to generate auth link" });
