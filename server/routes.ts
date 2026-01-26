@@ -154,52 +154,68 @@ export async function registerRoutes(
       const userId = req.session.userId!;
       const connection = await storage.getBrokerConnectionWithToken(userId);
       
-      if (!connection || !connection.accessToken) {
-        return res.status(400).json({ 
-          error: "No broker connection. Please connect a brokerage in Settings first." 
-        });
-      }
-
       const { symbols = DEFAULT_SCAN_SYMBOLS, strategyIds, timeframe = "1d" } = req.body;
       const selectedStrategies: StrategyIdType[] = strategyIds || getAllStrategyIds();
-      const brokerTimeframe = getBrokerTimeframe(timeframe);
       
-      const quotes = await fetchQuotesFromBroker(connection, symbols);
-      const allResults: any[] = [];
-      
-      for (const quote of quotes) {
-        try {
-          const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
-          const candles: CandleData[] = history.map(c => ({
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume,
-            time: c.time,
-          }));
-          
-          if (candles.length < 20) continue;
-          
-          const pluginResults = runAllPluginScans(
-            quote.symbol,
-            candles,
-            timeframe,
-            selectedStrategies.filter(id => 
-              id !== StrategyId.VCP && 
-              id !== StrategyId.VCP_MULTIDAY && 
-              id !== StrategyId.CLASSIC_PULLBACK
-            ) as StrategyIdType[],
-            quote
-          );
-          
-          allResults.push(...pluginResults);
-        } catch (e) {
-          console.error(`Failed to scan ${quote.symbol}:`, e);
+      // Try broker connection first
+      if (connection && connection.accessToken) {
+        const brokerTimeframe = getBrokerTimeframe(timeframe);
+        const quotes = await fetchQuotesFromBroker(connection, symbols);
+        const allResults: any[] = [];
+        
+        for (const quote of quotes) {
+          try {
+            const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
+            const candles: CandleData[] = history.map(c => ({
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.volume,
+              time: c.time,
+            }));
+            
+            if (candles.length < 20) continue;
+            
+            const pluginResults = runAllPluginScans(
+              quote.symbol,
+              candles,
+              timeframe,
+              selectedStrategies.filter(id => 
+                id !== StrategyId.VCP && 
+                id !== StrategyId.VCP_MULTIDAY && 
+                id !== StrategyId.CLASSIC_PULLBACK
+              ) as StrategyIdType[],
+              quote
+            );
+            
+            allResults.push(...pluginResults);
+          } catch (e) {
+            console.error(`Failed to scan ${quote.symbol}:`, e);
+          }
         }
+        
+        return res.json(allResults);
       }
       
-      res.json(allResults);
+      // Fallback to Twelve Data
+      if (isTwelveDataConfigured()) {
+        const quotes = await fetchTwelveDataQuotes(symbols);
+        const allResults: any[] = [];
+        
+        // For Twelve Data, we can only do intraday analysis without history
+        // Return basic scan results for now
+        for (const quote of quotes) {
+          const intradayResults = quotesToScanResults([quote]);
+          allResults.push(...intradayResults);
+        }
+        
+        return res.json(allResults);
+      }
+      
+      return res.status(400).json({ 
+        error: "No data source available. Please connect a brokerage or configure Twelve Data API." 
+      });
     } catch (error: any) {
       console.error("Multi-strategy scan error:", error);
       res.status(500).json({ error: error.message || "Failed to run multi-strategy scan" });
@@ -211,24 +227,44 @@ export async function registerRoutes(
       const userId = req.session.userId!;
       const connection = await storage.getBrokerConnectionWithToken(userId);
       
-      if (!connection || !connection.accessToken) {
-        return res.status(400).json({ 
-          error: "No broker connection. Please connect a brokerage in Settings first." 
-        });
+      // Try broker connection first
+      if (connection && connection.accessToken) {
+        const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
+        const spyCandles: CandleData[] = spyHistory.map(c => ({
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
+          time: c.time,
+        }));
+        
+        const regime = classifyMarketRegime(spyCandles);
+        return res.json(regime);
       }
-
-      const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
-      const spyCandles: CandleData[] = spyHistory.map(c => ({
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-        time: c.time,
-      }));
       
-      const regime = classifyMarketRegime(spyCandles);
-      res.json(regime);
+      // Fallback to Twelve Data
+      if (isTwelveDataConfigured()) {
+        try {
+          const spyHistory = await fetchTwelveDataHistory("SPY", "1day", 90);
+          const spyCandles: CandleData[] = spyHistory.map(c => ({
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            time: c.date, // Use date string directly
+          }));
+          
+          const regime = classifyMarketRegime(spyCandles);
+          return res.json(regime);
+        } catch (twelveDataError: any) {
+          console.error("Twelve Data market regime failed:", twelveDataError.message);
+        }
+      }
+      
+      // Return neutral regime if no data source available
+      return res.json({ regime: "NEUTRAL", confidence: 0.5, trend: 0 });
     } catch (error: any) {
       console.error("Market regime error:", error);
       res.status(500).json({ error: error.message || "Failed to get market regime" });
@@ -239,12 +275,6 @@ export async function registerRoutes(
     try {
       const userId = req.session.userId!;
       const connection = await storage.getBrokerConnectionWithToken(userId);
-      
-      if (!connection || !connection.accessToken) {
-        return res.status(400).json({ 
-          error: "No broker connection. Please connect a brokerage in Settings first." 
-        });
-      }
 
       const { 
         symbols = DEFAULT_SCAN_SYMBOLS, 
@@ -255,35 +285,15 @@ export async function registerRoutes(
         maxPrice,
         minVolume
       } = req.body;
-      const brokerTimeframe = getBrokerTimeframe(timeframe);
       
-      let marketRegime;
-      try {
-        const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
-        const spyCandles: CandleData[] = spyHistory.map(c => ({
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          volume: c.volume,
-          time: c.time,
-        }));
-        marketRegime = classifyMarketRegime(spyCandles);
-      } catch (e) {
-        console.error("Failed to get market regime, using default:", e);
-      }
-      
-      const quotes = await fetchQuotesFromBroker(connection, symbols);
-      const confluenceResults: ConfluenceResult[] = [];
-      
-      for (const quote of quotes) {
+      // Try broker connection first
+      if (connection && connection.accessToken) {
+        const brokerTimeframe = getBrokerTimeframe(timeframe);
+        
+        let marketRegime;
         try {
-          if (minPrice && quote.last < minPrice) continue;
-          if (maxPrice && quote.last > maxPrice) continue;
-          if (minVolume && quote.volume < minVolume) continue;
-          
-          const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
-          const candles: CandleData[] = history.map(c => ({
+          const spyHistory = await fetchHistoryFromBroker(connection, "SPY", "3M");
+          const spyCandles: CandleData[] = spyHistory.map(c => ({
             open: c.open,
             high: c.high,
             low: c.low,
@@ -291,37 +301,81 @@ export async function registerRoutes(
             volume: c.volume,
             time: c.time,
           }));
-          
-          if (candles.length < 20) continue;
-          
-          const pluginResults = runAllPluginScans(
-            quote.symbol,
-            candles,
-            timeframe,
-            strategies,
-            quote
-          );
-          
-          if (pluginResults.length > 0) {
-            const confluence = aggregateConfluence(
-              quote.symbol, 
-              pluginResults, 
-              10, 
-              marketRegime?.regime
-            );
-            if (confluence) {
-              confluenceResults.push(confluence);
-            }
-          }
+          marketRegime = classifyMarketRegime(spyCandles);
         } catch (e) {
-          console.error(`Failed to confluence scan ${quote.symbol}:`, e);
+          console.error("Failed to get market regime, using default:", e);
         }
+        
+        const quotes = await fetchQuotesFromBroker(connection, symbols);
+        const confluenceResults: ConfluenceResult[] = [];
+        
+        for (const quote of quotes) {
+          try {
+            if (minPrice && quote.last < minPrice) continue;
+            if (maxPrice && quote.last > maxPrice) continue;
+            if (minVolume && quote.volume < minVolume) continue;
+            
+            const history = await fetchHistoryFromBroker(connection, quote.symbol, brokerTimeframe);
+            const candles: CandleData[] = history.map(c => ({
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.volume,
+              time: c.time,
+            }));
+            
+            if (candles.length < 20) continue;
+            
+            const pluginResults = runAllPluginScans(
+              quote.symbol,
+              candles,
+              timeframe,
+              strategies,
+              quote
+            );
+            
+            if (pluginResults.length > 0) {
+              const confluence = aggregateConfluence(
+                quote.symbol, 
+                pluginResults, 
+                10, 
+                marketRegime?.regime
+              );
+              if (confluence) {
+                confluenceResults.push(confluence);
+              }
+            }
+          } catch (e) {
+            console.error(`Failed to confluence scan ${quote.symbol}:`, e);
+          }
+        }
+        
+        const filtered = filterByMinMatches(confluenceResults, minMatches);
+        const ranked = rankByConfluence(filtered);
+        
+        return res.json({ results: ranked, marketRegime });
       }
       
-      const filtered = filterByMinMatches(confluenceResults, minMatches);
-      const ranked = rankByConfluence(filtered);
+      // Fallback to Twelve Data with basic scan
+      if (isTwelveDataConfigured()) {
+        const quotes = await fetchTwelveDataQuotes(symbols);
+        const intradayResults = quotesToScanResults(quotes);
+        
+        // Filter results
+        const filteredResults = intradayResults.filter(r => {
+          if (minPrice && r.price < minPrice) return false;
+          if (maxPrice && r.price > maxPrice) return false;
+          if (minVolume && (r.volume ?? 0) < minVolume) return false;
+          return true;
+        });
+        
+        return res.json({ results: filteredResults, marketRegime: null });
+      }
       
-      res.json({ results: ranked, marketRegime });
+      return res.status(400).json({ 
+        error: "No data source available. Please connect a brokerage or configure Twelve Data API." 
+      });
     } catch (error: any) {
       console.error("Confluence scan error:", error);
       res.status(500).json({ error: error.message || "Failed to run confluence scan" });
