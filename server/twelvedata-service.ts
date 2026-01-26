@@ -45,7 +45,9 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
     const symbolsParam = batch.join(",");
     
     try {
-      const url = `${BASE_URL}/quote?symbol=${symbolsParam}&apikey=${TWELVEDATA_API_KEY}`;
+      // Include prepost=true for extended hours data
+      const url = `${BASE_URL}/quote?symbol=${symbolsParam}&prepost=true&apikey=${TWELVEDATA_API_KEY}`;
+      console.log(`[TwelveData] Fetching quotes for batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.join(", ")}`);
       const response = await fetch(url);
       
       if (response.status === 429) {
@@ -64,7 +66,11 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
       // Handle single symbol response (not wrapped in object)
       if (batch.length === 1 && data.symbol) {
         const quote = data as TwelveDataQuote;
-        if (!quote.close || quote.close === "0") continue;
+        console.log(`[TwelveData] Single quote for ${quote.symbol}: close=${quote.close}, volume=${quote.volume}`);
+        if (!quote.close || quote.close === "0") {
+          console.log(`[TwelveData] Skipping ${quote.symbol}: invalid close price`);
+          continue;
+        }
         
         results.push({
           symbol: quote.symbol,
@@ -81,10 +87,17 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
       } else {
         // Handle batch response
         const batchData = data as TwelveDataBatchResponse;
+        console.log(`[TwelveData] Batch response keys: ${Object.keys(batchData).join(", ")}`);
         for (const symbol of batch) {
           const quote = batchData[symbol];
-          if (!quote || "code" in quote || !("close" in quote)) continue;
-          if (!quote.close || quote.close === "0") continue;
+          if (!quote || "code" in quote || !("close" in quote)) {
+            console.log(`[TwelveData] Skipping ${symbol}: no valid quote data`);
+            continue;
+          }
+          if (!quote.close || quote.close === "0") {
+            console.log(`[TwelveData] Skipping ${symbol}: close price is 0 or empty`);
+            continue;
+          }
           
           results.push({
             symbol: quote.symbol,
@@ -110,6 +123,7 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
     }
   }
   
+  console.log(`[TwelveData] Total quotes fetched: ${results.length} from ${symbols.length} symbols requested`);
   return results;
 }
 
