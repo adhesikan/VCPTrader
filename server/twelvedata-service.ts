@@ -66,6 +66,13 @@ export async function fetchTwelveDataQuotes(symbols: string[]): Promise<QuoteDat
       // Check if the response is an error
       if (data.code && data.message) {
         console.error(`[TwelveData] API Error: ${data.code} - ${data.message}`);
+        // If rate limited (429), wait before retrying
+        if (data.code === 429) {
+          console.log(`[TwelveData] Rate limited, waiting 60 seconds before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, 60000));
+          // Retry this batch
+          i -= BATCH_SIZE;
+        }
         continue;
       }
       
