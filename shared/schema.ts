@@ -107,6 +107,60 @@ export const opportunityFirstSeen = pgTable("opportunity_first_seen", {
 
 export type OpportunityFirstSeen = typeof opportunityFirstSeen.$inferSelect;
 
+// Opportunity Outcome Report - tracks detected opportunities and their lifecycle
+export const OpportunityStatus = {
+  ACTIVE: "ACTIVE",
+  RESOLVED: "RESOLVED",
+} as const;
+
+export type OpportunityStatusType = typeof OpportunityStatus[keyof typeof OpportunityStatus];
+
+export const OpportunityOutcome = {
+  BROKE_RESISTANCE: "BROKE_RESISTANCE",
+  INVALIDATED: "INVALIDATED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type OpportunityOutcomeType = typeof OpportunityOutcome[keyof typeof OpportunityOutcome];
+
+export const opportunities = pgTable("opportunities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  strategyId: text("strategy_id").notNull(),
+  strategyName: text("strategy_name").notNull(),
+  timeframe: text("timeframe").notNull().default("1d"),
+  stageAtDetection: text("stage_at_detection").notNull(),
+  detectedAt: timestamp("detected_at").notNull(),
+  detectedPrice: real("detected_price"),
+  resistancePrice: real("resistance_price"),
+  stopReferencePrice: real("stop_reference_price"),
+  entryTriggerPrice: real("entry_trigger_price"),
+  rvol: real("rvol"),
+  score: integer("score"),
+  status: text("status").notNull().default("ACTIVE"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionOutcome: text("resolution_outcome"),
+  resolutionReason: text("resolution_reason"),
+  maxPriceAfter: real("max_price_after"),
+  minPriceAfter: real("min_price_after"),
+  maxFavorableMovePercent: real("max_favorable_move_percent"),
+  maxAdverseMovePercent: real("max_adverse_move_percent"),
+  barsTracked: integer("bars_tracked").notNull().default(0),
+  activeDurationMinutes: integer("active_duration_minutes"),
+  dedupeKey: text("dedupe_key").unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOpportunitySchema = createInsertSchema(opportunities).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertOpportunity = z.infer<typeof insertOpportunitySchema>;
+export type Opportunity = typeof opportunities.$inferSelect;
+
 export const AlertType = {
   BREAKOUT: "BREAKOUT",
   STOP_HIT: "STOP_HIT",

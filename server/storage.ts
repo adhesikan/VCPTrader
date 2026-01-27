@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto";
 import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken, decryptToken } from "./crypto";
 import { db } from "./db";
-import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable, snaptradeConnections as snaptradeConnectionsTable } from "@shared/schema";
+import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable, snaptradeConnections as snaptradeConnectionsTable, opportunities as opportunitiesTable } from "@shared/schema";
 import { users as usersTable } from "@shared/models/auth";
-import { desc, inArray, lt } from "drizzle-orm";
+import { desc, inArray, lt, gte, lte, or, sql, avg, count } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -53,6 +53,8 @@ import type {
   OpportunityFirstSeen,
   SnaptradeConnection,
   InsertSnaptradeConnection,
+  Opportunity,
+  InsertOpportunity,
 } from "@shared/schema";
 
 const ALERT_DISCLAIMER = "This alert is informational only and not investment advice.";
@@ -193,6 +195,40 @@ export interface IStorage {
   upsertOpportunityFirstSeen(ticker: string, stage: string, strategy?: string): Promise<OpportunityFirstSeen>;
   updateOpportunityLastSeen(tickers: string[]): Promise<void>;
   cleanupStaleOpportunities(): Promise<void>;
+
+  // Opportunity Outcome Report
+  getOpportunities(userId: string, filters?: OpportunityFilters): Promise<Opportunity[]>;
+  getOpportunity(id: string): Promise<Opportunity | null>;
+  getActiveOpportunities(): Promise<Opportunity[]>;
+  createOpportunity(opportunity: InsertOpportunity): Promise<Opportunity>;
+  updateOpportunity(id: string, data: Partial<Opportunity>): Promise<Opportunity | null>;
+  findOpportunityByDedupeKey(dedupeKey: string): Promise<Opportunity | null>;
+  getOpportunitySummary(userId: string, filters?: OpportunityFilters): Promise<OpportunitySummary>;
+}
+
+export interface OpportunityFilters {
+  startDate?: Date;
+  endDate?: Date;
+  strategyId?: string;
+  timeframe?: string;
+  stageAtDetection?: string;
+  resolutionOutcome?: string;
+  symbol?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface OpportunitySummary {
+  total: number;
+  active: number;
+  resolved: number;
+  brokeResistanceCount: number;
+  invalidatedCount: number;
+  expiredCount: number;
+  avgActiveDurationMinutes: number | null;
+  avgMaxFavorableMovePercent: number | null;
+  avgMaxAdverseMovePercent: number | null;
 }
 
 function generateMockScanResults(): ScanResult[] {
@@ -1820,6 +1856,142 @@ export class MemStorage implements IStorage {
     return {
       snaptradeUserId: user.snaptradeUserId,
       snaptradeUserSecret: decryptedSecret,
+    };
+  }
+
+  // Opportunity Outcome Report methods
+  async getOpportunities(userId: string, filters?: OpportunityFilters): Promise<Opportunity[]> {
+    const conditions = [eq(opportunitiesTable.userId, userId)];
+    
+    if (filters?.startDate) {
+      conditions.push(gte(opportunitiesTable.detectedAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(opportunitiesTable.detectedAt, filters.endDate));
+    }
+    if (filters?.strategyId) {
+      conditions.push(eq(opportunitiesTable.strategyId, filters.strategyId));
+    }
+    if (filters?.timeframe) {
+      conditions.push(eq(opportunitiesTable.timeframe, filters.timeframe));
+    }
+    if (filters?.stageAtDetection) {
+      conditions.push(eq(opportunitiesTable.stageAtDetection, filters.stageAtDetection));
+    }
+    if (filters?.resolutionOutcome) {
+      conditions.push(eq(opportunitiesTable.resolutionOutcome, filters.resolutionOutcome));
+    }
+    if (filters?.symbol) {
+      conditions.push(sql`${opportunitiesTable.symbol} ILIKE ${'%' + filters.symbol + '%'}`);
+    }
+    if (filters?.status) {
+      conditions.push(eq(opportunitiesTable.status, filters.status));
+    }
+    
+    const limit = filters?.limit || 100;
+    const offset = filters?.offset || 0;
+    
+    return db
+      .select()
+      .from(opportunitiesTable)
+      .where(and(...conditions))
+      .orderBy(desc(opportunitiesTable.detectedAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getOpportunity(id: string): Promise<Opportunity | null> {
+    const [opportunity] = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.id, id))
+      .limit(1);
+    return opportunity || null;
+  }
+
+  async getActiveOpportunities(): Promise<Opportunity[]> {
+    return db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.status, "ACTIVE"))
+      .orderBy(desc(opportunitiesTable.detectedAt));
+  }
+
+  async createOpportunity(opportunity: InsertOpportunity): Promise<Opportunity> {
+    const [created] = await db
+      .insert(opportunitiesTable)
+      .values(opportunity)
+      .returning();
+    return created;
+  }
+
+  async updateOpportunity(id: string, data: Partial<Opportunity>): Promise<Opportunity | null> {
+    const [updated] = await db
+      .update(opportunitiesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(opportunitiesTable.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async findOpportunityByDedupeKey(dedupeKey: string): Promise<Opportunity | null> {
+    const [opportunity] = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.dedupeKey, dedupeKey))
+      .limit(1);
+    return opportunity || null;
+  }
+
+  async getOpportunitySummary(userId: string, filters?: OpportunityFilters): Promise<OpportunitySummary> {
+    const conditions = [eq(opportunitiesTable.userId, userId)];
+    
+    if (filters?.startDate) {
+      conditions.push(gte(opportunitiesTable.detectedAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(opportunitiesTable.detectedAt, filters.endDate));
+    }
+    if (filters?.strategyId) {
+      conditions.push(eq(opportunitiesTable.strategyId, filters.strategyId));
+    }
+    if (filters?.timeframe) {
+      conditions.push(eq(opportunitiesTable.timeframe, filters.timeframe));
+    }
+    if (filters?.stageAtDetection) {
+      conditions.push(eq(opportunitiesTable.stageAtDetection, filters.stageAtDetection));
+    }
+    if (filters?.symbol) {
+      conditions.push(sql`${opportunitiesTable.symbol} ILIKE ${'%' + filters.symbol + '%'}`);
+    }
+    
+    const whereClause = and(...conditions);
+    
+    const [summary] = await db
+      .select({
+        total: count(),
+        active: sql<number>`COUNT(*) FILTER (WHERE ${opportunitiesTable.status} = 'ACTIVE')`,
+        resolved: sql<number>`COUNT(*) FILTER (WHERE ${opportunitiesTable.status} = 'RESOLVED')`,
+        brokeResistanceCount: sql<number>`COUNT(*) FILTER (WHERE ${opportunitiesTable.resolutionOutcome} = 'BROKE_RESISTANCE')`,
+        invalidatedCount: sql<number>`COUNT(*) FILTER (WHERE ${opportunitiesTable.resolutionOutcome} = 'INVALIDATED')`,
+        expiredCount: sql<number>`COUNT(*) FILTER (WHERE ${opportunitiesTable.resolutionOutcome} = 'EXPIRED')`,
+        avgActiveDurationMinutes: avg(opportunitiesTable.activeDurationMinutes),
+        avgMaxFavorableMovePercent: avg(opportunitiesTable.maxFavorableMovePercent),
+        avgMaxAdverseMovePercent: avg(opportunitiesTable.maxAdverseMovePercent),
+      })
+      .from(opportunitiesTable)
+      .where(whereClause);
+    
+    return {
+      total: Number(summary?.total ?? 0),
+      active: Number(summary?.active ?? 0),
+      resolved: Number(summary?.resolved ?? 0),
+      brokeResistanceCount: Number(summary?.brokeResistanceCount ?? 0),
+      invalidatedCount: Number(summary?.invalidatedCount ?? 0),
+      expiredCount: Number(summary?.expiredCount ?? 0),
+      avgActiveDurationMinutes: summary?.avgActiveDurationMinutes ? Number(summary.avgActiveDurationMinutes) : null,
+      avgMaxFavorableMovePercent: summary?.avgMaxFavorableMovePercent ? Number(summary.avgMaxFavorableMovePercent) : null,
+      avgMaxAdverseMovePercent: summary?.avgMaxAdverseMovePercent ? Number(summary.avgMaxAdverseMovePercent) : null,
     };
   }
 }

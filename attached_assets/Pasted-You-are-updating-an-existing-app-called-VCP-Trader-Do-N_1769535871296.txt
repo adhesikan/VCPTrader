@@ -1,0 +1,225 @@
+You are updating an existing app called “VCP Trader”. Do NOT create a new repo.
+
+GOAL
+Add a new reporting feature called “Opportunity Outcome Report” that lists all opportunities found by scans and how they behaved afterward, including:
+- detected timestamp
+- strategy + timeframe + stage (FORMING/READY/BREAKOUT)
+- the exact values shown to users at detection time: resistance and stop reference (and entry trigger if available)
+- the subsequent observed price behavior (max favorable move, max adverse move)
+- resolution outcome + reason
+- “Opportunity Active Duration” (time from detected_at to resolved_at)
+
+IMPORTANT COMPLIANCE REQUIREMENTS
+- This report must be framed as “historical opportunity detection + observed price behavior,” NOT trade performance.
+- Do NOT compute or display P&L, win rate, or “returns.”
+- Include a prominent disclaimer in the report UI:
+
+  “This report summarizes historical opportunity detection and subsequent price behavior relative to displayed reference levels.
+   It does not represent executed trades, trading performance, or investment recommendations.”
+
+SCOPE / DELIVERABLES
+1) Data model to log scan opportunities and lifecycle outcomes
+2) Background process to resolve opportunities based on deterministic rules
+3) UI report page with filters + table + detail view
+4) Export option (CSV)
+5) Multi-tenant safe (tenant_id on all tables, queries scoped to tenant_id)
+
+ASSUME TECH STACK
+- Node/Express backend
+- Postgres database
+- React frontend (Tailwind/shadcn if used)
+- Existing scan engine already produces scan results with:
+  symbol, strategy_id, timeframe, stage, resistance, stop_reference, (optional entry_trigger), rvol, score, etc.
+
+------------------------------------------------------------
+A) DATABASE CHANGES (Postgres)
+Create table: opportunities
+- id uuid primary key default gen_random_uuid()
+- tenant_id uuid not null
+- user_id uuid not null
+- symbol text not null
+- strategy_id text not null
+- strategy_name text not null
+- timeframe text not null
+- stage_at_detection text not null  -- FORMING/READY/BREAKOUT
+- detected_at timestamptz not null
+- detected_price numeric nullable  -- close/last at detection time
+- resistance_price numeric nullable
+- stop_reference_price numeric nullable
+- entry_trigger_price numeric nullable
+- rvol numeric nullable
+- score numeric nullable
+- status text not null default 'ACTIVE'  -- ACTIVE/RESOLVED
+- resolved_at timestamptz nullable
+- resolution_outcome text nullable  -- BROKE_RESISTANCE / INVALIDATED / EXPIRED
+- resolution_reason text nullable   -- close_below_ema21, stop_reference_breached, time_expired, etc.
+- max_price_after numeric nullable
+- min_price_after numeric nullable
+- max_favorable_move_pct numeric nullable   -- from detected_price to max_price_after
+- max_adverse_move_pct numeric nullable     -- from detected_price to min_price_after
+- bars_tracked int not null default 0
+- active_duration_minutes int nullable      -- computed on resolve
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+Indexes:
+- (tenant_id, detected_at desc)
+- (tenant_id, symbol)
+- (tenant_id, strategy_id)
+- (tenant_id, status)
+
+Optional table (for audits): opportunity_events
+- id uuid
+- tenant_id, opportunity_id, event_type, event_at, payload jsonb
+
+------------------------------------------------------------
+B) BACKEND: LOG OPPORTUNITIES FROM SCANS
+Add a server-side function that runs after each scan batch:
+- For each qualifying scan result (stage FORMING/READY/BREAKOUT):
+  1) Create an opportunity record if not already created for that symbol+strategy+timeframe “cycle”
+  2) Avoid duplicates by defining a dedupe key:
+     - dedupe_key = (tenant_id, symbol, strategy_id, timeframe, detected_at_bucket)
+     - bucket could be hourly or per session depending on timeframe
+  3) Store the resistance and stop_reference values EXACTLY as displayed at that moment.
+
+Add a backend endpoint:
+- POST /api/opportunities/ingest
+  This is internal (called by scanner service) and should require auth/secret header.
+  Payload: list of scan results
+  Behavior: upsert opportunities, status ACTIVE.
+
+------------------------------------------------------------
+C) BACKEND: RESOLVE & UPDATE “OBSERVED OUTCOME”
+Create a background job (cron / worker) that:
+- runs every 1–5 minutes (intraday) and daily for swing,
+- updates ACTIVE opportunities with observed min/max prices since detected_at,
+- resolves them deterministically based on strategy rules.
+
+Resolution rules (v1, deterministic + simple):
+1) BROKE_RESISTANCE:
+   If max_price_after >= resistance_price * (1 + breakout_buffer)
+   - breakout_buffer default 0.0 or 0.001 (0.1%) to avoid noise
+   - resolved_at = first bar/time when breakout occurred (approx OK if you can only compute on update)
+
+2) INVALIDATED:
+   If min_price_after <= stop_reference_price (or if your strategy uses “close below EMA21” and you can compute it)
+   - resolved_at = first time invalidation occurs
+
+3) EXPIRED:
+   If now - detected_at > max_duration_by_timeframe
+   - 5m/15m intraday: 1 trading day
+   - 1h: 3 trading days
+   - daily: 10 trading days
+   (Make these configurable in admin settings)
+
+On resolve:
+- set status=RESOLVED
+- set resolved_at
+- set resolution_outcome + resolution_reason
+- compute active_duration_minutes = floor((resolved_at - detected_at)/60)
+- compute max_favorable_move_pct and max_adverse_move_pct relative to detected_price
+
+Data fetching:
+- Use your existing market data provider (TwelveData/Polygon/etc.) to fetch bars from detected_at → now for the symbol+timeframe
+- Cache results and only fetch incremental bars to control cost
+- Update bars_tracked
+
+Endpoints needed:
+- GET /api/opportunities (list with filters + pagination)
+- GET /api/opportunities/:id (detail)
+- GET /api/opportunities/export.csv (same filters; returns CSV)
+
+Filters supported:
+- date range (detected_at)
+- strategy_id
+- timeframe
+- stage_at_detection
+- outcome (resolution_outcome)
+- symbol search
+- status (ACTIVE/RESOLVED)
+
+------------------------------------------------------------
+D) FRONTEND UI: “Opportunity Outcome Report”
+Add a new nav item under Reports:
+- “Opportunity Outcome Report”
+
+Page sections:
+
+1) Header + Disclaimer (prominent)
+Title: Opportunity Outcome Report
+Subtitle: “Historical opportunity detection and observed price behavior”
+Disclaimer block as provided above.
+
+2) Filters Bar
+- Date range picker
+- Strategy dropdown
+- Timeframe dropdown
+- Stage dropdown
+- Outcome dropdown
+- Symbol search
+- Status dropdown
+Buttons:
+- Apply
+- Reset
+- Export CSV
+
+3) Summary Cards (no P&L)
+- Total Opportunities (in range)
+- Active vs Resolved
+- % Broke Resistance (outcome share)
+- Avg Active Duration
+- Avg Max Favorable Move % (behavioral)
+- Avg Max Adverse Move % (behavioral)
+
+4) Results Table
+Columns:
+- Symbol
+- Strategy
+- Timeframe
+- Stage at Detection
+- Detected At
+- Resistance
+- Stop Reference
+- Detected Price
+- Max Price After
+- Min Price After
+- Max Favorable Move %
+- Max Adverse Move %
+- Outcome
+- Active Duration
+
+Row click opens detail drawer.
+
+5) Detail Drawer / Page
+Show:
+- All fields
+- “Levels at detection” section (resistance, stop, entry trigger)
+- “Observed behavior” section (max/min, move %)
+- “Resolution” section (outcome, reason, timestamps, duration)
+- “View chart” button to open your existing chart view with lines drawn at the stored levels (resistance/stop)
+
+Chart overlay:
+- Draw horizontal lines using stored resistance/stop_reference
+- Add markers at detected_at and resolved_at
+
+------------------------------------------------------------
+E) MULTI-TENANCY & SECURITY
+- Every insert/select/update MUST be scoped by tenant_id from session/JWT.
+- Never accept tenant_id from client.
+- In export endpoints, enforce tenant scope and rate limit.
+
+------------------------------------------------------------
+F) TESTING / QA
+- Unit tests for resolution logic
+- Integration test: ingest → becomes ACTIVE → worker updates → resolves
+- UI test: filters work; export matches table results
+- Ensure report does not include P&L wording or “performance claims”
+
+DELIVERABLE
+Implement:
+- DB tables
+- Ingest from scanner
+- Outcome resolver worker
+- Report page + filters + detail view + CSV export
+- Compliance disclaimer in UI
+All in the existing VCP Trader app, preserving current functionality.
