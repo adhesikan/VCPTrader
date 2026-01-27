@@ -159,6 +159,28 @@ InstaTrade supports two execution methods, selectable per trade:
 ### Push Notifications
 - Web Push API with VAPID keys for real-time alert delivery
 
+### Scheduled Scan Service
+The platform includes an automated daily scanning system that ensures all trading opportunities are tracked in the Outcome Report:
+
+**Configuration**:
+- **Schedule**: Runs at 9:45 AM ET on trading days (Monday-Friday)
+- **Holiday Awareness**: Skips major US market holidays (New Year's Day, MLK Day, Presidents Day, Good Friday, Memorial Day, Juneteenth, Independence Day, Labor Day, Thanksgiving, Christmas)
+- **Service File**: `server/scheduled-scan-service.ts`
+
+**Scanning Coverage**:
+- Scans all 10 trading strategies: VCP, VCP Multi-Day, Classic Pullback, VWAP Reclaim, ORB5, ORB15, High RVOL, Gap & Go, Trend Continuation, Volatility Squeeze
+- Uses 100-symbol LARGE_CAP_UNIVERSE for consistent coverage
+- Uses Twelve Data API for market data (no brokerage connection required)
+
+**Behavior**:
+1. Checks if current day is a trading day (not weekend, not holiday)
+2. Scans each strategy sequentially to avoid rate limiting
+3. Auto-ingests opportunities into the Outcome Report for tracking
+4. Logs all activity for monitoring
+
+**Admin API**:
+- `POST /api/scheduled-scan/run` - Manually trigger the scheduled scan (admin only)
+
 ### UI Dependencies
 - Radix UI primitives for accessible components
 - TradingView lightweight-charts for financial charting

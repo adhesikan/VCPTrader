@@ -37,6 +37,7 @@ import {
   getOpportunitySummary,
   exportOpportunitiesCSV
 } from "./opportunity-service";
+import { runManualScheduledScan } from "./scheduled-scan-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -1823,6 +1824,17 @@ export async function registerRoutes(
       res.json(results);
     } catch (error) {
       res.status(500).json({ error: "Failed to get backtest results" });
+    }
+  });
+
+  // Admin endpoint to manually trigger scheduled scan (for testing)
+  app.post("/api/scheduled-scan/run", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await runManualScheduledScan();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Manual scheduled scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to run scheduled scan" });
     }
   });
 

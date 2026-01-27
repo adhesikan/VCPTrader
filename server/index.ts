@@ -10,6 +10,7 @@ import { startAlertEngine } from "./alert-engine";
 import { storage } from "./storage";
 import cron from "node-cron";
 import { resolveOpportunities, updateOpportunityPrices } from "./opportunity-service";
+import { startScheduledScanService } from "./scheduled-scan-service";
 
 // Run inline migrations on startup (more reliable than separate script)
 async function runStartupMigrations() {
@@ -312,6 +313,10 @@ async function restoreBrokerConnections() {
     }
   });
   log("Opportunity resolver job started");
+
+  // Start scheduled scan service (runs at 9:45 AM ET on trading days)
+  startScheduledScanService();
+  log("Scheduled scan service started");
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
