@@ -58,26 +58,29 @@ interface Opportunity {
   timeframe: string;
   stageAtDetection: string;
   detectedAt: string;
-  resistanceLevel: number;
-  stopLevel: number;
-  entryPrice: number;
+  detectedPrice: number;
+  resistancePrice: number | null;
+  stopReferencePrice: number | null;
+  entryTriggerPrice: number | null;
   status: string;
   resolutionOutcome: string | null;
   resolvedAt: string | null;
   resolutionPrice: number | null;
   pnlPercent: number | null;
   daysToResolution: number | null;
-  deduplicationKey: string;
+  dedupeKey: string;
 }
 
 interface OpportunitySummary {
-  totalOpportunities: number;
-  brokeResistance: number;
-  invalidated: number;
-  expired: number;
-  pending: number;
-  avgDaysToResolution: number | null;
-  winRate: number | null;
+  total: number;
+  active: number;
+  resolved: number;
+  brokeResistanceCount: number;
+  invalidatedCount: number;
+  expiredCount: number;
+  avgActiveDurationMinutes: number | null;
+  avgMaxFavorableMovePercent: number | null;
+  avgMaxAdverseMovePercent: number | null;
 }
 
 const OUTCOMES = [
@@ -89,7 +92,7 @@ const OUTCOMES = [
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
-  { value: "PENDING", label: "Pending" },
+  { value: "ACTIVE", label: "Active" },
   { value: "RESOLVED", label: "Resolved" },
 ];
 
@@ -127,7 +130,7 @@ function getOutcomeIcon(outcome: string | null) {
 }
 
 function formatOutcome(outcome: string | null, status: string): string {
-  if (status === "PENDING") return "Pending";
+  if (status === "ACTIVE") return "Active";
   switch (outcome) {
     case "BROKE_RESISTANCE": return "Broke Resistance";
     case "INVALIDATED": return "Invalidated";
@@ -326,7 +329,7 @@ export default function OpportunitiesPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold" data-testid="text-total-opportunities">
-                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.totalOpportunities ?? 0}
+                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.total ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">Total Opportunities</p>
             </CardContent>
@@ -334,7 +337,7 @@ export default function OpportunitiesPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-broke-resistance">
-                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.brokeResistance ?? 0}
+                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.brokeResistanceCount ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">Broke Resistance</p>
             </CardContent>
@@ -342,7 +345,7 @@ export default function OpportunitiesPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-invalidated">
-                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.invalidated ?? 0}
+                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.invalidatedCount ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">Invalidated</p>
             </CardContent>
@@ -350,28 +353,28 @@ export default function OpportunitiesPage() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold text-muted-foreground" data-testid="text-expired">
-                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.expired ?? 0}
+                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.expiredCount ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">Expired</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-pending">
-                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.pending ?? 0}
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-active">
+                {loadingSummary ? <Skeleton className="h-8 w-16" /> : summary?.active ?? 0}
               </div>
-              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="text-xs text-muted-foreground">Active</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold" data-testid="text-win-rate">
+              <div className="text-2xl font-bold" data-testid="text-avg-favorable-move">
                 {loadingSummary ? <Skeleton className="h-8 w-16" /> : 
-                  summary && summary.winRate !== null && summary.winRate !== undefined 
-                    ? `${(summary.winRate * 100).toFixed(1)}%` 
+                  summary && summary.avgMaxFavorableMovePercent !== null 
+                    ? `+${summary.avgMaxFavorableMovePercent.toFixed(1)}%` 
                     : "-"}
               </div>
-              <p className="text-xs text-muted-foreground">Win Rate</p>
+              <p className="text-xs text-muted-foreground">Avg Best Move</p>
             </CardContent>
           </Card>
         </div>
@@ -394,7 +397,7 @@ export default function OpportunitiesPage() {
                     <TableHead>Detected</TableHead>
                     <TableHead className="text-right">Resistance</TableHead>
                     <TableHead className="text-right">Stop</TableHead>
-                    <TableHead className="text-right">Entry</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
                     <TableHead>Outcome</TableHead>
                     <TableHead className="text-right">P&L %</TableHead>
                     <TableHead className="text-right">Days</TableHead>
@@ -434,9 +437,9 @@ export default function OpportunitiesPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {format(new Date(opp.detectedAt), "MMM d, HH:mm")}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.resistanceLevel)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.stopLevel)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.entryPrice)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.resistancePrice)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.stopReferencePrice)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatPrice(opp.detectedPrice)}</TableCell>
                         <TableCell>
                           <Badge variant={getOutcomeBadgeVariant(opp.resolutionOutcome)} className="text-xs">
                             {getOutcomeIcon(opp.resolutionOutcome)}
@@ -528,19 +531,19 @@ export default function OpportunitiesPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Entry Price</Label>
-                    <p className="text-sm font-mono font-medium">{formatPrice(selectedOpportunity.entryPrice)}</p>
+                    <Label className="text-xs text-muted-foreground">Detected Price</Label>
+                    <p className="text-sm font-mono font-medium">{formatPrice(selectedOpportunity.detectedPrice)}</p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Resistance</Label>
                     <p className="text-sm font-mono font-medium text-green-600 dark:text-green-400">
-                      {formatPrice(selectedOpportunity.resistanceLevel)}
+                      {formatPrice(selectedOpportunity.resistancePrice)}
                     </p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Stop Level</Label>
                     <p className="text-sm font-mono font-medium text-red-600 dark:text-red-400">
-                      {formatPrice(selectedOpportunity.stopLevel)}
+                      {formatPrice(selectedOpportunity.stopReferencePrice)}
                     </p>
                   </div>
                 </div>

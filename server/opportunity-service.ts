@@ -85,7 +85,53 @@ export async function ingestOpportunitiesFromScan(
     }
   }
   
+  // Also update prices for all active opportunities based on scan results
+  if (scanResults.length > 0) {
+    try {
+      await updatePricesFromScanResults(userId, scanResults);
+    } catch (updateError: any) {
+      console.error(`[Opportunities] Error updating prices:`, updateError.message);
+    }
+  }
+  
   return ingested;
+}
+
+async function updatePricesFromScanResults(userId: string, scanResults: ScanResult[]): Promise<void> {
+  const activeOpportunities = await storage.getActiveOpportunities();
+  const userOpportunities = activeOpportunities.filter(o => o.userId === userId);
+  
+  const priceMap = new Map<string, number>();
+  for (const result of scanResults) {
+    if (result.price) {
+      priceMap.set(result.ticker, result.price);
+    }
+  }
+  
+  for (const opp of userOpportunities) {
+    const currentPrice = priceMap.get(opp.symbol);
+    if (currentPrice === undefined) continue;
+    
+    const updates: Partial<Opportunity> = {
+      barsTracked: (opp.barsTracked || 0) + 1,
+    };
+    
+    if (!opp.maxPriceAfter || currentPrice > opp.maxPriceAfter) {
+      updates.maxPriceAfter = currentPrice;
+      if (opp.detectedPrice) {
+        updates.maxFavorableMovePercent = ((currentPrice - opp.detectedPrice) / opp.detectedPrice) * 100;
+      }
+    }
+    
+    if (!opp.minPriceAfter || currentPrice < opp.minPriceAfter) {
+      updates.minPriceAfter = currentPrice;
+      if (opp.detectedPrice) {
+        updates.maxAdverseMovePercent = ((opp.detectedPrice - currentPrice) / opp.detectedPrice) * 100;
+      }
+    }
+    
+    await storage.updateOpportunity(opp.id, updates);
+  }
 }
 
 export async function resolveOpportunities(): Promise<number> {
