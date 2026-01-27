@@ -8,6 +8,8 @@ import { eq, sql } from "drizzle-orm";
 import { configurePushService } from "./push-service";
 import { startAlertEngine } from "./alert-engine";
 import { storage } from "./storage";
+import cron from "node-cron";
+import { resolveOpportunities, updateOpportunityPrices } from "./opportunity-service";
 
 // Run inline migrations on startup (more reliable than separate script)
 async function runStartupMigrations() {
@@ -296,6 +298,20 @@ async function restoreBrokerConnections() {
     60000
   );
   log("Alert engine started");
+  
+  // Start opportunity resolver job (runs every 5 minutes)
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      log("[Opportunities] Running resolver job...", "opportunities");
+      const resolved = await resolveOpportunities();
+      if (resolved > 0) {
+        log(`[Opportunities] Resolved ${resolved} opportunities`, "opportunities");
+      }
+    } catch (error: any) {
+      log(`[Opportunities] Resolver error: ${error.message}`, "opportunities");
+    }
+  });
+  log("Opportunity resolver job started");
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
