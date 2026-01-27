@@ -100,6 +100,13 @@ const STATUS_OPTIONS = [
   { value: "RESOLVED", label: "Resolved" },
 ];
 
+const STAGE_OPTIONS = [
+  { value: "all", label: "All Stages" },
+  { value: "FORMING", label: "Forming" },
+  { value: "READY", label: "Ready" },
+  { value: "BREAKOUT", label: "Breakout" },
+];
+
 const TIMEFRAME_OPTIONS = [
   { value: "all", label: "All Timeframes" },
   { value: "5m", label: "5 Min" },
@@ -173,6 +180,7 @@ export default function OpportunitiesPage() {
   const [timeframeFilter, setTimeframeFilter] = useState("all");
   const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
   const [symbolFilter, setSymbolFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [sortBy, setSortBy] = useState<SortField>("detectedAt");
@@ -222,12 +230,13 @@ export default function OpportunitiesPage() {
     if (timeframeFilter !== "all") params.set("timeframe", timeframeFilter);
     if (outcomeFilter !== "all") params.set("outcome", outcomeFilter);
     if (includeStatus && statusFilter !== "all") params.set("status", statusFilter);
+    if (stageFilter !== "all") params.set("stage", stageFilter);
     if (symbolFilter.trim()) params.set("symbol", symbolFilter.trim().toUpperCase());
     return params;
   };
 
   const { data: opportunities, isLoading: loadingOpportunities } = useQuery<Opportunity[]>({
-    queryKey: ["/api/opportunities", dateRange, strategyFilter, timeframeFilter, outcomeFilter, statusFilter, symbolFilter, sortBy, sortOrder, page],
+    queryKey: ["/api/opportunities", dateRange, strategyFilter, timeframeFilter, outcomeFilter, statusFilter, stageFilter, symbolFilter, sortBy, sortOrder, page],
     queryFn: async () => {
       const params = buildQueryParams();
       params.set("limit", String(pageSize));
@@ -241,7 +250,7 @@ export default function OpportunitiesPage() {
   });
 
   const { data: summary, isLoading: loadingSummary } = useQuery<OpportunitySummary>({
-    queryKey: ["/api/opportunities/summary", dateRange, strategyFilter, timeframeFilter, symbolFilter],
+    queryKey: ["/api/opportunities/summary", dateRange, strategyFilter, timeframeFilter, stageFilter, symbolFilter],
     queryFn: async () => {
       const params = buildQueryParams(false);
       const res = await fetch(`/api/opportunities/summary?${params.toString()}`);
@@ -283,7 +292,7 @@ export default function OpportunitiesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
               <div>
                 <Label className="text-xs">Date Range</Label>
                 <Select value={dateRange} onValueChange={(v) => { setDateRange(v); setPage(0); }}>
@@ -349,6 +358,20 @@ export default function OpportunitiesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Stage</Label>
+                <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(0); }}>
+                  <SelectTrigger data-testid="select-stage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGE_OPTIONS.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>

@@ -168,9 +168,10 @@ The platform includes an automated daily scanning system that ensures all tradin
 - **Service File**: `server/scheduled-scan-service.ts`
 
 **Scanning Coverage**:
-- Scans all 10 trading strategies: VCP, VCP Multi-Day, Classic Pullback, VWAP Reclaim, ORB5, ORB15, High RVOL, Gap & Go, Trend Continuation, Volatility Squeeze
+- Scans VCP-based strategies: VCP (Momentum Breakout), VCP Multi-Day (Power Breakout)
+- Other strategies (ORB, VWAP, Gap&Go, etc.) require different classification logic and are scanned via the manual Scanner page
 - Uses 100-symbol LARGE_CAP_UNIVERSE for consistent coverage
-- Uses Twelve Data API for market data (no brokerage connection required)
+- Requires an active brokerage connection for market data
 
 **Behavior**:
 1. Checks if current day is a trading day (not weekend, not holiday)

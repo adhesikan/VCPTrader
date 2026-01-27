@@ -26,17 +26,11 @@ const US_MARKET_HOLIDAYS_2025_2026 = [
   "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
 ];
 
-const ALL_STRATEGIES = [
+// Only scan strategies that the classifyVCPStage function can actually detect
+// VCP-based strategies share similar classification logic
+const VCP_BASED_STRATEGIES = [
   StrategyType.VCP,
   StrategyType.VCP_MULTIDAY,
-  StrategyType.CLASSIC_PULLBACK,
-  StrategyType.VWAP_RECLAIM,
-  StrategyType.ORB5,
-  StrategyType.ORB15,
-  StrategyType.HIGH_RVOL,
-  StrategyType.GAP_AND_GO,
-  StrategyType.TREND_CONTINUATION,
-  StrategyType.VOLATILITY_SQUEEZE,
 ];
 
 function isTradingDay(date: Date = new Date()): boolean {
@@ -124,7 +118,9 @@ async function runScheduledScan(): Promise<void> {
     
     let totalIngested = 0;
     
-    for (const strategy of ALL_STRATEGIES) {
+    // Only run VCP-based strategies since classifyVCPStage is designed for VCP pattern detection
+    // Other strategies (ORB, VWAP, Gap&Go, etc.) require different classification logic
+    for (const strategy of VCP_BASED_STRATEGIES) {
       const results = quotesToScanResults(allQuotes, strategy);
       
       if (results.length > 0) {
