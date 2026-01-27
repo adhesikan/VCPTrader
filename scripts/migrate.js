@@ -605,6 +605,48 @@ async function migrate() {
     `);
     console.log('Created/verified opportunity_first_seen table');
 
+    // Create opportunities table for Opportunity Outcome Report
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS opportunities (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        user_id VARCHAR NOT NULL,
+        symbol TEXT NOT NULL,
+        strategy_id TEXT NOT NULL,
+        strategy_name TEXT NOT NULL,
+        timeframe TEXT NOT NULL DEFAULT '1d',
+        stage_at_detection TEXT NOT NULL,
+        detected_at TIMESTAMP NOT NULL,
+        detected_price REAL,
+        resistance_price REAL,
+        stop_reference_price REAL,
+        entry_trigger_price REAL,
+        rvol REAL,
+        score INTEGER,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        resolved_at TIMESTAMP,
+        resolution_outcome TEXT,
+        resolution_reason TEXT,
+        max_price_after REAL,
+        min_price_after REAL,
+        max_favorable_move_percent REAL,
+        max_adverse_move_percent REAL,
+        bars_tracked INTEGER NOT NULL DEFAULT 0,
+        active_duration_minutes INTEGER,
+        dedupe_key TEXT UNIQUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    
+    // Create indexes for efficient querying
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_opportunities_user_detected ON opportunities(user_id, detected_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_opportunities_user_symbol ON opportunities(user_id, symbol);
+      CREATE INDEX IF NOT EXISTS idx_opportunities_user_strategy ON opportunities(user_id, strategy_id);
+      CREATE INDEX IF NOT EXISTS idx_opportunities_user_status ON opportunities(user_id, status);
+    `);
+    console.log('Created/verified opportunities table with indexes');
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {

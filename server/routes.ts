@@ -28,6 +28,15 @@ import {
 } from "./broker-service";
 import { isPromoActive, PROMO_CONFIG, PROMO_CODE } from "@shared/promo";
 import { fetchTwelveDataQuotes, fetchTwelveDataHistory, isTwelveDataConfigured, runTwelveDataMultidayScan } from "./twelvedata-service";
+import { 
+  ingestOpportunitiesFromScan, 
+  resolveOpportunities, 
+  updateOpportunityPrices, 
+  getOpportunities, 
+  getOpportunity, 
+  getOpportunitySummary,
+  exportOpportunitiesCSV
+} from "./opportunity-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -632,6 +641,13 @@ export async function registerRoutes(
         firstSeenAt: firstSeenMap[r.ticker] || null,
       }));
       
+      // Ingest opportunities for the Opportunity Outcome Report
+      if (req.session?.userId) {
+        ingestOpportunitiesFromScan(req.session.userId, results, strategy, "1d")
+          .then(count => count > 0 && console.log(`[Opportunities] Ingested ${count} from live scan`))
+          .catch(err => console.error("[Opportunities] Ingestion error:", err.message));
+      }
+      
       res.json({
         results: resultsWithFirstSeen,
         metadata: {
@@ -875,6 +891,88 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to mark events as read" });
+    }
+  });
+
+  // Opportunity Outcome Report endpoints
+  app.get("/api/opportunities", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const filters = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        strategyId: req.query.strategyId as string | undefined,
+        timeframe: req.query.timeframe as string | undefined,
+        stageAtDetection: req.query.stage as string | undefined,
+        resolutionOutcome: req.query.outcome as string | undefined,
+        symbol: req.query.symbol as string | undefined,
+        status: req.query.status as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 100,
+        offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+      };
+      const opportunities = await getOpportunities(userId, filters);
+      res.json(opportunities);
+    } catch (error: any) {
+      console.error("Error getting opportunities:", error);
+      res.status(500).json({ error: "Failed to get opportunities" });
+    }
+  });
+
+  app.get("/api/opportunities/summary", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const filters = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        strategyId: req.query.strategyId as string | undefined,
+        timeframe: req.query.timeframe as string | undefined,
+        stageAtDetection: req.query.stage as string | undefined,
+        symbol: req.query.symbol as string | undefined,
+      };
+      const summary = await getOpportunitySummary(userId, filters);
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Error getting opportunity summary:", error);
+      res.status(500).json({ error: "Failed to get opportunity summary" });
+    }
+  });
+
+  app.get("/api/opportunities/export.csv", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const filters = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        strategyId: req.query.strategyId as string | undefined,
+        timeframe: req.query.timeframe as string | undefined,
+        stageAtDetection: req.query.stage as string | undefined,
+        resolutionOutcome: req.query.outcome as string | undefined,
+        symbol: req.query.symbol as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+      const csv = await exportOpportunitiesCSV(userId, filters);
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=opportunities.csv");
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Error exporting opportunities:", error);
+      res.status(500).json({ error: "Failed to export opportunities" });
+    }
+  });
+
+  app.get("/api/opportunities/:id", isAuthenticated, async (req, res) => {
+    try {
+      const opportunity = await getOpportunity(req.params.id);
+      if (!opportunity) {
+        return res.status(404).json({ error: "Opportunity not found" });
+      }
+      if (opportunity.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(opportunity);
+    } catch (error: any) {
+      console.error("Error getting opportunity:", error);
+      res.status(500).json({ error: "Failed to get opportunity" });
     }
   });
 

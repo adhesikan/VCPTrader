@@ -1,0 +1,254 @@
+import { storage, type OpportunityFilters, type OpportunitySummary } from "./storage";
+import type { ScanResult, Opportunity, InsertOpportunity, StrategyInfo } from "@shared/schema";
+import { StrategyType } from "@shared/schema";
+
+const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
+  [StrategyType.VCP]: "VCP Pattern",
+  [StrategyType.VCP_MULTIDAY]: "VCP Multi-Day",
+  [StrategyType.CLASSIC_PULLBACK]: "Classic Pullback",
+  [StrategyType.VWAP_RECLAIM]: "VWAP Reclaim",
+  [StrategyType.ORB5]: "5-Min Opening Range",
+  [StrategyType.ORB15]: "15-Min Opening Range",
+  [StrategyType.HIGH_RVOL]: "High RVOL",
+  [StrategyType.GAP_AND_GO]: "Gap & Go",
+  [StrategyType.TREND_CONTINUATION]: "Trend Continuation",
+  [StrategyType.VOLATILITY_SQUEEZE]: "Volatility Squeeze",
+};
+
+const EXPIRATION_DAYS: Record<string, number> = {
+  "5m": 1,
+  "15m": 1,
+  "1h": 3,
+  "1d": 10,
+  "daily": 10,
+};
+
+const BREAKOUT_BUFFER = 0.001;
+
+function generateDedupeKey(userId: string, symbol: string, strategyId: string, timeframe: string, detectedAt: Date): string {
+  const hourBucket = Math.floor(detectedAt.getTime() / (1000 * 60 * 60));
+  return `${userId}:${symbol}:${strategyId}:${timeframe}:${hourBucket}`;
+}
+
+function getStrategyName(strategyId: string): string {
+  return STRATEGY_DISPLAY_NAMES[strategyId] || strategyId;
+}
+
+export async function ingestOpportunitiesFromScan(
+  userId: string,
+  scanResults: ScanResult[],
+  strategyId: string = "VCP",
+  timeframe: string = "1d"
+): Promise<number> {
+  let ingested = 0;
+  const now = new Date();
+  
+  const qualifyingStages = ["FORMING", "READY", "BREAKOUT"];
+  const qualifyingResults = scanResults.filter(r => qualifyingStages.includes(r.stage));
+  
+  for (const result of qualifyingResults) {
+    const dedupeKey = generateDedupeKey(userId, result.ticker, strategyId, timeframe, now);
+    
+    const existing = await storage.findOpportunityByDedupeKey(dedupeKey);
+    if (existing) {
+      continue;
+    }
+    
+    const opportunity: InsertOpportunity = {
+      userId,
+      symbol: result.ticker,
+      strategyId,
+      strategyName: getStrategyName(strategyId),
+      timeframe,
+      stageAtDetection: result.stage,
+      detectedAt: now,
+      detectedPrice: result.price,
+      resistancePrice: result.resistance || null,
+      stopReferencePrice: result.stopLoss || null,
+      entryTriggerPrice: null,
+      rvol: result.rvol || null,
+      score: result.patternScore || null,
+      status: "ACTIVE",
+      dedupeKey,
+      barsTracked: 0,
+    };
+    
+    try {
+      await storage.createOpportunity(opportunity);
+      ingested++;
+      console.log(`[Opportunities] Ingested: ${result.ticker} (${result.stage}) for user ${userId}`);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        continue;
+      }
+      console.error(`[Opportunities] Failed to ingest ${result.ticker}:`, error.message);
+    }
+  }
+  
+  return ingested;
+}
+
+export async function resolveOpportunities(): Promise<number> {
+  let resolved = 0;
+  const now = new Date();
+  
+  try {
+    const activeOpportunities = await storage.getActiveOpportunities();
+    console.log(`[Opportunities] Processing ${activeOpportunities.length} active opportunities`);
+    
+    for (const opp of activeOpportunities) {
+      const expirationDays = EXPIRATION_DAYS[opp.timeframe] || 10;
+      const expirationMs = expirationDays * 24 * 60 * 60 * 1000;
+      const isExpired = now.getTime() - new Date(opp.detectedAt).getTime() > expirationMs;
+      
+      let resolutionOutcome: string | null = null;
+      let resolutionReason: string | null = null;
+      
+      if (opp.resistancePrice && opp.maxPriceAfter) {
+        const breakoutThreshold = opp.resistancePrice * (1 + BREAKOUT_BUFFER);
+        if (opp.maxPriceAfter >= breakoutThreshold) {
+          resolutionOutcome = "BROKE_RESISTANCE";
+          resolutionReason = `Price reached ${opp.maxPriceAfter.toFixed(2)}, exceeding resistance ${opp.resistancePrice.toFixed(2)}`;
+        }
+      }
+      
+      if (!resolutionOutcome && opp.stopReferencePrice && opp.minPriceAfter) {
+        if (opp.minPriceAfter <= opp.stopReferencePrice) {
+          resolutionOutcome = "INVALIDATED";
+          resolutionReason = `Price dropped to ${opp.minPriceAfter.toFixed(2)}, below stop reference ${opp.stopReferencePrice.toFixed(2)}`;
+        }
+      }
+      
+      if (!resolutionOutcome && isExpired) {
+        resolutionOutcome = "EXPIRED";
+        resolutionReason = `Opportunity expired after ${expirationDays} trading days without resolution`;
+      }
+      
+      if (resolutionOutcome) {
+        const resolvedAt = now;
+        const activeDurationMinutes = Math.floor((resolvedAt.getTime() - new Date(opp.detectedAt).getTime()) / 60000);
+        
+        await storage.updateOpportunity(opp.id, {
+          status: "RESOLVED",
+          resolvedAt,
+          resolutionOutcome,
+          resolutionReason,
+          activeDurationMinutes,
+        });
+        
+        resolved++;
+        console.log(`[Opportunities] Resolved: ${opp.symbol} -> ${resolutionOutcome}`);
+      }
+    }
+  } catch (error: any) {
+    console.error("[Opportunities] Error resolving opportunities:", error.message);
+  }
+  
+  return resolved;
+}
+
+export async function updateOpportunityPrices(
+  symbol: string,
+  currentPrice: number,
+  highPrice?: number,
+  lowPrice?: number
+): Promise<void> {
+  try {
+    const activeOpportunities = await storage.getActiveOpportunities();
+    const symbolOpportunities = activeOpportunities.filter(o => o.symbol === symbol);
+    
+    for (const opp of symbolOpportunities) {
+      const updates: Partial<Opportunity> = {
+        barsTracked: (opp.barsTracked || 0) + 1,
+      };
+      
+      const effectiveHigh = highPrice ?? currentPrice;
+      const effectiveLow = lowPrice ?? currentPrice;
+      
+      if (!opp.maxPriceAfter || effectiveHigh > opp.maxPriceAfter) {
+        updates.maxPriceAfter = effectiveHigh;
+        if (opp.detectedPrice) {
+          updates.maxFavorableMovePercent = ((effectiveHigh - opp.detectedPrice) / opp.detectedPrice) * 100;
+        }
+      }
+      
+      if (!opp.minPriceAfter || effectiveLow < opp.minPriceAfter) {
+        updates.minPriceAfter = effectiveLow;
+        if (opp.detectedPrice) {
+          updates.maxAdverseMovePercent = ((opp.detectedPrice - effectiveLow) / opp.detectedPrice) * 100;
+        }
+      }
+      
+      await storage.updateOpportunity(opp.id, updates);
+    }
+  } catch (error: any) {
+    console.error(`[Opportunities] Error updating prices for ${symbol}:`, error.message);
+  }
+}
+
+export async function getOpportunities(userId: string, filters?: OpportunityFilters): Promise<Opportunity[]> {
+  return storage.getOpportunities(userId, filters);
+}
+
+export async function getOpportunity(id: string): Promise<Opportunity | null> {
+  return storage.getOpportunity(id);
+}
+
+export async function getOpportunitySummary(userId: string, filters?: OpportunityFilters): Promise<OpportunitySummary> {
+  return storage.getOpportunitySummary(userId, filters);
+}
+
+export async function exportOpportunitiesCSV(userId: string, filters?: OpportunityFilters): Promise<string> {
+  const opportunities = await storage.getOpportunities(userId, { ...filters, limit: 10000 });
+  
+  const headers = [
+    "Symbol",
+    "Strategy",
+    "Timeframe",
+    "Stage at Detection",
+    "Detected At",
+    "Detected Price",
+    "Resistance",
+    "Stop Reference",
+    "Max Price After",
+    "Min Price After",
+    "Max Favorable Move %",
+    "Max Adverse Move %",
+    "Status",
+    "Outcome",
+    "Resolution Reason",
+    "Active Duration (min)",
+    "Bars Tracked",
+    "RVOL",
+    "Score",
+  ];
+  
+  const rows = opportunities.map(opp => [
+    opp.symbol,
+    opp.strategyName,
+    opp.timeframe,
+    opp.stageAtDetection,
+    opp.detectedAt ? new Date(opp.detectedAt).toISOString() : "",
+    opp.detectedPrice?.toFixed(2) ?? "",
+    opp.resistancePrice?.toFixed(2) ?? "",
+    opp.stopReferencePrice?.toFixed(2) ?? "",
+    opp.maxPriceAfter?.toFixed(2) ?? "",
+    opp.minPriceAfter?.toFixed(2) ?? "",
+    opp.maxFavorableMovePercent?.toFixed(2) ?? "",
+    opp.maxAdverseMovePercent?.toFixed(2) ?? "",
+    opp.status,
+    opp.resolutionOutcome ?? "",
+    opp.resolutionReason ?? "",
+    opp.activeDurationMinutes?.toString() ?? "",
+    opp.barsTracked?.toString() ?? "",
+    opp.rvol?.toFixed(2) ?? "",
+    opp.score?.toString() ?? "",
+  ]);
+  
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+  ].join("\n");
+  
+  return csvContent;
+}
