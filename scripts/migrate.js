@@ -592,6 +592,19 @@ async function migrate() {
     await client.query(`ALTER TABLE alert_rules ALTER COLUMN symbol DROP NOT NULL;`);
     console.log('Verified all columns exist in alert_rules');
 
+    // Create opportunity_first_seen table for tracking when opportunities were first detected
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS opportunity_first_seen (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::VARCHAR,
+        ticker TEXT NOT NULL UNIQUE,
+        stage TEXT NOT NULL,
+        strategy TEXT,
+        first_seen_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        last_seen_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+    console.log('Created/verified opportunity_first_seen table');
+
     console.log('Migrations complete!');
     client.release();
   } catch (error) {

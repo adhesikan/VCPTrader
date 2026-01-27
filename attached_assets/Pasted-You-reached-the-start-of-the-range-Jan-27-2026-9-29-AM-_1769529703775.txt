@@ -1,0 +1,62 @@
+You reached the start of the range
+Jan 27, 2026, 9:29 AM
+Starting Container
+npm warn config production Use `--omit=dev` instead.
+npm warn using --force Recommended protections disabled.
+> rest-express@1.0.0 db:push
+> drizzle-kit push
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/app/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[⣯] Pulling schema from database...
+[⣟] Pulling schema from database...
+[⡿] Pulling schema from database...
+[⢿] Pulling schema from database...
+[⣻] Pulling schema from database...
+[✓] Pulling schema from database...
+· You're about to add broker_connections_user_id_unique unique constraint to the table, which contains 2 items. If this statement fails, you will receive an error from the database. Do you want to truncate broker_connections table?
+❯ No, add the constraint without truncating the table
+  Yes, truncate the table
+[PushService] Push notifications configured successfully
+Fixed snaptrade_connections table columns
+Created/verified opportunity_defaults table
+Created/verified user_settings table
+Added/verified preferred_data_source column
+Added/verified tutorial tracking columns
+Marked 0 existing users as having seen tutorials
+Created/verified automation_endpoints table
+Created/verified trades table
+Verified alert_event_id column exists in trades
+Created/verified execution_requests table
+Verified all columns exist in execution_requests
+Verified all columns exist in alert_rules
+Migrations complete!
+Connecting to database...
+npm warn config production Use `--omit=dev` instead.
+Connected. Running migrations...
+Added SnapTrade columns to users table
+> rest-express@1.0.0 start
+Created/verified snaptrade_connections table
+> NODE_ENV=production node dist/index.cjs
+2:30:15 PM [migrations] Running startup migrations...
+2:30:15 PM [migrations] Startup migrations completed successfully
+[AlertEngine] Processing 1 watchlist rule(s) against 0 scan results
+2:30:15 PM [express] Restored 2 broker connection(s) from database
+[AlertEngine] Watchlist rule 49b2e398-4774-4983-835d-71d580ec7857: Looking for stage=BREAKOUT in watchlist MyTechWatch (1 symbols)
+[AlertEngine] Watchlist rule 49b2e398-4774-4983-835d-71d580ec7857: Found 0 matching results
+[Tradier] Time check: Tue 9:30 ET, marketMinutes=570, isExtendedHours=false
+[AlertEngine] Starting with 60000ms interval
+2:30:15 PM [express] Alert engine started
+2:30:15 PM [express] serving on port 8080
+[AlertEngine] Processing 2 global rule(s) against 0 scan results
+[AlertEngine] Rule 57eebe16-fca2-4de9-8c45-1841c8f261de: Looking for stage=BREAKOUT, previouslyTriggered=SMCI,CSGP,LRCX,MU,HON,IBM,AMAT,AVGO,GILD,MDB,MRNA,INTC,GFS,KDP,GOOGL,NVDA,TTD,ARM,CPRT,CSX,DDOG,FAST,ILMN,MCHP,ODFL,PYPL,TEAM,TSLA,SBUX,CHTR,CMCSA,ADI,AMGN,BKR,CTSH,GEHC,MAR,MRVL,ON,PCAR,TXN,VRTX,ORLY,PG,FTNT,KHC,MSFT,NFLX,PANW,AAPL
+[AlertEngine] Rule 57eebe16-fca2-4de9-8c45-1841c8f261de: Found 0 matching results
+[AlertEngine] Rule 19e903c9-1a7e-4fb3-92fa-ad64d28d52db: Looking for stage=BREAKOUT, previouslyTriggered=SMCI,AMD,HON,MDB,MRNA,MU,AVGO,CSGP,LRCX,META,NVDA,IBM,AMAT,GILD,INTC,GFS,KDP,GOOGL,ORLY,TTD,ARM,CPRT,CSX,DDOG,FAST,ILMN,MCHP,ODFL,PYPL,TEAM,TSLA,SBUX,CHTR,CMCSA,ADI,AMGN,BKR,CTSH,GEHC,MAR,MRVL,ON,PCAR,TXN,VRTX,PG,FTNT,KHC,MSFT,NFLX,PANW,AAPL
+[AlertEngine] Rule 19e903c9-1a7e-4fb3-92fa-ad64d28d52db: Found 0 matching results
+First-seen tracking unavailable: relation "opportunity_first_seen" does not exist
+2:30:20 PM [express] POST /api/scan/live 200 in 130ms :: {"results":[{"id":"76f7188b-2712-4802-be1a-48ac4a4492d9","scanRunId":null,"ticker":"UNH","name":"UNH","price":295.66,"change":-55.98,"changePercent":-15.92,"volume":5547191,"avgVolume":3765082,"rvol":1.47,"stage":"FORMING","resistance":303.45,"stopLoss":274.96,"patternScore":70,"ema9":292.7,"ema21":286.79,"atr":5.91,"createdAt":"2026-01-27T14:30:20.145Z","strategy":"VCP","firstSeenAt":null}],"metadata":{"isLive":true,"provider":"tradier","symbolsRequested":30,"symbolsReturned":30,"batchCount":1,"scanTimeMs":42,"timestamp":"2026-01-27T14:30:20.147Z"}}
+[Tradier] Time check: Tue 9:30 ET, marketMinutes=570, isExtendedHours=false
+[Tradier] Time check: Tue 9:30 ET, marketMinutes=570, isExtendedHours=false
+[Tradier] Time check: Tue 9:30 ET, marketMinutes=570, isExtendedHours=false
+First-seen tracking unavailable: relation "opportunity_first_seen" does not exist
