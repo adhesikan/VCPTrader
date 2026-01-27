@@ -11,6 +11,7 @@ import {
   Zap,
   BookOpen,
   Rocket,
+  FileBarChart2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const mainNavItems = [
 
 const toolsNavItems = [
   { title: "Backtest", url: "/backtest", icon: FlaskConical },
+  { title: "Outcome Report", url: "/opportunities", icon: FileBarChart2 },
   { title: "Strategy Guide", url: "/strategy-guide", icon: BookOpen },
   { title: "Execution Cockpit", url: "/execution", icon: Rocket },
   { title: "Settings", url: "/settings", icon: Settings },
