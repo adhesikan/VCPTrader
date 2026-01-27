@@ -152,7 +152,7 @@ export default function Scanner() {
   const [autoRunOnLoad, setAutoRunOnLoad] = useState(false);
   const [shouldAutoRun, setShouldAutoRun] = useState(false);
   const [initialScanDone, setInitialScanDone] = useState(false);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(300000); // Default 5 minutes
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0); // Default Off to prevent unwanted automation triggers
 
   const { data: strategies } = useQuery<StrategyInfo[]>({
     queryKey: ["/api/strategies"],
@@ -364,7 +364,8 @@ export default function Scanner() {
     }
   }, [shouldAutoRun, defaultsApplied, hasDataSource, engineMode]);
 
-  // Auto-run scan on page load (with or without saved defaults)
+  // Auto-run scan on page load ONLY if user has explicitly enabled autoRunOnLoad
+  // This prevents unwanted automation triggers on every page refresh
   useEffect(() => {
     const shouldRun = !initialScanDone && 
                       hasDataSource && 
@@ -374,12 +375,11 @@ export default function Scanner() {
                       !confluenceMutation.isPending;
     
     if (shouldRun) {
-      // If user has saved defaults with autoRunOnLoad, that effect will handle it
-      // Otherwise, run with current/default settings after a short delay
+      setInitialScanDone(true);
+      // Only auto-run if user has explicitly saved defaults with autoRunOnLoad enabled
+      // This prevents unexpected automation triggers on page refresh
       const hasAutoRunDefaults = userDefaults?.autoRunOnLoad;
-      if (!hasAutoRunDefaults) {
-        setInitialScanDone(true);
-        // Small delay to ensure UI is ready
+      if (hasAutoRunDefaults) {
         setTimeout(() => {
           if (engineMode === "fusion") {
             confluenceMutation.mutate();
@@ -387,9 +387,8 @@ export default function Scanner() {
             runScanMutation.mutate();
           }
         }, 500);
-      } else {
-        setInitialScanDone(true);
       }
+      // If autoRunOnLoad is not enabled, user must manually click "Run Scan"
     }
   }, [initialScanDone, isConnected, defaultsLoading, watchlistsLoading, userDefaults, engineMode]);
 
