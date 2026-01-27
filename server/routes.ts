@@ -397,7 +397,7 @@ export async function registerRoutes(
       const includeMeta = req.query.meta === "true";
       
       // Get user's preferred data source
-      let preferredDataSource = "twelvedata";
+      let preferredDataSource = "brokerage";
       if (userId) {
         const userSettings = await storage.getUserSettings(userId);
         if (userSettings?.preferredDataSource) {
@@ -490,7 +490,7 @@ export async function registerRoutes(
       
       // Get user's preferred data source
       const userSettings = await storage.getUserSettings(userId);
-      const preferredDataSource = userSettings?.preferredDataSource || "twelvedata";
+      const preferredDataSource = userSettings?.preferredDataSource || "brokerage";
       
       // If no broker connection, try Twelve Data
       if (!connection || !connection.accessToken) {
@@ -1038,7 +1038,7 @@ export async function registerRoutes(
       const userId = req.session?.userId;
       
       // Get user's preferred data source
-      let preferredDataSource = "twelvedata";
+      let preferredDataSource = "brokerage";
       let hasBrokerConnection = false;
       let brokerProvider: string | null = null;
       
