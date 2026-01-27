@@ -3,12 +3,12 @@ import type { ScanResult, Opportunity, InsertOpportunity, StrategyInfo } from "@
 import { StrategyType } from "@shared/schema";
 
 const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
-  [StrategyType.VCP]: "VCP Pattern",
-  [StrategyType.VCP_MULTIDAY]: "VCP Multi-Day",
+  [StrategyType.VCP]: "Momentum Breakout",
+  [StrategyType.VCP_MULTIDAY]: "Power Breakout",
   [StrategyType.CLASSIC_PULLBACK]: "Classic Pullback",
   [StrategyType.VWAP_RECLAIM]: "VWAP Reclaim",
-  [StrategyType.ORB5]: "5-Min Opening Range",
-  [StrategyType.ORB15]: "15-Min Opening Range",
+  [StrategyType.ORB5]: "Open Drive 5m",
+  [StrategyType.ORB15]: "Open Drive 15m",
   [StrategyType.HIGH_RVOL]: "High RVOL",
   [StrategyType.GAP_AND_GO]: "Gap & Go",
   [StrategyType.TREND_CONTINUATION]: "Trend Continuation",

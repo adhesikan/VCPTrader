@@ -898,6 +898,8 @@ export async function registerRoutes(
   app.get("/api/opportunities", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId!;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = req.query.sortOrder as string | undefined;
       const filters = {
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
         endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
@@ -909,6 +911,10 @@ export async function registerRoutes(
         status: req.query.status as string | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string) : 100,
         offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+        sortBy: ["detectedAt", "symbol", "strategyName", "pnlPercent", "daysToResolution"].includes(sortBy || "") 
+          ? sortBy as "detectedAt" | "symbol" | "strategyName" | "pnlPercent" | "daysToResolution"
+          : undefined,
+        sortOrder: (sortOrder === "asc" || sortOrder === "desc" ? sortOrder : undefined) as "asc" | "desc" | undefined,
       };
       const opportunities = await getOpportunities(userId, filters);
       res.json(opportunities);

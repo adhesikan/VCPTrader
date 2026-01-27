@@ -3,7 +3,7 @@ import { encryptCredentials, decryptCredentials, hasEncryptionKey, encryptToken,
 import { db } from "./db";
 import { brokerConnections, watchlists as watchlistsTable, opportunityDefaults as opportunityDefaultsTable, userSettings as userSettingsTable, algoPilotxConnections as algoPilotxConnectionsTable, executionRequests as executionRequestsTable, automationEndpoints as automationEndpointsTable, trades as tradesTable, alertRules as alertRulesTable, alertEvents as alertEventsTable, opportunityFirstSeen as opportunityFirstSeenTable, snaptradeConnections as snaptradeConnectionsTable, opportunities as opportunitiesTable } from "@shared/schema";
 import { users as usersTable } from "@shared/models/auth";
-import { desc, inArray, lt, gte, lte, or, sql, avg, count } from "drizzle-orm";
+import { desc, asc, inArray, lt, gte, lte, or, sql, avg, count } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import type {
   User,
@@ -217,6 +217,8 @@ export interface OpportunityFilters {
   status?: string;
   limit?: number;
   offset?: number;
+  sortBy?: "detectedAt" | "symbol" | "strategyName" | "pnlPercent" | "daysToResolution";
+  sortOrder?: "asc" | "desc";
 }
 
 export interface OpportunitySummary {
@@ -1891,11 +1893,32 @@ export class MemStorage implements IStorage {
     const limit = filters?.limit || 100;
     const offset = filters?.offset || 0;
     
+    // Determine sort column and order
+    const sortOrderFn = filters?.sortOrder === "asc" ? asc : desc;
+    let orderByColumn;
+    switch (filters?.sortBy) {
+      case "symbol":
+        orderByColumn = opportunitiesTable.symbol;
+        break;
+      case "strategyName":
+        orderByColumn = opportunitiesTable.strategyName;
+        break;
+      case "pnlPercent":
+        orderByColumn = opportunitiesTable.maxFavorableMovePercent;
+        break;
+      case "daysToResolution":
+        orderByColumn = opportunitiesTable.activeDurationMinutes;
+        break;
+      case "detectedAt":
+      default:
+        orderByColumn = opportunitiesTable.detectedAt;
+    }
+    
     return db
       .select()
       .from(opportunitiesTable)
       .where(and(...conditions))
-      .orderBy(desc(opportunitiesTable.detectedAt))
+      .orderBy(sortOrderFn(orderByColumn))
       .limit(limit)
       .offset(offset);
   }

@@ -46,6 +46,10 @@ import {
   ChevronLeft,
   ChevronRight,
   BarChart3,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -150,6 +154,19 @@ function formatPercent(pct: number | null): string {
   return `${prefix}${pct.toFixed(2)}%`;
 }
 
+function formatStrategyName(name: string): string {
+  const nameMap: Record<string, string> = {
+    "VCP Pattern": "Momentum Breakout",
+    "VCP Multi-Day": "Power Breakout",
+    "5-Min Opening Range": "Open Drive 5m",
+    "15-Min Opening Range": "Open Drive 15m",
+  };
+  return nameMap[name] || name;
+}
+
+type SortField = "detectedAt" | "symbol" | "strategyName" | "pnlPercent" | "daysToResolution";
+type SortOrder = "asc" | "desc";
+
 export default function OpportunitiesPage() {
   const [dateRange, setDateRange] = useState("30d");
   const [strategyFilter, setStrategyFilter] = useState("all");
@@ -157,9 +174,34 @@ export default function OpportunitiesPage() {
   const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [symbolFilter, setSymbolFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [sortBy, setSortBy] = useState<SortField>("detectedAt");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [page, setPage] = useState(0);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const pageSize = 20;
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("desc");
+    }
+    setPage(0);
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    return sortOrder === "asc" 
+      ? <ArrowUp className="h-3 w-3 ml-1" /> 
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const handleSearch = () => {
+    setSymbolFilter(searchInput);
+    setPage(0);
+  };
 
   const getDateRange = () => {
     const now = new Date();
@@ -185,11 +227,13 @@ export default function OpportunitiesPage() {
   };
 
   const { data: opportunities, isLoading: loadingOpportunities } = useQuery<Opportunity[]>({
-    queryKey: ["/api/opportunities", dateRange, strategyFilter, timeframeFilter, outcomeFilter, statusFilter, symbolFilter, page],
+    queryKey: ["/api/opportunities", dateRange, strategyFilter, timeframeFilter, outcomeFilter, statusFilter, symbolFilter, sortBy, sortOrder, page],
     queryFn: async () => {
       const params = buildQueryParams();
       params.set("limit", String(pageSize));
       params.set("offset", String(page * pageSize));
+      params.set("sortBy", sortBy);
+      params.set("sortOrder", sortOrder);
       const res = await fetch(`/api/opportunities?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch opportunities");
       return res.json();
@@ -380,27 +424,90 @@ export default function OpportunitiesPage() {
         </div>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Opportunities</CardTitle>
-            <CardDescription>
-              Click on a row to view details and chart
-            </CardDescription>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">Opportunities</CardTitle>
+              <CardDescription>
+                Click on a row to view details. Click column headers to sort.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search symbol..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  className="pl-8 w-40"
+                  data-testid="input-search-symbol"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSearch}
+                data-testid="button-search"
+              >
+                Search
+              </Button>
+              {symbolFilter && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => { setSearchInput(""); setSymbolFilter(""); setPage(0); }}
+                  data-testid="button-clear-search"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead>Strategy</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort("symbol")}
+                      data-testid="sort-symbol"
+                    >
+                      <span className="flex items-center">Symbol {getSortIcon("symbol")}</span>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort("strategyName")}
+                      data-testid="sort-strategy"
+                    >
+                      <span className="flex items-center">Strategy {getSortIcon("strategyName")}</span>
+                    </TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead>Detected</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort("detectedAt")}
+                      data-testid="sort-detected"
+                    >
+                      <span className="flex items-center">Detected {getSortIcon("detectedAt")}</span>
+                    </TableHead>
                     <TableHead className="text-right">Resistance</TableHead>
                     <TableHead className="text-right">Stop</TableHead>
                     <TableHead className="text-right">Price</TableHead>
                     <TableHead>Outcome</TableHead>
-                    <TableHead className="text-right">P&L %</TableHead>
-                    <TableHead className="text-right">Days</TableHead>
+                    <TableHead 
+                      className="text-right cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort("pnlPercent")}
+                      data-testid="sort-pnl"
+                    >
+                      <span className="flex items-center justify-end">P&L % {getSortIcon("pnlPercent")}</span>
+                    </TableHead>
+                    <TableHead 
+                      className="text-right cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort("daysToResolution")}
+                      data-testid="sort-days"
+                    >
+                      <span className="flex items-center justify-end">Days {getSortIcon("daysToResolution")}</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -430,7 +537,7 @@ export default function OpportunitiesPage() {
                             {opp.symbol}
                           </Link>
                         </TableCell>
-                        <TableCell className="text-sm">{opp.strategyName}</TableCell>
+                        <TableCell className="text-sm">{formatStrategyName(opp.strategyName)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">{opp.stageAtDetection}</Badge>
                         </TableCell>
@@ -511,7 +618,7 @@ export default function OpportunitiesPage() {
                   </Badge>
                 </SheetTitle>
                 <SheetDescription>
-                  {selectedOpportunity.strategyName} - {selectedOpportunity.stageAtDetection}
+                  {formatStrategyName(selectedOpportunity.strategyName)} - {selectedOpportunity.stageAtDetection}
                 </SheetDescription>
               </SheetHeader>
 
