@@ -6,11 +6,12 @@ import { db } from "./db";
 import { brokerConnections } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { configurePushService } from "./push-service";
-import { startAlertEngine } from "./alert-engine";
+import { startAlertEngine, isWithinAnyTradingHours } from "./alert-engine";
 import { storage } from "./storage";
 import cron from "node-cron";
 import { resolveOpportunities, updateOpportunityPrices } from "./opportunity-service";
 import { startScheduledScanService } from "./scheduled-scan-service";
+import { fetchQuotesFromBroker } from "./broker-service";
 
 // Run inline migrations on startup (more reliable than separate script)
 async function runStartupMigrations() {
@@ -313,6 +314,66 @@ async function restoreBrokerConnections() {
     }
   });
   log("Opportunity resolver job started");
+
+  // Extended hours price tracking job (runs every 5 minutes during 4 AM - 8 PM ET)
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      // Only track prices during trading hours (including extended hours)
+      if (!isWithinAnyTradingHours()) {
+        return;
+      }
+      
+      const activeOpportunities = await storage.getActiveOpportunities();
+      if (activeOpportunities.length === 0) {
+        return;
+      }
+      
+      // Get unique symbols from active opportunities
+      const symbols = Array.from(new Set(activeOpportunities.map(o => o.symbol)));
+      
+      // Get active broker connection
+      const connection = await storage.getAnyActiveBrokerConnection();
+      if (!connection) {
+        return;
+      }
+      
+      const connectionWithToken = await storage.getBrokerConnectionWithToken(connection.userId);
+      if (!connectionWithToken || !connectionWithToken.accessToken) {
+        return;
+      }
+      
+      // Fetch quotes in batches
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+        const batch = symbols.slice(i, i + BATCH_SIZE);
+        try {
+          const quotes = await fetchQuotesFromBroker(connectionWithToken, batch);
+          
+          // Update prices for each symbol
+          for (const quote of quotes) {
+            if (quote.symbol && quote.last) {
+              await updateOpportunityPrices(
+                quote.symbol,
+                quote.last,
+                quote.high,
+                quote.low
+              );
+            }
+          }
+        } catch (error: any) {
+          log(`[Opportunities] Price fetch error for batch: ${error.message}`, "opportunities");
+        }
+        
+        // Small delay between batches
+        if (i + BATCH_SIZE < symbols.length) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+    } catch (error: any) {
+      log(`[Opportunities] Extended hours tracker error: ${error.message}`, "opportunities");
+    }
+  });
+  log("Extended hours price tracking started (4 AM - 8 PM ET)");
 
   // Start scheduled scan service (runs at 9:45 AM ET on trading days)
   startScheduledScanService();

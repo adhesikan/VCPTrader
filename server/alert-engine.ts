@@ -7,13 +7,10 @@ import { resolveAutomationProfileForSignal, createAutomationEvent, type Automati
 import { ALERT_DISCLAIMER, getStrategyDisplayName } from "@shared/strategies";
 
 /**
- * Check if current time is within US market hours (9:30 AM - 4:00 PM ET)
- * Webhooks/automation should only execute during market hours
+ * Get current time in Eastern Time as minutes since midnight
  */
-export function isWithinMarketHours(): boolean {
+function getEasternTimeMinutes(): number {
   const now = new Date();
-  
-  // Convert to Eastern Time
   const etFormatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: 'numeric',
@@ -25,11 +22,50 @@ export function isWithinMarketHours(): boolean {
   const hour = parseInt(etParts.find(p => p.type === 'hour')?.value || '0');
   const minute = parseInt(etParts.find(p => p.type === 'minute')?.value || '0');
   
-  const timeInMinutes = hour * 60 + minute;
+  return hour * 60 + minute;
+}
+
+/**
+ * Check if current time is within US market hours (9:30 AM - 4:00 PM ET)
+ * Webhooks/automation should only execute during market hours
+ */
+export function isWithinMarketHours(): boolean {
+  const timeInMinutes = getEasternTimeMinutes();
   const marketOpen = 9 * 60 + 30;  // 9:30 AM = 570 minutes
   const marketClose = 16 * 60;     // 4:00 PM = 960 minutes
   
   return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+}
+
+/**
+ * Check if current time is within extended trading hours
+ * Pre-market: 4:00 AM - 9:30 AM ET
+ * After-hours: 4:00 PM - 8:00 PM ET
+ */
+export function isWithinExtendedHours(): boolean {
+  const timeInMinutes = getEasternTimeMinutes();
+  
+  const preMarketOpen = 4 * 60;    // 4:00 AM = 240 minutes
+  const marketOpen = 9 * 60 + 30;  // 9:30 AM = 570 minutes
+  const marketClose = 16 * 60;     // 4:00 PM = 960 minutes
+  const afterHoursClose = 20 * 60; // 8:00 PM = 1200 minutes
+  
+  const isPreMarket = timeInMinutes >= preMarketOpen && timeInMinutes < marketOpen;
+  const isAfterHours = timeInMinutes >= marketClose && timeInMinutes < afterHoursClose;
+  
+  return isPreMarket || isAfterHours;
+}
+
+/**
+ * Check if current time is within any trading hours (regular + extended)
+ * Covers 4:00 AM - 8:00 PM ET for price tracking
+ */
+export function isWithinAnyTradingHours(): boolean {
+  const timeInMinutes = getEasternTimeMinutes();
+  const tradingStart = 4 * 60;     // 4:00 AM = 240 minutes
+  const tradingEnd = 20 * 60;      // 8:00 PM = 1200 minutes
+  
+  return timeInMinutes >= tradingStart && timeInMinutes < tradingEnd;
 }
 
 export interface VCPClassification {

@@ -182,6 +182,22 @@ The platform includes an automated daily scanning system that ensures all tradin
 **Admin API**:
 - `POST /api/scheduled-scan/run` - Manually trigger the scheduled scan (admin only)
 
+### Extended Hours Price Tracking
+The platform supports extended hours price tracking for the Opportunity Outcome Report:
+
+**Coverage Window**: 4:00 AM - 8:00 PM ET
+- Pre-market: 4:00 AM - 9:30 AM ET
+- Regular hours: 9:30 AM - 4:00 PM ET
+- After-hours: 4:00 PM - 8:00 PM ET
+
+**Behavior**:
+1. Runs every 5 minutes during trading window
+2. Fetches latest quotes for all active opportunities
+3. Updates max/min prices to track resistance breaks and stop hits
+4. Opportunity resolver uses these prices to determine outcomes (BROKE_RESISTANCE, INVALIDATED, EXPIRED)
+
+**Note**: Automation/webhooks remain restricted to regular market hours (9:30 AM - 4:00 PM ET) while price tracking covers extended hours.
+
 ### UI Dependencies
 - Radix UI primitives for accessible components
 - TradingView lightweight-charts for financial charting
