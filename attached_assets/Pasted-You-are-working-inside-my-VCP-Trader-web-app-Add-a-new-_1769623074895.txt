@@ -1,0 +1,116 @@
+You are working inside my VCP Trader web app. Add a new “News & Research” feature under the LEARN section that lets users search recent headlines for any ticker. This must be compliance-safe: show headlines as informational context only, with no sentiment, interpretation, or recommendations.
+
+IMPORTANT REQUIREMENTS
+- Do NOT expose the API key to the browser. All calls must go through the server (API route / Express endpoint).
+- Do NOT change any trading logic, scanning logic, or opportunities logic.
+- UI must be clean and beginner-friendly.
+- Display factual fields only (headline, source, published date/time, url, image if provided).
+- Avoid using “catalyst”, “bullish/bearish”, “reason”, “impact”, “buy/sell”, “opportunity”.
+- Add disclaimers on the page.
+
+ASSUMPTION
+- “SNAPI key” refers to Stock News API by Snapi LLC (stocknewsapi.com). Example endpoint uses:
+  GET https://stocknewsapi.com/api/v1?tickers=TSLA&items=10&token=YOUR_KEY  (items 1–100) :contentReference[oaicite:1]{index=1}
+
+STEP 1 — ENV VAR
+- Add environment variable:
+  STOCKNEWSAPI_TOKEN=your_key_here
+- Update .env.example and any Replit secrets docs if present.
+
+STEP 2 — SERVER API PROXY ENDPOINT
+Implement a server endpoint to fetch news safely:
+- Route: GET /api/news?ticker=TSLA&items=10
+- Validate:
+  - ticker required; uppercase; 1–10 chars; allow letters, dot, dash (e.g., BRK.B, RDS-A)
+  - items optional default 10, clamp 1..20 (keep small for speed)
+- Construct request to StockNewsAPI:
+  https://stocknewsapi.com/api/v1?tickers=${ticker}&items=${items}&token=${STOCKNEWSAPI_TOKEN}
+- Handle errors gracefully:
+  - If upstream fails, return { ok:false, error:"..." }
+- Add lightweight caching to reduce API calls:
+  - In-memory cache (Map) keyed by ticker+items with TTL 60 seconds
+- Add basic rate limiting (best-effort):
+  - Simple per-IP sliding window in memory (e.g., 30 req/5 min)
+- Never pass the token to the client.
+
+Return normalized JSON:
+{
+  ok: true,
+  ticker: "TSLA",
+  items: 10,
+  articles: [
+    {
+      title: "...",          // use upstream title
+      source: "...",         // upstream source
+      date: "...",           // ISO string if possible
+      url: "...",            // upstream news_url
+      imageUrl: "...",       // upstream image_url (optional)
+    }
+  ]
+}
+
+STEP 3 — LEFT NAV UPDATE
+- Under LEARN section, add nav item:
+  “News & Research”
+- Keep icons consistent (outline).
+- Route to /learn/news (or similar) without breaking existing router patterns.
+
+STEP 4 — NEWS & RESEARCH PAGE UI
+Create a new page with:
+Header:
+- Title: “News & Research”
+- Subheading: “Search recent headlines for research purposes only.”
+- Disclaimer box (small, not scary):
+  “Headlines are provided for general information only and are not investment advice. No interpretation or recommendation is implied.”
+
+Search area:
+- Input: “Enter ticker (e.g., AAPL)”
+- Button: “Search”
+- Optional dropdown: items (5, 10, 15, 20)
+- Optional date filter UI can be omitted (API supports days/rank but keep v1 simple & safe)
+
+Results area:
+- Show loading skeleton while fetching.
+- Show empty state:
+  “Search a ticker to see recent headlines.”
+- On results:
+  - List cards (max 20) with:
+    - Headline (clickable, open in new tab rel="noreferrer noopener")
+    - Source + date/time (human-friendly)
+    - Optional thumbnail image (small)
+  - No sentiment badges, no highlighting “positive/negative”.
+  - Add a “View more” link only if the API returns more pages; otherwise omit.
+
+Error state:
+- If invalid ticker: “Please enter a valid ticker symbol.”
+- If API error: “Couldn’t load headlines right now. Try again.”
+
+UX polish:
+- Remember the last searched ticker in localStorage (key: vcp_last_news_ticker)
+- Press Enter triggers search
+- Mobile friendly layout
+
+STEP 5 — COMPLIANCE WORDING GUARDRAILS
+- Do NOT label anything “catalyst” or “reason”.
+- Use “Recent headlines” or “Related coverage”.
+- Do not generate summaries or interpretations.
+- Do not auto-load any ticker by default (only after user searches).
+
+STEP 6 — FILES & SUMMARY
+After implementation:
+- List files changed
+- Note where the env var is used
+- Confirm token never reaches the client
+- Provide quick instructions to set STOCKNEWSAPI_TOKEN in Replit Secrets
+
+IMPLEMENTATION NOTES (adapt to my stack)
+- If Next.js: create /pages/learn/news.tsx (pages router) or /app/learn/news/page.tsx (app router) and an API route /pages/api/news.ts or /app/api/news/route.ts.
+- If React + Express: add Express route /api/news and a React route/page for News & Research.
+- Use fetch on the client to call /api/news?ticker=...
+- Keep code consistent with existing patterns in the repository.
+
+ACCEPTANCE CRITERIA
+- User can search ticker and see a list of recent headlines with source + date.
+- API key stays server-side.
+- Page includes disclaimers and neutral phrasing.
+- Clean UI suitable for new users.
