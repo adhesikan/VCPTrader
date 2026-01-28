@@ -599,6 +599,8 @@ export async function registerRoutes(
       }
       
       // Apply filters to quotes before processing
+      console.log(`[Scan] Received ${allQuotes.length} quotes from broker, applying filters: minPrice=${minPrice}, maxPrice=${maxPrice}, minVolume=${minVolume}, minRvol=${minRvol}`);
+      
       const filteredQuotes = allQuotes.filter(quote => {
         if (minPrice && quote.last < minPrice) return false;
         if (maxPrice && quote.last > maxPrice) return false;
@@ -610,7 +612,10 @@ export async function registerRoutes(
         return true;
       });
       
+      console.log(`[Scan] ${filteredQuotes.length} quotes passed filters`);
+      
       const results = quotesToScanResults(filteredQuotes, strategy);
+      console.log(`[Scan] Generated ${results.length} scan results for strategy ${strategy}`);
       const scanTime = Date.now() - startTime;
       
       // Store results in storage so chart page can access them

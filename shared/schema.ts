@@ -89,6 +89,7 @@ export const scanResults = pgTable("scan_results", {
   ema9: real("ema9"),
   ema21: real("ema21"),
   atr: real("atr"),
+  strategy: text("strategy"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
