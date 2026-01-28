@@ -5,7 +5,7 @@ import {
   Search, Loader2, RefreshCw, List, Info, ChevronDown, ChevronRight, 
   TrendingUp, Layers, Activity, Zap, Target, X, LayoutGrid, LayoutList,
   AlertTriangle, Clock, CheckCircle2, Flame, TrendingDown, BookOpen, ExternalLink,
-  ArrowUpDown, Filter, SlidersHorizontal
+  ArrowUpDown, Filter, SlidersHorizontal, Sparkles, Circle
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -158,6 +158,65 @@ export default function Scanner() {
   const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
     const [showAdvanced, setShowAdvanced] = useState(false);
   const [showStrategyInfo, setShowStrategyInfo] = useState(false);
+  
+  // Progressive disclosure & coach mark state
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [coachDismissed, setCoachDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('vcp_opportunity_engine_coach_dismissed') === 'true';
+    }
+    return false;
+  });
+  const [scanConfigCollapsed, setScanConfigCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('vcp_scan_config_collapsed') !== 'false';
+    }
+    return true;
+  });
+  
+  const dismissCoachMark = () => {
+    setCoachDismissed(true);
+    localStorage.setItem('vcp_opportunity_engine_coach_dismissed', 'true');
+  };
+  
+  const toggleScanConfig = () => {
+    const newState = !scanConfigCollapsed;
+    setScanConfigCollapsed(newState);
+    localStorage.setItem('vcp_scan_config_collapsed', String(newState));
+  };
+  
+  const toggleCardExpand = (id: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+  
+  // Helper to get contextual micro-badge
+  const getMicroBadge = (result: ScanResult) => {
+    if (result.rvol && result.rvol >= 3) return { text: "Volume expanding", color: "text-chart-2" };
+    if (result.changePercent && result.changePercent >= 5) return { text: "Momentum strong", color: "text-orange-500" };
+    return { text: "Tight setup", color: "text-muted-foreground" };
+  };
+  
+  // Find top setup (highest patternScore, then highest rvol as tiebreaker)
+  const getTopSetup = (results: ScanResult[] | undefined): string | null => {
+    if (!results || results.length === 0) return null;
+    const breakouts = results.filter(r => r.stage === "BREAKOUT");
+    if (breakouts.length === 0) return null;
+    
+    const sorted = [...breakouts].sort((a, b) => {
+      const scoreDiff = (b.patternScore || 0) - (a.patternScore || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      return (b.rvol || 0) - (a.rvol || 0);
+    });
+    return sorted[0]?.id || null;
+  };
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("patternScore");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -798,9 +857,9 @@ export default function Scanner() {
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               Find trading setups that match your strategy
-              {getMarketSession().session !== "REGULAR" && getMarketSession().session !== "CLOSED" && (
-                <span className="ml-1 text-xs">• Extended hours data available</span>
-              )}
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              Live breakout candidates from tight consolidations with volume expansion. Updates during market hours.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -808,6 +867,17 @@ export default function Scanner() {
               <div className="flex items-center gap-2 text-sm flex-wrap">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Last Scan: {format(lastScanTime, "MMM d, h:mm a")}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="gap-1.5 text-xs cursor-help" data-testid="badge-live-scan">
+                      <Circle className="h-2 w-2 fill-green-500 text-green-500 animate-pulse" />
+                      Live Scan
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    Auto-updates during market hours. Click Scan Now to refresh instantly.
+                  </TooltipContent>
+                </Tooltip>
                 <Button
                   variant="outline"
                   size="sm"
@@ -832,8 +902,31 @@ export default function Scanner() {
         </div>
       </div>
 
+      {/* First-time Coach Mark */}
+      {!coachDismissed && liveResults && liveResults.length > 0 && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5" data-testid="coach-mark">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-sm">
+              <span className="font-medium">New here?</span> Click any card to preview the trade plan. Use InstaTrade™ when you're ready.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={dismissCoachMark}
+            className="shrink-0"
+            data-testid="button-dismiss-coach"
+          >
+            Got it
+          </Button>
+        </div>
+      )}
+
       {/* Featured Opportunities - Breakout & Triggered Symbols */}
-      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT").length > 0 && (
+      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT").length > 0 && (() => {
+        const topSetupId = getTopSetup(liveResults);
+        return (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -870,10 +963,18 @@ export default function Scanner() {
                 {liveResults
                   .filter(r => r.stage === "BREAKOUT")
                   .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
-                  .map((result) => (
+                  .map((result) => {
+                    const isTopSetup = result.id === topSetupId;
+                    const isExpanded = expandedCards.has(result.id);
+                    const microBadge = getMicroBadge(result);
+                    
+                    return (
                     <Card 
                       key={result.id} 
-                      className="hover-elevate cursor-pointer"
+                      className={cn(
+                        "hover-elevate cursor-pointer transition-all",
+                        isTopSetup && "ring-2 ring-primary/50 shadow-md shadow-primary/10"
+                      )}
                       onClick={() => navigate(`/charts/${result.ticker}`)}
                       data-testid={`card-opportunity-${result.ticker}`}
                     >
@@ -890,20 +991,27 @@ export default function Scanner() {
                             >
                               {result.stage}
                             </Badge>
+                            {isTopSetup && (
+                              <Badge variant="secondary" className="shrink-0 text-xs bg-primary/10 text-primary">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Top Setup
+                              </Badge>
+                            )}
                           </div>
                           {result.patternScore && (
-                            <Badge variant="secondary" className="shrink-0 text-xs">
-                              {result.patternScore}%
-                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="secondary" className="shrink-0 text-xs font-semibold cursor-help">
+                                  {result.patternScore}%
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                <span className="font-medium">Setup Strength:</span> A score based on historical quality of similar setups. Not investment advice.
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{result.name || result.ticker}</p>
-                        {(result as any).firstSeenAt && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground/70">
-                            <Clock className="h-3 w-3" />
-                            <span>First seen: {format(new Date((result as any).firstSeenAt), "MMM d, h:mm a")}</span>
-                          </div>
-                        )}
+                        
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">${result.price?.toFixed(2)}</span>
                           <span className={cn(
@@ -913,63 +1021,85 @@ export default function Scanner() {
                             {(result.changePercent || 0) >= 0 ? "+" : ""}{result.changePercent?.toFixed(2)}%
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <span className="block text-muted-foreground/70 flex items-center gap-1">
-                                  <Target className="h-3 w-3 text-chart-2" />
-                                  Resistance
-                                </span>
-                                <span className="font-medium text-chart-2">${result.resistance?.toFixed(2) || "N/A"}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                              Price level where the stock has struggled to break above. A breakout happens when price pushes through this ceiling.
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <span className="block text-muted-foreground/70 flex items-center gap-1">
-                                  <TrendingDown className="h-3 w-3 text-destructive" />
-                                  Stop
-                                </span>
-                                <span className="font-medium text-destructive">${result.stopLoss?.toFixed(2) || "N/A"}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                              Safety price level to exit a trade and limit losses. Placed below recent support to protect your capital.
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <span className="block text-muted-foreground/70">Vol</span>
-                                <span className="font-medium text-foreground">{result.volume ? (result.volume / 1000000).toFixed(1) + "M" : "N/A"}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                              Number of shares traded. Higher volume confirms price moves and indicates stronger conviction.
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <span className="block text-muted-foreground/70">RVOL</span>
-                                <span className={cn(
-                                  "font-medium",
-                                  (result.rvol || 0) >= 1.5 ? "text-chart-2" : "text-foreground"
-                                )}>
-                                  {result.rvol?.toFixed(1) || "N/A"}x
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                              Relative Volume compares current volume to the 20-day average. Above 1.5x often signals strong interest.
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                        
+                        {/* Contextual micro-badge */}
+                        {microBadge && (
+                          <p className={cn("text-xs", microBadge.color)}>{microBadge.text}</p>
+                        )}
+                        
+                        {/* Details toggle */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); toggleCardExpand(result.id); }}
+                          className="w-full gap-1 h-7 text-xs"
+                          data-testid={`button-details-${result.ticker}`}
+                        >
+                          <ChevronDown className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-180")} />
+                          {isExpanded ? "Hide Details" : "Show Details"}
+                        </Button>
+                        
+                        {/* Expandable details panel */}
+                        {isExpanded && (
+                          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <span className="block text-muted-foreground/70 flex items-center gap-1">
+                                    <Target className="h-3 w-3 text-chart-2" />
+                                    Resistance
+                                  </span>
+                                  <span className="font-medium text-chart-2">${result.resistance?.toFixed(2) || "N/A"}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                Price level where the stock has struggled to break above. A breakout happens when price pushes through this ceiling.
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <span className="block text-muted-foreground/70 flex items-center gap-1">
+                                    <TrendingDown className="h-3 w-3 text-destructive" />
+                                    Stop
+                                  </span>
+                                  <span className="font-medium text-destructive">${result.stopLoss?.toFixed(2) || "N/A"}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                Safety price level to exit a trade and limit losses. Placed below recent support to protect your capital.
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <span className="block text-muted-foreground/70">Vol</span>
+                                  <span className="font-medium text-foreground">{result.volume ? (result.volume / 1000000).toFixed(1) + "M" : "N/A"}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                Number of shares traded. Higher volume confirms price moves and indicates stronger conviction.
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <span className="block text-muted-foreground/70">RVOL</span>
+                                  <span className={cn(
+                                    "font-medium",
+                                    (result.rvol || 0) >= 1.5 ? "text-chart-2" : "text-foreground"
+                                  )}>
+                                    {result.rvol?.toFixed(1) || "N/A"}x
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                Relative Volume compares current volume to the 20-day average. Above 1.5x often signals strong interest.
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
+                        
                         <Button
                           size="sm"
                           className="w-full gap-1 mt-2"
@@ -982,17 +1112,24 @@ export default function Scanner() {
                         </Button>
                       </CardContent>
                     </Card>
-                  ))}
+                  );
+                  })}
               </div>
             ) : (
               <div className="space-y-1">
                 {liveResults
                   .filter(r => r.stage === "BREAKOUT")
                   .sort((a, b) => (b.patternScore || 0) - (a.patternScore || 0))
-                  .map((result) => (
+                  .map((result) => {
+                    const isTopSetup = result.id === topSetupId;
+                    
+                    return (
                     <div
                       key={result.id}
-                      className="flex items-center justify-between gap-4 p-2 rounded-md hover-elevate cursor-pointer"
+                      className={cn(
+                        "flex items-center justify-between gap-4 p-2 rounded-md hover-elevate cursor-pointer",
+                        isTopSetup && "ring-1 ring-primary/30 bg-primary/5"
+                      )}
                       onClick={() => navigate(`/charts/${result.ticker}`)}
                       data-testid={`row-opportunity-${result.ticker}`}
                     >
@@ -1010,6 +1147,12 @@ export default function Scanner() {
                           <span className="font-semibold">{result.ticker}</span>
                           <span className="text-muted-foreground text-sm ml-2 hidden sm:inline">{result.name}</span>
                         </div>
+                        {isTopSetup && (
+                          <Badge variant="secondary" className="shrink-0 text-xs bg-primary/10 text-primary hidden sm:flex">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Top
+                          </Badge>
+                        )}
                         {(result as any).firstSeenAt && (
                           <span className="hidden lg:flex items-center gap-1 text-xs text-muted-foreground/70">
                             <Clock className="h-3 w-3" />
@@ -1052,15 +1195,54 @@ export default function Scanner() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
               </div>
             )}
           </CardContent>
         </Card>
+        );
+      })()}
+
+      {/* Empty State for No Opportunities */}
+      {liveResults && liveResults.filter(r => r.stage === "BREAKOUT").length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Target className="h-10 w-10 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-lg font-medium mb-2">No active breakouts right now</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+              We'll surface opportunities when volume expands from tight consolidations.
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              Try "Scan Now" or adjust filters in Customize Your Scan below.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
+      {/* Customize Your Scan - Collapsible */}
       <Card>
-        <CardContent className="p-6 space-y-6">
+        <CardHeader 
+          className="pb-3 cursor-pointer hover-elevate" 
+          onClick={toggleScanConfig}
+          data-testid="button-toggle-scan-config"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4" />
+                Customize Your Scan (Optional)
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Most users start with the default scan. Adjust anytime.
+              </p>
+            </div>
+            <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", !scanConfigCollapsed && "rotate-180")} />
+          </div>
+        </CardHeader>
+        <Collapsible open={!scanConfigCollapsed} onOpenChange={(open) => setScanConfigCollapsed(!open)}>
+          <CollapsibleContent>
+        <CardContent className="pt-0 space-y-6">
           <div className="space-y-3">
             <Label className="text-sm font-medium">Step 1: Choose Mode</Label>
             <RadioGroup 
@@ -1480,6 +1662,8 @@ export default function Scanner() {
             )}
           </div>
         </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       {filteredResults && filteredResults.length > 0 && (

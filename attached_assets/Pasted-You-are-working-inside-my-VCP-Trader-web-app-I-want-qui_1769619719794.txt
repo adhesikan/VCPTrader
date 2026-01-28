@@ -1,0 +1,109 @@
+You are working inside my VCP Trader web app. I want quick UI/UX improvements to make the Opportunity Engine more enticing and less overwhelming to new users, while keeping the same data and functionality.
+
+GOAL
+- Reduce cognitive load for first-time users (less default info density).
+- Add lightweight guidance + trust cues.
+- Keep power-user details available via hover/expand (“progressive disclosure”).
+- Do NOT change backend logic or the scan algorithm. UI-only changes.
+
+SCOPE
+- Only update the “Opportunity Engine” page and components it uses (Opportunity cards, scan header area, scan config section).
+- Keep existing styling system (Tailwind/shadcn if used). Don’t introduce new heavy libraries unless already present.
+- Must be responsive and not cluttered.
+
+CHANGES TO IMPLEMENT
+
+1) Add 1-line explainer above Active Opportunities
+- Directly under “Opportunity Engine” title and subtitle, add a short explainer line:
+  “Live breakout candidates from tight consolidations with volume expansion. Updates during market hours.”
+- Style as muted text (smaller than subtitle).
+
+2) Add a “Live / Auto-Updating” indicator near Last Scan
+- Next to “Last Scan: …” add a small green dot + label “Live Scan”
+- Tooltip: “Auto-updates during market hours. Click Scan Now to refresh instantly.”
+
+3) Progressive disclosure on opportunity cards (reduce default density)
+- Default card should show only:
+  - Ticker
+  - Strategy badge (e.g., BREAKOUT)
+  - Score (rename from “Confidence %” to “Setup Strength”)
+  - Current price + % move
+  - Primary CTA button (InstaTrade™)
+- Hide secondary metrics by default:
+  - Resistance
+  - Stop
+  - Volume
+  - RVOL
+- Provide a “Details” affordance:
+  - Option A (preferred): a small “Details” link or chevron on the card that expands/collapses a details panel.
+  - Option B: show details only on hover on desktop, but ALWAYS accessible on mobile via expand toggle.
+- Expanded details panel shows the hidden metrics exactly as before, with same values.
+
+4) Rename “Confidence %” label + add tooltip for clarity
+- Change label from “Confidence” to “Setup Strength”
+- Tooltip content (short, compliant): “A score based on historical quality of similar setups. Not investment advice.”
+- Keep the numeric value the same (e.g., 90%).
+
+5) Add “Why this matters” micro-badge (non-advisory)
+- On each card, show one small contextual badge under the main row (muted, optional):
+  Choose from existing available fields (no new backend):
+  - If RVOL >= 3: show “Volume expanding”
+  - If % move is high (e.g., >= 5%): show “Momentum strong”
+  - Else show “Tight setup”
+- This must be purely descriptive and not a recommendation.
+- If data missing, omit badge.
+
+6) Feature ONE “Top Setup Right Now”
+- In Active Opportunities list, pick the top opportunity using existing values:
+  - Highest “Setup Strength” score
+  - If tie, highest RVOL
+- Add a small “Top Setup” pill on that card and slightly emphasize the card (subtle border/glow).
+- Do not reorder the list unless already sorting exists; okay to reorder if simple and consistent.
+- Keep it subtle (no flashing).
+
+7) Improve visual hierarchy
+- Reduce visual weight of secondary text and numbers.
+- Make score/Setup Strength slightly more prominent.
+- Keep colors consistent with current theme.
+
+8) Make scan configuration feel optional
+- The section currently labeled “Step 1 / Step 2” should become:
+  - Title: “Customize Your Scan (Optional)”
+  - Add small helper text: “Most users start with the default scan. Adjust anytime.”
+- Collapse this section by default (accordion).
+- Remember the collapsed state in localStorage so it stays collapsed for returning users.
+- Keep existing controls/logic unchanged inside the accordion.
+
+9) Add a first-time user coach mark (shows once)
+- On first visit to Opportunity Engine ONLY, show a small dismissible helper banner above the cards:
+  “New here? Click any card to preview the trade plan. Use InstaTrade™ when you’re ready.”
+- Add “Got it” dismiss button.
+- Store dismissal in localStorage so it shows only once.
+
+10) Empty state improvements
+- If there are 0 active opportunities, show an empty state card:
+  Title: “No active breakouts right now”
+  Text: “We’ll surface opportunities when volume expands from tight consolidations.”
+  Secondary: “Try ‘Scan Now’ or adjust filters in Customize Your Scan.”
+- Keep it in the same container so the page doesn’t look broken.
+
+IMPLEMENTATION NOTES
+- Identify the Opportunity Engine page component (likely under pages/ or app/ routes).
+- Identify the OpportunityCard component (or create one if currently inline).
+- Add a small Tooltip component if shadcn/ui already exists; otherwise implement a simple title attribute tooltip for speed.
+- Add an Accordion for the optional scan section if already available; otherwise create a minimal collapsible panel using state + Tailwind.
+- Use localStorage keys like:
+  - vcp_opportunity_engine_coach_dismissed
+  - vcp_scan_config_collapsed
+
+ACCEPTANCE CRITERIA (must meet)
+- On load, the page looks simpler: cards show fewer default metrics.
+- Users can still access Resistance/Stop/Vol/RVOL via “Details” expand on every device.
+- “Confidence” is now “Setup Strength” with tooltip.
+- One card has “Top Setup” highlight.
+- Scan config is collapsed by default and labeled optional.
+- Coach mark shows only once and can be dismissed.
+- Empty state is friendly and actionable.
+- No backend changes, no breaking existing scan results.
+
+After you implement, list the files changed and summarize what you did.
