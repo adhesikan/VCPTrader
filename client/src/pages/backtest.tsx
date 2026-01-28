@@ -143,7 +143,7 @@ export default function Backtest() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Backtest</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Test VCP strategy on a single stock using broker historical data
+            Explore historical behavior of setups for research
           </p>
         </div>
 

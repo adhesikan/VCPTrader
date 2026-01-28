@@ -384,10 +384,10 @@ export default function StrategyGuide() {
       <div>
         <h1 className="text-xl lg:text-2xl font-semibold tracking-tight flex items-center gap-2">
           <BookOpen className="h-6 w-6" />
-          Strategy Guide
+          How This Works
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Learn about supported trading strategies and how to use the platform
+          Learn the workflow and how to use the scanner
         </p>
       </div>
 

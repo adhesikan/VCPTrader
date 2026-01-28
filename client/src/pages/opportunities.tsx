@@ -273,8 +273,8 @@ export default function OpportunitiesPage() {
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold" data-testid="text-page-title">Opportunity Outcome Report</h1>
-            <p className="text-sm text-muted-foreground">Track detected opportunities and their lifecycle outcomes</p>
+            <h1 className="text-xl font-semibold" data-testid="text-page-title">Trade Outcomes</h1>
+            <p className="text-sm text-muted-foreground">Summaries of detected opportunities and system activity</p>
           </div>
           <Button variant="outline" size="sm" onClick={handleExportCSV} data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />

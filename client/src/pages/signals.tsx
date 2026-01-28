@@ -471,7 +471,7 @@ export default function Signals() {
           <div>
             <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Breakout Alerts</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Pattern alerts - click for detailed analysis
+              Real-time alerts when price and volume conditions trigger
             </p>
           </div>
           <div className="flex items-center gap-1 border rounded-md p-0.5">

@@ -1,0 +1,149 @@
+You are working inside my VCP Trader web app. I want to improve the LEFT NAV + PAGE HEADERS to make the UI cleaner and more user-friendly for new users, while keeping power-user features accessible. Also replace any “Performance Report” wording with “Trade Outcomes”.
+
+IMPORTANT
+- UI/UX changes only. Do NOT change backend logic, data fetching, scan algorithms, or trading logic.
+- Keep existing routing intact (URLs should not change unless already easy/aliasable). Prefer changing labels/titles, not routes.
+- Keep existing styling system (Tailwind/shadcn if used). Don’t add heavy new libraries.
+- Must remain responsive and work on desktop + mobile.
+
+OBJECTIVES
+1) Simplify navigation by grouping items by user intent.
+2) Reduce perceived complexity via collapsible sections + “Advanced” grouping.
+3) Make each page clearer with consistent titles + 1-line helper text.
+4) Add one-time onboarding guidance (“Start here”) without being annoying.
+5) Replace “Performance Report” with “Trade Outcomes” everywhere in UI text.
+
+NAVIGATION INFORMATION ARCHITECTURE (IA)
+Update the left nav to these groups/sections:
+
+DISCOVER
+- Opportunities (this is currently “Opportunity Engine” label, keep route the same)
+- Breakout Alerts
+- Watchlists
+
+ANALYZE
+- Charts
+- Backtest
+- Trade Outcomes (this replaces “Performance Report” or “Outcome Report” label; keep route the same)
+
+EXECUTE
+- Trade Execution (this is currently “Execution Cockpit” label; keep route the same)
+- Alerts (execution/notifications)
+
+LEARN
+- How This Works (this is currently “Strategy Guide” label; keep route the same)
+- Tutorials (only show if this page exists; otherwise omit)
+
+SETTINGS
+- Settings
+
+NAV CHANGES TO IMPLEMENT
+
+1) Rename intimidating items (label changes only)
+- “Opportunity Engine” => “Opportunities” (route unchanged)
+- “Execution Cockpit” => “Trade Execution” (route unchanged)
+- “Strategy Guide” => “How This Works” (route unchanged)
+- “Performance Report” => “Trade Outcomes” (route unchanged)
+- If there is “Outcome Report” in UI, also rename to “Trade Outcomes”
+
+2) Group items into collapsible sections
+- Implement collapsible nav sections: Discover / Analyze / Execute / Learn / Settings
+- Default behavior for NEW users:
+  - Only “Discover” expanded, all others collapsed
+- Store expand/collapse state in localStorage so returning users keep their preference.
+- localStorage keys:
+  - vcp_nav_section_discover
+  - vcp_nav_section_analyze
+  - vcp_nav_section_execute
+  - vcp_nav_section_learn
+  - vcp_nav_section_settings
+
+3) Add “Start Here” indicator
+- Add a subtle “Start here” / star indicator to “Opportunities” nav item for first-time users only.
+- On hover or tooltip: “Start here to find live setups.”
+- This indicator should disappear after the user clicks Opportunities once.
+- Persist in localStorage:
+  - vcp_start_here_seen = true after first click
+
+4) Progressive disclosure for advanced tools
+- Add an “Advanced” sub-section (or keep within Analyze but collapsed by default):
+  - Backtest
+  - Trade Outcomes
+  - (Optionally) Trade Execution if you consider it advanced
+- The goal: new users see fewer items immediately, but pros can access quickly.
+
+5) Visual polish
+- Ensure icons are consistent style (outline). If icons are mixed, normalize them.
+- Slightly reduce sidebar width (e.g. from 280px to ~240px) unless it breaks layout.
+- Improve spacing and alignment; reduce visual noise.
+- Ensure active item highlight is clear.
+
+6) Add a small status footer area in left nav (if relevant data exists)
+- At bottom of sidebar show:
+  - A small indicator “Live Scan” or “Market Hours” (static label is fine if no data)
+  - Connection status if you already have it (e.g. “Broker Connected”)
+- If you don’t have real status data, keep it simple and purely presentational.
+
+PAGE-LEVEL CHANGES
+
+7) Align page headers with nav labels
+For each page, ensure:
+- The page title matches the nav label (or a friendly expansion).
+Examples:
+- Nav: Opportunities -> Page title can be “Opportunity Engine” with a smaller label “Opportunities” OR just “Opportunities”
+- Nav: Trade Outcomes -> Page title “Trade Outcomes”
+- Nav: Trade Execution -> Page title “Trade Execution”
+- Nav: How This Works -> Page title “How This Works”
+
+8) Add a one-line helper text under each page title
+Add a short descriptive line (NOT advisory) under the title. Examples:
+- Opportunities: “Live breakout candidates from tight consolidations with volume expansion.”
+- Breakout Alerts: “Real-time alerts when price and volume conditions trigger.”
+- Watchlists: “Track names you care about and monitor setups.”
+- Charts: “Review price action and levels for context.”
+- Backtest: “Explore historical behavior of setups for research.”
+- Trade Outcomes: “Summaries of executed trades and system activity.”
+- Trade Execution: “Manage and monitor trade actions in one place.”
+- Alerts: “Configure notifications and routing.”
+- How This Works: “Learn the workflow and how to use the scanner.”
+
+9) Reduce redundancy/confusion between pages
+- Ensure “Breakout Alerts” vs “Alerts” are clearly distinct via helper text and page copy:
+  - Breakout Alerts = discovery
+  - Alerts = notifications/config
+
+ONBOARDING (ONE-TIME) OPTIONAL BUT RECOMMENDED
+
+10) One-time mini coach banner on first visit to app (or first visit to Opportunities)
+- Add a dismissible banner near top of main content:
+  “New here? Start with Opportunities to see live setups. You can explore details before taking any action.”
+- Add “Got it” button.
+- Show only once; store:
+  - vcp_coach_banner_dismissed
+
+SEARCH & REPLACE REQUIREMENT
+
+11) Replace “Performance Report” with “Trade Outcomes”
+- Replace any UI string “Performance Report” with “Trade Outcomes”
+- Replace “Outcome Report” label with “Trade Outcomes” as well (if present)
+- Do not claim returns; avoid terms like “profit”, “returns”, “track record” in UI labels.
+
+IMPLEMENTATION GUIDANCE
+- Locate the left sidebar nav component (e.g., Sidebar.tsx, Nav.tsx, Layout.tsx).
+- Update the nav structure to grouped sections with collapsible behavior.
+- Update page header components (e.g., PageHeader.tsx) or each page file to add helper text.
+- Use localStorage helpers with safe guards for SSR (if Next.js): check typeof window !== 'undefined'
+- Ensure mobile behavior: sidebar collapses/hamburger as currently implemented; do not break it.
+
+ACCEPTANCE CRITERIA
+- Sidebar shows grouped, collapsible sections with fewer items visible by default for first-time users.
+- “Opportunities” is clearly the starting point and highlighted for first-time users only.
+- All occurrences of “Performance Report” and “Outcome Report” in UI become “Trade Outcomes”.
+- Each page has a clear header + 1-line helper text.
+- No route changes required; only labels/titles and UI components updated.
+- Provide a summary of changes and list of files changed.
+
+After implementation:
+- Output a concise summary of what you changed
+- List all files modified
+- Mention any TODOs if you discover missing pages (e.g., Tutorials not present)

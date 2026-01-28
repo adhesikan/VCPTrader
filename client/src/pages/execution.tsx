@@ -190,9 +190,9 @@ export default function ExecutionCockpit() {
       <div className="container max-w-6xl mx-auto p-4 md:p-6 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-page-title">Execution Cockpit</h1>
+            <h1 className="text-2xl font-semibold" data-testid="text-page-title">Trade Execution</h1>
             <p className="text-muted-foreground">
-              Connect VCP Trader to AlgoPilotX for self-directed automated trade execution
+              Manage and monitor trade actions in one place
             </p>
           </div>
         </div>

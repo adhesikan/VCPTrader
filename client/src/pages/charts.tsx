@@ -126,7 +126,7 @@ export default function Charts() {
           <div>
             <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Charts</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Technical analysis with VCP overlays
+              Review price action and levels for context
             </p>
           </div>
         </div>

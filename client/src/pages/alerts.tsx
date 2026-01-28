@@ -580,7 +580,7 @@ export default function Alerts() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your VCP stage alerts and view triggered events
+            Configure notifications and routing
           </p>
         </div>
 
