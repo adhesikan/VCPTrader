@@ -47,6 +47,44 @@ import { Save } from "lucide-react";
 
 type EngineMode = "single" | "fusion";
 type TargetType = "watchlist" | "symbol" | "universe";
+type MarketSession = "PRE_MARKET" | "REGULAR" | "AFTER_HOURS" | "CLOSED";
+
+function getMarketSession(): { session: MarketSession; label: string; color: string } {
+  const now = new Date();
+  const etFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+    weekday: 'short',
+  });
+  
+  const parts = etFormatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+  const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+  
+  // Check if weekend
+  if (weekday === 'Sat' || weekday === 'Sun') {
+    return { session: "CLOSED", label: "Market Closed", color: "text-muted-foreground" };
+  }
+  
+  const timeInMinutes = hour * 60 + minute;
+  const preMarketOpen = 4 * 60;     // 4:00 AM
+  const marketOpen = 9 * 60 + 30;   // 9:30 AM
+  const marketClose = 16 * 60;      // 4:00 PM
+  const afterHoursClose = 20 * 60;  // 8:00 PM
+  
+  if (timeInMinutes >= preMarketOpen && timeInMinutes < marketOpen) {
+    return { session: "PRE_MARKET", label: "Pre-Market", color: "text-blue-500" };
+  } else if (timeInMinutes >= marketOpen && timeInMinutes < marketClose) {
+    return { session: "REGULAR", label: "Market Open", color: "text-chart-2" };
+  } else if (timeInMinutes >= marketClose && timeInMinutes < afterHoursClose) {
+    return { session: "AFTER_HOURS", label: "After-Hours", color: "text-orange-500" };
+  }
+  
+  return { session: "CLOSED", label: "Market Closed", color: "text-muted-foreground" };
+}
 
 interface MarketRegime {
   regime: "TRENDING" | "CHOPPY" | "RISK_OFF";
@@ -739,12 +777,30 @@ export default function Scanner() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Target className="h-6 w-6" />
-              Opportunity Engine
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+                <Target className="h-6 w-6" />
+                Opportunity Engine
+              </h1>
+              {(() => {
+                const marketSession = getMarketSession();
+                return (
+                  <Badge 
+                    variant="outline" 
+                    className={cn("gap-1 text-xs", marketSession.color)}
+                    data-testid="badge-market-session"
+                  >
+                    <Activity className="h-3 w-3" />
+                    {marketSession.label}
+                  </Badge>
+                );
+              })()}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               Find trading setups that match your strategy
+              {getMarketSession().session !== "REGULAR" && getMarketSession().session !== "CLOSED" && (
+                <span className="ml-1 text-xs">• Extended hours data available</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
