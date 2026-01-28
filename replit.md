@@ -159,6 +159,29 @@ InstaTrade supports two execution methods, selectable per trade:
 ### Push Notifications
 - Web Push API with VAPID keys for real-time alert delivery
 
+### News & Research (Stock News API)
+The platform includes a compliance-safe news research feature for looking up recent headlines:
+
+**Configuration**:
+- **API Provider**: Stock News API (stocknewsapi.com)
+- **Required Secret**: `STOCKNEWSAPI_TOKEN` environment variable
+- **Service File**: `server/news-service.ts`
+
+**Features**:
+- Search headlines by ticker symbol
+- In-memory caching with 60-second TTL to reduce API calls
+- Per-IP rate limiting (30 requests per 5 minutes)
+- Compliance-safe: Shows factual data only (headline, source, date, URL)
+- No sentiment analysis, interpretations, or recommendations
+
+**API Endpoints**:
+- `GET /api/news?ticker=AAPL&items=10` - Fetch headlines for a ticker
+- `GET /api/news/status` - Check if news service is configured
+
+**Security**: API token is server-side only and never exposed to the client.
+
+**UI Location**: Learn > News & Research (`/learn/news`)
+
 ### Scheduled Scan Service
 The platform includes an automated daily scanning system that ensures all trading opportunities are tracked in the Outcome Report:
 

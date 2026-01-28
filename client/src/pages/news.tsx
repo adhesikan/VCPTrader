@@ -64,7 +64,11 @@ export default function NewsPage() {
   const [items, setItems] = useState("10");
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<NewsResponse>({
-    queryKey: ["/api/news", searchTicker, items],
+    queryKey: ["/api/news", { ticker: searchTicker, items }],
+    queryFn: async () => {
+      const response = await fetch(`/api/news?ticker=${encodeURIComponent(searchTicker)}&items=${items}`);
+      return response.json();
+    },
     enabled: !!searchTicker,
   });
 
@@ -92,14 +96,14 @@ export default function NewsPage() {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Newspaper className="h-6 w-6 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold">News & Research</h1>
+          <h1 className="text-2xl font-semibold" data-testid="text-news-title">News & Research</h1>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground" data-testid="text-news-subtitle">
           Search recent headlines for research purposes only.
         </p>
       </div>
 
-      <Alert className="border-muted bg-muted/30">
+      <Alert className="border-muted bg-muted/30" data-testid="alert-news-disclaimer">
         <Info className="h-4 w-4" />
         <AlertDescription className="text-sm text-muted-foreground">
           Headlines are provided for general information only and are not investment advice. 
@@ -147,7 +151,7 @@ export default function NewsPage() {
       </Card>
 
       {!searchTicker && !isLoading && (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-12 text-muted-foreground" data-testid="text-news-empty-state">
           <Newspaper className="h-12 w-12 mx-auto mb-4 opacity-30" />
           <p>Search a ticker to see recent headlines.</p>
         </div>
@@ -173,7 +177,7 @@ export default function NewsPage() {
       )}
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" data-testid="alert-news-error">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Couldn't load headlines right now. Try again.
@@ -182,20 +186,20 @@ export default function NewsPage() {
       )}
 
       {data && !data.ok && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" data-testid="alert-news-api-error">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{data.error || "Please enter a valid ticker symbol."}</AlertDescription>
         </Alert>
       )}
 
       {data?.ok && data.articles && !isFetching && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-3" data-testid="container-news-results">
+          <p className="text-sm text-muted-foreground" data-testid="text-news-results-summary">
             Showing {data.articles.length} recent headlines for <span className="font-medium">{data.ticker}</span>
           </p>
           
           {data.articles.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground" data-testid="text-news-no-results">
               <p>No recent headlines found for {data.ticker}.</p>
             </div>
           ) : (
@@ -225,10 +229,10 @@ export default function NewsPage() {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium line-clamp-2 group-hover:underline">
+                          <h3 className="font-medium line-clamp-2 group-hover:underline" data-testid={`text-news-article-title-${index}`}>
                             {article.title}
                           </h3>
-                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground" data-testid={`text-news-article-meta-${index}`}>
                             <span>{article.source}</span>
                             <span>·</span>
                             <span>{formatDate(article.date)}</span>
@@ -245,7 +249,7 @@ export default function NewsPage() {
         </div>
       )}
 
-      <div className="text-xs text-muted-foreground text-center pt-4 border-t">
+      <div className="text-xs text-muted-foreground text-center pt-4 border-t" data-testid="text-news-footer">
         Headlines provided by Stock News API for informational purposes only.
       </div>
     </div>
