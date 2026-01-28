@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Star,
   Radio,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -87,6 +88,7 @@ const navSections: NavSection[] = [
     defaultExpanded: false,
     items: [
       { title: "How This Works", url: "/strategy-guide", icon: BookOpen },
+      { title: "News & Research", url: "/learn/news", icon: Newspaper },
     ],
   },
   {

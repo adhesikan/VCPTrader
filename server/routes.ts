@@ -38,6 +38,7 @@ import {
   exportOpportunitiesCSV
 } from "./opportunity-service";
 import { runManualScheduledScan } from "./scheduled-scan-service";
+import { fetchNews, checkRateLimit, isNewsConfigured } from "./news-service";
 
 const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
@@ -3396,6 +3397,39 @@ export async function registerRoutes(
       console.error("Failed to send entry:", error);
       res.status(500).json({ error: "Failed to send entry" });
     }
+  });
+
+  // News & Research - fetch headlines for a ticker (compliance-safe, no sentiment)
+  app.get("/api/news", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+      
+      if (!checkRateLimit(clientIp)) {
+        return res.status(429).json({ ok: false, error: "Too many requests. Please wait a few minutes." });
+      }
+      
+      const ticker = req.query.ticker as string;
+      const items = parseInt(req.query.items as string) || 10;
+      
+      if (!ticker) {
+        return res.status(400).json({ ok: false, error: "Please enter a ticker symbol" });
+      }
+      
+      const result = await fetchNews(ticker, items);
+      
+      if (!result.ok) {
+        return res.status(400).json(result);
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[News] Error:", error);
+      res.status(500).json({ ok: false, error: "Couldn't load headlines right now. Try again." });
+    }
+  });
+
+  app.get("/api/news/status", (req, res) => {
+    res.json({ configured: isNewsConfigured() });
   });
 
   // InstaTrade Exit - send exit signal and close trade

@@ -51,6 +51,7 @@ import AutomationPage from "@/pages/automation";
 import ExecutionCockpit from "@/pages/execution";
 import SnaptradeCallback from "@/pages/snaptrade-callback";
 import OpportunitiesPage from "@/pages/opportunities";
+import NewsPage from "@/pages/news";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -65,6 +66,7 @@ function AppRouter() {
       <Route path="/watchlists" component={Watchlists} />
       <Route path="/backtest" component={Backtest} />
       <Route path="/strategy-guide" component={StrategyGuide} />
+      <Route path="/learn/news" component={NewsPage} />
       <Route path="/automation" component={AutomationPage} />
       <Route path="/execution" component={ExecutionCockpit} />
       <Route path="/opportunities" component={OpportunitiesPage} />
